@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GIS Map — Water Supply Distribution Project</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="css/styles.css">
+<style>
+  .gis-layout { display:grid; grid-template-columns: 300px 1fr; gap: var(--sp-5); align-items:start; }
+  @media (max-width:992px) { .gis-layout { grid-template-columns: 1fr; } }
+  .filter-group { margin-bottom: var(--sp-5); }
+  .filter-group h4 { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); margin: 0 0 10px; }
+  .filter-chip { display:flex; align-items:center; gap:8px; padding:7px 4px; font-size:13px; color:var(--text-secondary); cursor:pointer; }
+  #gisMap { height: 620px; border-radius: var(--radius-md); z-index:1; }
+  .gis-popup strong { display:block; margin-bottom:2px; }
+</style>
+</head>
+<body data-page="gis">
+
+<script>
+  window.WSDP_PAGE = {
+    title: "GIS Map",
+    breadcrumb: "Water Supply Distribution Project <span class=\"separator\">/</span> GIS Map",
+    statusClass: "status-pill--warning",
+    statusText: "At Risk — Schedule"
+  };
+</script>
+
+<div class="app-shell">
+  <aside class="sidebar" id="sidebarMount"></aside>
+
+  <div class="main-column">
+    <header class="topbar" id="topbarMount"></header>
+
+    <main class="main-content">
+
+      <div class="section-heading">
+        <h2>Interactive Project Map</h2>
+        <span class="section-sub">Pipeline corridor, sites &amp; village clusters — filter by zone or status</span>
+      </div>
+
+      <div class="gis-layout">
+        <div class="card">
+          <div class="card-body">
+            <div class="filter-group">
+              <h4>Status</h4>
+              <label class="filter-chip"><input type="checkbox" class="gis-filter" data-status="completed" checked> Completed</label>
+              <label class="filter-chip"><input type="checkbox" class="gis-filter" data-status="progress" checked> In Progress</label>
+              <label class="filter-chip"><input type="checkbox" class="gis-filter" data-status="pending" checked> Pending</label>
+            </div>
+            <div class="filter-group">
+              <h4>Zone</h4>
+              <label class="filter-chip"><input type="checkbox" class="gis-filter-zone" data-zone="A" checked> Zone A</label>
+              <label class="filter-chip"><input type="checkbox" class="gis-filter-zone" data-zone="B" checked> Zone B</label>
+              <label class="filter-chip"><input type="checkbox" class="gis-filter-zone" data-zone="C" checked> Zone C</label>
+              <label class="filter-chip"><input type="checkbox" class="gis-filter-zone" data-zone="D" checked> Zone D</label>
+            </div>
+            <div class="filter-group">
+              <h4>Legend</h4>
+              <div class="map-legend" style="flex-direction:column;align-items:flex-start;gap:8px;">
+                <div class="item"><span class="dot" style="background:var(--color-primary);"></span> Completed pipeline</div>
+                <div class="item"><span class="dot" style="background:var(--color-warning);"></span> Under construction</div>
+                <div class="item"><span class="dot" style="background:var(--color-neutral);"></span> Pending</div>
+              </div>
+            </div>
+            <button class="btn-primary" id="resetFiltersBtn" style="width:100%;justify-content:center;"><i class="fa-solid fa-rotate-left"></i> Reset Filters</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-body">
+            <div id="gisMap"></div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <footer style="text-align:center;padding:24px;color:var(--text-muted);font-size:12px;">
+      Water Supply Distribution Project — Monitoring Dashboard · Sample data for layout demonstration
+    </footer>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/api.js"></script>
+<script src="js/shell.js"></script>
+<script src="js/main.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    var el = document.getElementById("gisMap");
+    if (!el || typeof L === "undefined") return;
+
+    var map = L.map(el, { zoomControl: true }).setView([23.259933, 77.412615], 12);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18 }).addTo(map);
+
+    var statusStyles = {
+      completed: { color: "#0A4595" },
+      progress: { color: "#B9770E" },
+      pending: { color: "#8C9AA8" },
+    };
+
+    var segments = [
+      { status: "completed", zone: "A", coords: [[23.30, 77.36], [23.28, 77.39], [23.26, 77.41]] },
+      { status: "completed", zone: "B", coords: [[23.26, 77.41], [23.245, 77.425]] },
+      { status: "progress", zone: "B", coords: [[23.245, 77.425], [23.24, 77.43], [23.22, 77.45]] },
+      { status: "progress", zone: "C", coords: [[23.22, 77.45], [23.205, 77.465]] },
+      { status: "pending", zone: "C", coords: [[23.205, 77.465], [23.20, 77.47]] },
+      { status: "pending", zone: "D", coords: [[23.20, 77.47], [23.18, 77.49]] },
+    ];
+
+    var sites = [
+      { name: "Intake Pump Station", status: "completed", zone: "A", coords: [23.30, 77.36] },
+      { name: "Zone A Valve Chamber", status: "completed", zone: "A", coords: [23.27, 77.40] },
+      { name: "Zone B Pipeline Works", status: "progress", zone: "B", coords: [23.24, 77.43] },
+      { name: "Chainage 44+900 Canal Crossing", status: "progress", zone: "C", coords: [23.215, 77.455] },
+      { name: "Village Cluster 12 — House Connections", status: "pending", zone: "D", coords: [23.19, 77.48] },
+      { name: "Chainage 61+200 NH Road Crossing (NOC pending)", status: "pending", zone: "D", coords: [23.185, 77.485] },
+    ];
+
+    var segLayers = segments.map(function (seg) {
+      var layer = L.polyline(seg.coords, {
+        color: statusStyles[seg.status].color,
+        weight: 5,
+        opacity: 0.85,
+        dashArray: seg.status === "progress" ? "2 8" : seg.status === "pending" ? "1 6" : null,
+      });
+      layer._status = seg.status;
+      layer._zone = seg.zone;
+      return layer.addTo(map);
+    });
+
+    var siteLayers = sites.map(function (s) {
+      var layer = L.circleMarker(s.coords, {
+        radius: 8, color: "#fff", weight: 2,
+        fillColor: statusStyles[s.status].color, fillOpacity: 1,
+      }).bindPopup('<div class="gis-popup"><strong>' + s.name + '</strong>Zone ' + s.zone + ' · <span style="text-transform:capitalize">' + s.status + '</span></div>');
+      layer._status = s.status;
+      layer._zone = s.zone;
+      return layer.addTo(map);
+    });
+
+    function applyFilters() {
+      var activeStatuses = Array.from(document.querySelectorAll(".gis-filter:checked")).map(function (c) { return c.dataset.status; });
+      var activeZones = Array.from(document.querySelectorAll(".gis-filter-zone:checked")).map(function (c) { return c.dataset.zone; });
+      segLayers.concat(siteLayers).forEach(function (layer) {
+        var visible = activeStatuses.indexOf(layer._status) !== -1 && activeZones.indexOf(layer._zone) !== -1;
+        if (visible && !map.hasLayer(layer)) layer.addTo(map);
+        if (!visible && map.hasLayer(layer)) map.removeLayer(layer);
+      });
+    }
+
+    document.querySelectorAll(".gis-filter, .gis-filter-zone").forEach(function (cb) {
+      cb.addEventListener("change", applyFilters);
+    });
+    document.getElementById("resetFiltersBtn")?.addEventListener("click", function () {
+      document.querySelectorAll(".gis-filter, .gis-filter-zone").forEach(function (cb) { cb.checked = true; });
+      applyFilters();
+    });
+  });
+</script>
+</body>
+</html>

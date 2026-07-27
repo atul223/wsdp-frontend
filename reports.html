@@ -1,0 +1,291 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Reports — Water Supply Distribution Project</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+
+<style>
+  .reports-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+
+  .reports-project-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  .reports-project-label strong {
+    color: var(--text-primary);
+  }
+
+  .reports-form-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .reports-form-grid .full {
+    grid-column: 1 / -1;
+  }
+
+  .form-field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+  }
+
+  .form-field input,
+  .form-field select,
+  .form-field textarea {
+    width: 100%;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border-radius: 8px;
+    padding: 9px 10px;
+    font: inherit;
+    font-size: 13px;
+  }
+
+  .form-field textarea {
+    min-height: 80px;
+    resize: vertical;
+  }
+
+  .form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+
+  .export-btn,
+  .table-action-btn {
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: border-color var(--transition-base), color var(--transition-base);
+    margin-left: 4px;
+  }
+
+  .export-btn:hover,
+  .table-action-btn:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+  }
+
+  .table-action-btn.danger:hover {
+    border-color: var(--color-critical);
+    color: var(--color-critical);
+  }
+
+  .status-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    background: rgba(56, 142, 60, 0.12);
+    color: #2e7d32;
+    text-transform: capitalize;
+  }
+
+  .status-chip.draft {
+    background: rgba(245, 124, 0, 0.12);
+    color: #ef6c00;
+  }
+
+  .status-chip.archived {
+    background: rgba(84, 110, 122, 0.14);
+    color: #455a64;
+  }
+
+  .status-chip.approved {
+    background: rgba(25, 118, 210, 0.12);
+    color: #1565c0;
+  }
+
+  .table-empty-message {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 22px;
+    font-size: 13px;
+  }
+
+  @media (max-width: 900px) {
+    .reports-form-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+</head>
+
+<body data-page="reports">
+
+<script>
+  window.WSDP_PAGE = {
+    title: "Reports",
+    breadcrumb: "Water Supply Distribution Project <span class=\"separator\">/</span> Reports",
+    statusClass: "status-pill--success",
+    statusText: "On Schedule — Reporting"
+  };
+</script>
+
+<div class="app-shell">
+  <aside class="sidebar" id="sidebarMount"></aside>
+
+  <div class="main-column">
+    <header class="topbar" id="topbarMount"></header>
+
+    <main class="main-content">
+
+      <div class="reports-toolbar">
+        <div>
+          <div class="section-heading" style="margin-bottom:0;">
+            <h2>Reports Management</h2>
+            <span class="section-sub">Create, update, export, and delete project reports</span>
+          </div>
+        </div>
+
+        <div class="reports-project-label" id="reportsProjectLabel">
+          Project: <strong>Loading…</strong>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body">
+          <form id="reportForm">
+            <input type="hidden" id="reportId">
+
+            <div class="reports-form-grid">
+              <div class="form-field">
+                <label for="reportTitle">Report Title</label>
+                <input id="reportTitle" type="text" placeholder="Monthly Progress Report — July 2026" required>
+              </div>
+
+              <div class="form-field">
+                <label for="reportPeriod">Period</label>
+                <input id="reportPeriod" type="text" placeholder="Jul 2026" required>
+              </div>
+
+              <div class="form-field">
+                <label for="reportModule">Module</label>
+                <select id="reportModule">
+                  <option value="overall">Overall</option>
+                  <option value="construction_progress">Construction Progress</option>
+                  <option value="financial_dashboard">Financial Dashboard</option>
+                  <option value="resource_dashboard">Resource Dashboard</option>
+                  <option value="risk_delay">Risk & Delay</option>
+                  <option value="ehs">EHS</option>
+                  <option value="gis">GIS</option>
+                </select>
+              </div>
+
+              <div class="form-field">
+                <label for="reportDateFrom">Date From</label>
+                <input id="reportDateFrom" type="date">
+              </div>
+
+              <div class="form-field">
+                <label for="reportDateTo">Date To</label>
+                <input id="reportDateTo" type="date">
+              </div>
+
+              <div class="form-field">
+                <label for="reportGeneratedDate">Generated Date</label>
+                <input id="reportGeneratedDate" type="date" required>
+              </div>
+
+              <div class="form-field">
+                <label for="reportStatus">Status</label>
+                <select id="reportStatus">
+                  <option value="draft">Draft</option>
+                  <option value="generated">Generated</option>
+                  <option value="approved">Approved</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </div>
+
+              <div class="form-field full">
+                <label for="reportSummary">Summary</label>
+                <textarea id="reportSummary" placeholder="Write short report summary..."></textarea>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button class="btn-primary" type="submit" id="saveReportBtn">
+                <i class="fa-solid fa-floppy-disk"></i> Save Report
+              </button>
+
+              <button class="btn-ghost" type="button" id="resetReportFormBtn">
+                <i class="fa-solid fa-rotate-left"></i> Reset
+              </button>
+
+              <button class="btn-ghost" type="button" id="customReportBtn">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Custom Draft
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="section-heading">
+        <h2>Monthly Progress Reports</h2>
+        <span class="section-sub">Stored report records from the project database</span>
+      </div>
+
+      <div class="card">
+        <div class="card-body table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th scope="col">Report</th>
+                <th scope="col">Period</th>
+                <th scope="col">Module</th>
+                <th scope="col">Generated</th>
+                <th scope="col">Status</th>
+                <th scope="col" style="text-align:right;">Actions</th>
+              </tr>
+            </thead>
+
+            <tbody id="reportsTableBody">
+              <tr>
+                <td colspan="6" class="table-empty-message">Loading reports…</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+
+    <footer style="text-align:center;padding:24px;color:var(--text-muted);font-size:12px;">
+      Water Supply Distribution Project — Monitoring Dashboard
+    </footer>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/shell.js"></script>
+<script src="js/main.js"></script>
+<script src="js/reports.js"></script>
+</body>
+</html>

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Delay & Risk — Water Supply Distribution Project</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="css/styles.css">
+<!-- subnav / data-table / status-chip are now defined once in css/styles.css -->
+<style>
+  .risk-matrix { display:grid; grid-template-columns: repeat(5, 1fr); gap:4px; max-width:520px; }
+  .risk-cell { aspect-ratio:1; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#fff; }
+</style>
+</head>
+<body data-page="delay">
+
+<script>
+  // Pick the correct sidebar item depending on which section of this
+  // combined page is open (both "Delay Analysis" and "Risk Register"
+  // in the nav point here, at different anchors).
+  if (location.hash === "#risk-register") document.body.setAttribute("data-page", "risk");
+  window.WSDP_PAGE = {
+    title: "Delay Analysis & Risk Register",
+    breadcrumb: "Water Supply Distribution Project <span class=\"separator\">/</span> Delay &amp; Risk",
+    statusClass: "status-pill--critical",
+    statusText: "Schedule Slippage — 22 days"
+  };
+</script>
+
+<div class="app-shell">
+  <aside class="sidebar" id="sidebarMount"></aside>
+
+  <div class="main-column">
+    <header class="topbar" id="topbarMount"></header>
+
+    <main class="main-content">
+
+      <div class="filter-bar">
+        <span class="filter-bar__label"><i class="fa-solid fa-sliders"></i> Scope</span>
+        <select class="filter-select" aria-label="Filter by zone">
+          <option>All Zones</option>
+          <option>Zone A</option>
+          <option>Zone B</option>
+          <option>Zone C</option>
+          <option>Zone D</option>
+        </select>
+        <select class="filter-select" aria-label="Filter by date range">
+          <option>Last 30 days</option>
+          <option>Last 90 days</option>
+          <option>This quarter</option>
+          <option>Year to date</option>
+        </select>
+        <button class="btn-ghost"><i class="fa-solid fa-download"></i> Export</button>
+      </div>
+
+      <div class="subnav">
+        <a href="#delay-analysis">Delay Analysis</a>
+        <a href="#risk-register">Risk Register</a>
+      </div>
+
+      <section id="delay-analysis">
+        <div class="section-heading"><h2>Delay Analysis</h2><span class="section-sub">Root causes, timeline impact &amp; mitigation</span></div>
+
+        <div class="grid grid-4">
+          <div class="card card-accent card-accent--critical"><div class="card-body"><div class="kpi-card__label">Projected Slippage</div><div class="kpi-card__value" style="color:var(--color-critical);font-size:1.6rem;">22 days</div></div></div>
+          <div class="card card-accent card-accent--primary"><div class="card-body"><div class="kpi-card__label">Open Delay Items</div><div class="kpi-card__value" style="font-size:1.6rem;">4</div></div></div>
+          <div class="card card-accent card-accent--success"><div class="card-body"><div class="kpi-card__label">Mitigated This Quarter</div><div class="kpi-card__value" style="color:var(--color-success);font-size:1.6rem;">3</div></div></div>
+          <div class="card card-accent card-accent--warning"><div class="card-body"><div class="kpi-card__label">On Critical Path</div><div class="kpi-card__value" style="color:var(--color-warning);font-size:1.6rem;">2</div></div></div>
+        </div>
+
+        <div class="card" style="margin-top:20px;">
+          <div class="card-body table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th scope="col">Delay Item</th>
+                  <th scope="col">Category</th>
+                  <th scope="col" class="num">Impact (days)</th>
+                  <th scope="col">Root Cause</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr data-zone="Zone C"><td>Zone C road-crossing NOC</td><td>Regulatory / NOC</td><td class="num">18</td><td>Highway authority approval pending</td><td><span class="status-chip crit"><i class="fa-solid fa-circle-exclamation"></i> Open — Critical Path</span></td></tr>
+                <tr data-zone="Zone D"><td>HDPE pipe delivery, Zone D</td><td>Materials</td><td class="num">9</td><td>Supplier logistics delay</td><td><span class="status-chip warn"><i class="fa-solid fa-triangle-exclamation"></i> Mitigation in Progress</span></td></tr>
+                <tr><td>Monsoon working restriction</td><td>Weather</td><td class="num">12</td><td>Seasonal — trenching halted 3 weeks</td><td><span class="status-chip ok"><i class="fa-solid fa-circle-check"></i> Closed — Absorbed</span></td></tr>
+                <tr><td>Land access, Village Cluster 17</td><td>Land / ROW</td><td class="num">6</td><td>Local landowner dispute</td><td><span class="status-chip warn"><i class="fa-solid fa-triangle-exclamation"></i> In Progress</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="risk-register">
+        <div class="section-heading"><h2>Risk Register</h2><span class="section-sub">Likelihood vs. impact &amp; corrective actions</span></div>
+
+        <div class="grid grid-12">
+          <div class="card col-span-5">
+            <div class="card-header"><h3>Risk Matrix</h3></div>
+            <div class="card-body">
+              <div class="risk-matrix" id="riskMatrix"></div>
+              <p style="font-size:11.5px;color:var(--text-muted);margin-top:12px;">Rows = Impact (top = highest) · Columns = Likelihood (left = lowest)</p>
+            </div>
+          </div>
+          <div class="card col-span-7">
+            <div class="card-header"><h3>Top Risks</h3></div>
+            <div class="card-body table-scroll">
+              <table class="data-table">
+                <thead><tr><th scope="col">Risk</th><th scope="col">Category</th><th scope="col">Rating</th><th scope="col">Owner</th></tr></thead>
+                <tbody>
+                  <tr><td>Further NOC delays on remaining road crossings</td><td>Regulatory</td><td><span class="status-chip crit"><i class="fa-solid fa-circle-exclamation"></i> High</span></td><td>Project Director</td></tr>
+                  <tr><td>Cost escalation on imported DI fittings</td><td>Financial</td><td><span class="status-chip warn"><i class="fa-solid fa-triangle-exclamation"></i> Medium</span></td><td>Procurement Lead</td></tr>
+                  <tr><td>Labour shortage during peak season</td><td>Resource</td><td><span class="status-chip warn"><i class="fa-solid fa-triangle-exclamation"></i> Medium</span></td><td>Site Manager</td></tr>
+                  <tr data-zone="Zone D"><td>Groundwater ingress in Zone D trenching</td><td>Technical</td><td><span class="status-chip ok"><i class="fa-solid fa-circle-check"></i> Low</span></td><td>Site Engineer</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <footer style="text-align:center;padding:24px;color:var(--text-muted);font-size:12px;">
+      Water Supply Distribution Project — Monitoring Dashboard · Sample data for layout demonstration
+    </footer>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/shell.js"></script>
+<script src="js/main.js"></script>
+<script src="js/risk-delay.js"></script>
+</body>
+</html>

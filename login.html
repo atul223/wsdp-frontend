@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sign In — Water Supply Distribution Project</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="css/styles.css">
+
+<style>
+  /* Scoped to this page only — same variables styles.css already
+     defines elsewhere (see settings.html for the same pattern). */
+  body[data-page="login"] {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-page, #F4F6F8);
+  }
+  .auth-card {
+    width: 100%;
+    max-width: 380px;
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border-color, #E3E7EB);
+    border-radius: var(--radius-lg, 12px);
+    padding: var(--sp-6, 32px) var(--sp-5, 28px);
+    box-shadow: 0 2px 18px rgba(16, 30, 54, 0.06);
+  }
+  .auth-brand { display: flex; align-items: center; gap: 10px; margin-bottom: var(--sp-5, 24px); }
+  .auth-brand__mark {
+    width: 38px; height: 38px; border-radius: 10px;
+    background: var(--color-primary, #0A4595);
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 17px;
+  }
+  .auth-brand__text .name { font-weight: 800; font-size: 15px; color: var(--text-primary, #16232F); }
+  .auth-brand__text .sub { font-size: 11.5px; color: var(--text-muted, #8C9AA8); }
+  .auth-title { font-size: 19px; font-weight: 700; color: var(--text-primary, #16232F); margin: 0 0 4px; }
+  .auth-subtitle { font-size: 13px; color: var(--text-muted, #8C9AA8); margin: 0 0 22px; }
+  .auth-field { margin-bottom: 16px; }
+  .auth-field label {
+    display: block; font-size: 12.5px; font-weight: 600;
+    color: var(--text-primary, #16232F); margin-bottom: 6px;
+  }
+  .auth-field input {
+    width: 100%; box-sizing: border-box;
+    padding: 10px 12px; font-size: 13.5px; font-family: inherit;
+    border: 1px solid var(--border-color-strong, #C7CED6);
+    border-radius: 8px; outline: none;
+    transition: border-color var(--transition-base, 150ms ease);
+  }
+  .auth-field input:focus { border-color: var(--color-primary, #0A4595); }
+  .auth-submit {
+    width: 100%; padding: 11px; font-size: 13.5px; font-weight: 700;
+    color: #fff; background: var(--color-primary, #0A4595);
+    border: none; border-radius: 8px; cursor: pointer;
+    transition: opacity var(--transition-base, 150ms ease);
+  }
+  .auth-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+  .auth-error {
+    display: none;
+    background: var(--color-critical-light, #FBE7E5);
+    color: var(--color-critical, #C0392B);
+    font-size: 12.5px; padding: 10px 12px; border-radius: 8px;
+    margin-bottom: 16px;
+  }
+  .auth-error.visible { display: block; }
+  .auth-footer { text-align: center; margin-top: 18px; font-size: 12px; color: var(--text-muted, #8C9AA8); }
+</style>
+</head>
+<body data-page="login">
+
+<div class="auth-card">
+  <div class="auth-brand">
+    <div class="auth-brand__mark"><i class="fa-solid fa-droplet"></i></div>
+    <div class="auth-brand__text">
+      <div class="name">PDISA WSDP</div>
+      <div class="sub">Water Supply Distribution</div>
+    </div>
+  </div>
+
+  <h1 class="auth-title">Sign in</h1>
+  <p class="auth-subtitle">Enter your credentials to access the dashboard</p>
+
+  <div class="auth-error" id="authError"></div>
+
+  <form id="loginForm" novalidate>
+    <div class="auth-field">
+      <label for="email">Email</label>
+      <input type="email" id="email" name="email" autocomplete="username" required />
+    </div>
+    <div class="auth-field">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" autocomplete="current-password" required />
+    </div>
+    <button type="submit" class="auth-submit" id="loginSubmitBtn">Sign In</button>
+  </form>
+
+  <div class="auth-footer">Water Supply Distribution Project — Monitoring Dashboard</div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+  (function () {
+    "use strict";
+
+    // If a valid session already exists (e.g. user navigated back to
+    // /login.html manually), skip straight to the dashboard instead of
+    // showing the form again.
+    window.WSDP_API.restoreSession().then(function (user) {
+      if (user) window.location.href = "index.html";
+    });
+
+    var form = document.getElementById("loginForm");
+    var errorBox = document.getElementById("authError");
+    var submitBtn = document.getElementById("loginSubmitBtn");
+
+    function showError(message) {
+      errorBox.textContent = message;
+      errorBox.classList.add("visible");
+    }
+    function hideError() {
+      errorBox.classList.remove("visible");
+    }
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      hideError();
+
+      var email = document.getElementById("email").value.trim();
+      var password = document.getElementById("password").value;
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Signing in…";
+
+      window.WSDP_API.login(email, password)
+        .then(function () {
+          window.location.href = "index.html";
+        })
+        .catch(function (err) {
+          if (err.status === 423) {
+            showError(err.message || "Account temporarily locked. Try again later.");
+          } else if (err.status === 429) {
+            showError("Too many attempts. Please wait a moment and try again.");
+          } else {
+            showError(err.message || "Invalid email or password.");
+          }
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Sign In";
+        });
+    });
+  })();
+</script>
+</body>
+</html>

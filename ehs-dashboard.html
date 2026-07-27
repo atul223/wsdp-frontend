@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>EHS Dashboard — Water Supply Distribution Project</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="css/styles.css">
+<!-- subnav / data-table / status-chip are now defined once in css/styles.css -->
+</head>
+<body data-page="ehs">
+
+<script>
+  // Pick the correct sidebar item depending on which section of this
+  // combined page is open ("EHS Dashboard" and "Social & Environmental"
+  // in the nav both point here, at different anchors).
+  if (location.hash === "#social-environmental") document.body.setAttribute("data-page", "social");
+  window.WSDP_PAGE = {
+    title: "EHS & Social-Environmental Dashboard",
+    breadcrumb: "Water Supply Distribution Project <span class=\"separator\">/</span> EHS Dashboard",
+    statusClass: "status-pill--critical",
+    statusText: "1 Open Safety Incident"
+  };
+</script>
+
+<div class="app-shell">
+  <aside class="sidebar" id="sidebarMount"></aside>
+
+  <div class="main-column">
+    <header class="topbar" id="topbarMount"></header>
+
+    <main class="main-content">
+
+      <div class="filter-bar">
+        <span class="filter-bar__label"><i class="fa-solid fa-sliders"></i> Scope</span>
+        <select class="filter-select" aria-label="Filter by zone">
+          <option>All Zones</option>
+          <option>Zone A</option>
+          <option>Zone B</option>
+          <option>Zone C</option>
+          <option>Zone D</option>
+        </select>
+        <select class="filter-select" aria-label="Filter by date range">
+          <option>Last 30 days</option>
+          <option>Last 90 days</option>
+          <option>This quarter</option>
+          <option>Year to date</option>
+        </select>
+        <button class="btn-ghost"><i class="fa-solid fa-download"></i> Export</button>
+      </div>
+
+      <div class="subnav">
+        <a href="#ehs">EHS Dashboard</a>
+        <a href="#social-environmental">Social &amp; Environmental</a>
+      </div>
+
+      <section id="ehs">
+        <div class="section-heading"><h2>Safety Statistics</h2><span class="section-sub">Incidents, inspections &amp; toolbox talks</span></div>
+        <div class="grid grid-4 fade-in">
+          <div class="card kpi-card card-accent card-accent--success"><div class="kpi-card__top"><div class="kpi-card__label">Man-hours (Safe)</div><div class="kpi-card__icon icon-tone-green"><i class="fa-solid fa-shield-heart"></i></div></div>
+            <div class="kpi-card__value"><span class="count-up" data-count="482">0</span><span class="unit">k</span></div>
+            <div class="kpi-card__delta up">Since last lost-time incident</div>
+          </div>
+          <div class="card kpi-card card-accent card-accent--warning"><div class="kpi-card__top"><div class="kpi-card__label">Near Misses (30d)</div><div class="kpi-card__icon icon-tone-amber"><i class="fa-solid fa-triangle-exclamation"></i></div></div>
+            <div class="kpi-card__value"><span class="count-up" data-count="7">0</span></div>
+            <div class="kpi-card__delta flat">All logged &amp; closed out</div>
+          </div>
+          <div class="card kpi-card card-accent card-accent--critical"><div class="kpi-card__top"><div class="kpi-card__label">Open Incidents</div><div class="kpi-card__icon icon-tone-red"><i class="fa-solid fa-triangle-exclamation"></i></div></div>
+            <div class="kpi-card__value" style="color:var(--color-critical);"><span class="count-up" data-count="1">0</span></div>
+            <div class="kpi-card__delta down">Zone B trench collapse (minor)</div>
+          </div>
+          <div class="card kpi-card card-accent card-accent--primary"><div class="kpi-card__top"><div class="kpi-card__label">Toolbox Talks (30d)</div><div class="kpi-card__icon icon-tone-blue"><i class="fa-solid fa-people-group"></i></div></div>
+            <div class="kpi-card__value"><span class="count-up" data-count="26">0</span></div>
+            <div class="kpi-card__delta flat">Across all active work fronts</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:20px;">
+          <div class="card-header"><h3>Incident &amp; Inspection Log</h3></div>
+          <div class="card-body">
+            <div class="activity-item" data-zone="Zone B">
+              <div class="activity-dot-line"><div class="activity-dot" style="background:var(--color-critical);"></div><div class="activity-line"></div></div>
+              <div><div class="activity-text">Minor trench collapse reported in Zone B, no injuries — corrective action in progress</div><div class="activity-time">2 days ago · EHS Team</div></div>
+            </div>
+            <div class="activity-item" data-zone="Zone C">
+              <div class="activity-dot-line"><div class="activity-dot" style="background:var(--color-success);"></div><div class="activity-line"></div></div>
+              <div><div class="activity-text">Weekly site safety inspection completed — Zone C, no NCRs</div><div class="activity-time">4 days ago · Safety Officer</div></div>
+            </div>
+            <div class="activity-item" data-zone="Zone D">
+              <div class="activity-dot-line"><div class="activity-dot" style="background:var(--color-secondary);"></div></div>
+              <div><div class="activity-text">Toolbox talk: excavation &amp; shoring safety, Zone D crew</div><div class="activity-time">5 days ago · Site Supervisor</div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="social-environmental">
+        <div class="section-heading"><h2>Social &amp; Environmental Compliance</h2><span class="section-sub">Community engagement &amp; environmental safeguards</span></div>
+        <div class="grid grid-4">
+          <div class="card card-accent card-accent--primary"><div class="card-body"><div class="kpi-card__label">Grievances Logged</div><div class="kpi-card__value" style="font-size:1.5rem;">12</div><div class="kpi-card__delta flat">All acknowledged within SLA</div></div></div>
+          <div class="card card-accent card-accent--success">
+            <div class="card-body">
+              <div class="kpi-card__label">Grievances Resolved</div>
+              <div class="kpi-card__value" style="color:var(--color-success);font-size:1.5rem;">10</div>
+              <div class="mini-progress">
+                <div class="progress-track"><div class="progress-fill" data-target="83" style="width:0; background:var(--color-success);"></div></div>
+                <span class="progress-pct">83%</span>
+              </div>
+            </div>
+          </div>
+          <div class="card card-accent card-accent--secondary"><div class="card-body"><div class="kpi-card__label">Tree Compensatory Plantation</div><div class="kpi-card__value" style="font-size:1.5rem;">1,240</div><div class="kpi-card__delta flat">of 1,500 planned</div></div></div>
+          <div class="card card-accent card-accent--primary"><div class="card-body"><div class="kpi-card__label">Community Meetings (Qtr)</div><div class="kpi-card__value" style="font-size:1.5rem;">9</div><div class="kpi-card__delta flat">Across affected villages</div></div></div>
+        </div>
+      </section>
+
+    </main>
+
+    <footer style="text-align:center;padding:24px;color:var(--text-muted);font-size:12px;">
+      Water Supply Distribution Project — Monitoring Dashboard · Sample data for layout demonstration
+    </footer>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/shell.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

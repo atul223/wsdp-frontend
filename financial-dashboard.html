@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Financial Dashboard — Water Supply Distribution Project</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="css/styles.css">
+<!-- data-table / status-chip are now defined once in css/styles.css -->
+</head>
+<body data-page="financial">
+
+<script>
+  window.WSDP_PAGE = {
+    title: "Financial Dashboard",
+    breadcrumb: "Water Supply Distribution Project <span class=\"separator\">/</span> Financial Dashboard",
+    statusClass: "status-pill--success",
+    statusText: "Within Budget"
+  };
+</script>
+
+<div class="app-shell">
+  <aside class="sidebar" id="sidebarMount"></aside>
+
+  <div class="main-column">
+    <header class="topbar" id="topbarMount"></header>
+
+    <main class="main-content">
+
+      <div class="grid grid-4 fade-in">
+        <div class="card kpi-card card-accent card-accent--primary"><div class="kpi-card__top"><div class="kpi-card__label">Financial Progress</div><div class="kpi-card__icon icon-tone-teal"><i class="fa-solid fa-sack-dollar"></i></div></div>
+          <div class="kpi-card__value"><span class="count-up" data-count="54.2" data-decimals="1">0</span><span class="unit">%</span></div>
+          <div class="kpi-card__delta up"><i class="fa-solid fa-arrow-trend-up"></i> +3.1% this month</div>
+        </div>
+        <div class="card kpi-card card-accent card-accent--secondary"><div class="kpi-card__top"><div class="kpi-card__label">Physical Progress</div><div class="kpi-card__icon icon-tone-blue"><i class="fa-solid fa-chart-simple"></i></div></div>
+          <div class="kpi-card__value"><span class="count-up" data-count="61.4" data-decimals="1">0</span><span class="unit">%</span></div>
+          <div class="kpi-card__delta flat">Physical ahead of financial by 7.2pp</div>
+        </div>
+        <div class="card kpi-card card-accent card-accent--success"><div class="kpi-card__top"><div class="kpi-card__label">Cumulative Expenditure</div><div class="kpi-card__icon icon-tone-green"><i class="fa-solid fa-money-bill-trend-up"></i></div></div>
+          <div class="kpi-card__value"><span class="unit" style="font-size:1.4rem;">₹</span><span class="count-up" data-count="128.4" data-decimals="1">0</span><span class="unit">Cr</span></div>
+          <div class="kpi-card__delta flat">of ₹236.8 Cr contract value</div>
+        </div>
+        <div class="card kpi-card card-accent card-accent--warning"><div class="kpi-card__top"><div class="kpi-card__label">IPC Status</div><div class="kpi-card__icon icon-tone-amber"><i class="fa-solid fa-file-invoice-dollar"></i></div></div>
+          <div class="kpi-card__value" style="font-size:1.3rem;">IPC-02</div>
+          <div class="kpi-card__delta flat">IPC-01 Received · IPC-02 Ready</div>
+        </div>
+      </div>
+
+      <div class="section-heading">
+        <h2>Cash Flow</h2>
+        <span class="section-sub">Planned vs. actual monthly expenditure</span>
+      </div>
+      <div class="card"><div class="card-body"><div style="height:280px;"><canvas id="cashFlowChart"></canvas></div></div></div>
+
+      <div class="section-heading">
+        <h2>Financial vs. Physical Progress</h2>
+        <span class="section-sub">Comparing cumulative % completion</span>
+      </div>
+      <div class="card"><div class="card-body"><div style="height:260px;"><canvas id="finPhysChart"></canvas></div></div></div>
+
+      <div class="section-heading">
+        <h2>IPC Register</h2>
+        <span class="section-sub">Interim payment certificates</span>
+      </div>
+      <div class="card">
+        <div class="card-body table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th scope="col">IPC No.</th>
+                <th scope="col">Period</th>
+                <th scope="col" class="num">Gross Value (₹ Cr)</th>
+                <th scope="col">Submitted</th>
+                <th scope="col">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>IPC-01</td><td>Jan – Jun 2025</td><td class="num">58.6</td><td>04 Jul 2025</td><td><span class="status-chip ok"><i class="fa-solid fa-circle-check"></i> Received</span></td></tr>
+              <tr><td>IPC-02</td><td>Jul – Dec 2025</td><td class="num">69.8</td><td>02 Jan 2026</td><td><span class="status-chip warn"><i class="fa-solid fa-triangle-exclamation"></i> Ready for Submission</span></td></tr>
+              <tr><td>IPC-03</td><td>Jan – Jun 2026</td><td class="num">—</td><td>—</td><td><span class="status-chip warn"><i class="fa-solid fa-clock"></i> Pending</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+
+    <footer style="text-align:center;padding:24px;color:var(--text-muted);font-size:12px;">
+      Water Supply Distribution Project — Monitoring Dashboard · Sample data for layout demonstration
+    </footer>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/shell.js"></script>
+<script src="js/main.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+    var months = ["Feb", "Mar", "Apr", "May", "Jun", "Jul"];
+
+    var cf = document.getElementById("cashFlowChart");
+    if (cf && window.Chart) {
+      new Chart(cf, {
+        type: "bar",
+        data: {
+          labels: months,
+          datasets: [
+            { label: "Planned (₹ Cr)", data: [14.2, 15.8, 16.5, 17.9, 18.4, 19.0], backgroundColor: cssVar("--color-neutral-light"), borderRadius: 6 },
+            { label: "Actual (₹ Cr)", data: [12.6, 14.1, 15.0, 16.2, 17.5, 18.1], backgroundColor: cssVar("--color-secondary"), borderRadius: 6 },
+          ],
+        },
+        options: { maintainAspectRatio: false, plugins: { legend: { position: "top", align: "end", labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true, pointStyle: "circle" } } }, scales: { x: { grid: { display: false } } } },
+      });
+    }
+
+    var fp = document.getElementById("finPhysChart");
+    if (fp && window.Chart) {
+      new Chart(fp, {
+        type: "line",
+        data: {
+          labels: months,
+          datasets: [
+            { label: "Physical %", data: [35, 40, 45, 51, 57, 61.4], borderColor: cssVar("--color-primary"), backgroundColor: "transparent", tension: 0.35, borderWidth: 3, pointRadius: 3 },
+            { label: "Financial %", data: [30, 35, 41, 46, 50, 54.2], borderColor: cssVar("--color-secondary"), backgroundColor: "transparent", tension: 0.35, borderWidth: 3, pointRadius: 3, borderDash: [5, 4] },
+          ],
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: { legend: { position: "top", align: "end", labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true, pointStyle: "circle" } } },
+          scales: { y: { min: 0, max: 100, ticks: { callback: function (v) { return v + "%"; } } }, x: { grid: { display: false } } },
+        },
+      });
+    }
+  });
+</script>
+<script src="js/financial-dashboard.js"></script>
+</body>
+</html>
