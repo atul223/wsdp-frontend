@@ -137,7 +137,19 @@
       submitBtn.textContent = "Signing in…";
 
       window.WSDP_API.login(email, password)
-        .then(function () {
+        .then(async function () {
+          const result = await window.WSDP_API.request(
+            "GET",
+            "/projects"
+          );
+
+          if (result.data?.length) {
+            localStorage.setItem(
+              "current_project",
+              JSON.stringify(result.data[0])
+            );
+          }
+
           window.location.href = "index.html";
         })
         .catch(function (err) {
