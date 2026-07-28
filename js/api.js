@@ -7,7 +7,7 @@
 (function () {
   "use strict";
 
-  const API_BASE = "http://localhost:5000/api/v1"; // <-- confirm/adjust this
+  const API_BASE = "https://wsdp-backend.onrender.com/api/v1"; // <-- confirm/adjust this
 
   let accessToken = null;
   let currentUser = null; // { id, name, email, role, permissions }
