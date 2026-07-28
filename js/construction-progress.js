@@ -1,7 +1,18 @@
 (function () {
   "use strict";
 
-  let PROJECT_ID = localStorage.getItem("current_project");
+  let PROJECT_ID = (() => {
+    const stored = localStorage.getItem("current_project");
+
+    if (!stored) return null;
+
+    try {
+      const parsed = JSON.parse(stored);
+      return parsed.id || parsed.projectId || parsed.project_id || null;
+    } catch (e) {
+      return stored;
+    }
+  })();
   let dashboardData = null;
 
   function unwrap(result) {
@@ -75,7 +86,10 @@
     }
 
     PROJECT_ID = project.id;
-    localStorage.setItem("current_project", project.id);
+    localStorage.setItem(
+      "current_project",
+      JSON.stringify(project)
+    );
     localStorage.setItem("current_project_code", project.code || "");
     localStorage.setItem("current_project_name", project.name || "");
 
