@@ -11,6 +11,7 @@
 
   let accessToken = null;
   let currentUser = null; // { id, name, email, role, permissions }
+  let refreshPromise = null;
 
   /**
    * Core request function. Every call sends credentials: 'include' so
@@ -40,10 +41,21 @@
       // No JSON body (e.g. 204 No Content) — fine, data stays null.
     }
 
-    if (res.status === 401 && data?.error?.code === "TOKEN_EXPIRED" && !opts._retried) {
+    if (
+      res.status === 401 &&
+      data?.error?.code === "TOKEN_EXPIRED" &&
+      !opts._retried &&
+      !opts.skipRefreshRetry
+    ) {
       const refreshed = await refreshSession();
+
       if (refreshed) {
-        return request(method, path, body, Object.assign({}, opts, { _retried: true }));
+        return request(
+          method,
+          path,
+          body,
+          Object.assign({}, opts, { _retried: true })
+        );
       }
     }
 
@@ -67,8 +79,12 @@
   /** POST /auth/login — stores the access token in memory, returns the user. */
   async function login(email, password) {
     const result = await request("POST", "/auth/login", { email, password }, { skipAuth: true });
+
     accessToken = result.data.access_token;
     currentUser = result.data.user;
+
+    sessionStorage.setItem("wsdp_user", JSON.stringify(currentUser));
+
     return currentUser;
   }
 
@@ -80,15 +96,36 @@
    * routine outcome (no session yet, or truly logged out) — not an error.
    */
   async function refreshSession() {
-    try {
-      const result = await request("POST", "/auth/refresh", null, { skipAuth: true });
-      accessToken = result.data.access_token;
-      return true;
-    } catch (e) {
-      accessToken = null;
-      currentUser = null;
-      return false;
+    if (refreshPromise) {
+      return refreshPromise;
     }
+
+    refreshPromise = (async function () {
+      try {
+        const result = await request("POST", "/auth/refresh", null, {
+          skipAuth: true,
+          skipRefreshRetry: true,
+        });
+
+        accessToken = result.data.access_token;
+
+        if (result.data.user) {
+          currentUser = result.data.user;
+          sessionStorage.setItem("wsdp_user", JSON.stringify(currentUser));
+        }
+
+        return true;
+      } catch (e) {
+        accessToken = null;
+        currentUser = null;
+        sessionStorage.removeItem("wsdp_user");
+        return false;
+      } finally {
+        refreshPromise = null;
+      }
+    })();
+
+    return refreshPromise;
   }
 
   /** POST /auth/logout — revokes the session server-side and clears local state. */
@@ -101,6 +138,7 @@
     }
     accessToken = null;
     currentUser = null;
+    sessionStorage.removeItem("wsdp_user");
   }
 
   /** GET /auth/me — refreshes the cached currentUser from the server. */
@@ -115,6 +153,15 @@
   }
 
   function getCurrentUser() {
+    if (currentUser) return currentUser;
+
+    try {
+      const stored = sessionStorage.getItem("wsdp_user");
+      currentUser = stored ? JSON.parse(stored) : null;
+    } catch (e) {
+      currentUser = null;
+    }
+
     return currentUser;
   }
 

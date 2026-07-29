@@ -61,7 +61,11 @@
   }
 
   async function ensureSessionAndProject() {
-    const user = await WSDP_API.restoreSession();
+    let user = WSDP_API.getCurrentUser();
+
+    if (!user) {
+      user = await WSDP_API.restoreSession();
+    }
 
     if (!user) {
       toast("Session expired. Please login again.", "fa-lock");
@@ -86,10 +90,8 @@
     }
 
     PROJECT_ID = project.id;
-    localStorage.setItem(
-      "current_project",
-      JSON.stringify(project)
-    );
+
+    localStorage.setItem("current_project", JSON.stringify(project));
     localStorage.setItem("current_project_code", project.code || "");
     localStorage.setItem("current_project_name", project.name || "");
 
