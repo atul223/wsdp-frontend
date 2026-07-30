@@ -3,22 +3,29 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>EHS Dashboard — Water Supply Distribution Project</title>
+<title>Environment, Health & Safety — Water Supply Distribution Project</title>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="css/styles.css">
-<!-- subnav / data-table / status-chip are now defined once in css/styles.css -->
+
 </head>
 <body data-page="ehs">
 
 <script>
-  // Pick the correct sidebar item depending on which section of this
-  // combined page is open ("EHS Dashboard" and "Social & Environmental"
-  // in the nav both point here, at different anchors).
-  if (location.hash === "#social-environmental") document.body.setAttribute("data-page", "social");
+  /*
+    Keep existing sidebar behavior:
+    - EHS Dashboard highlights when URL hash is #ehs or empty.
+    - Social & Environmental highlights when URL hash is #social-environmental.
+    The page content itself is now a unified Environment, Health & Safety dashboard.
+  */
+  if (location.hash === "#social-environmental") {
+    document.body.setAttribute("data-page", "social");
+  }
+
   window.WSDP_PAGE = {
-    title: "EHS & Social-Environmental Dashboard",
+    title: "Environment, Health & Safety",
     breadcrumb: "Water Supply Distribution Project <span class=\"separator\">/</span> EHS Dashboard",
     statusClass: "status-pill--critical",
     statusText: "1 Open Safety Incident"
@@ -35,6 +42,7 @@
 
       <div class="filter-bar">
         <span class="filter-bar__label"><i class="fa-solid fa-sliders"></i> Scope</span>
+
         <select class="filter-select" aria-label="Filter by zone">
           <option>All Zones</option>
           <option>Zone A</option>
@@ -42,77 +50,339 @@
           <option>Zone C</option>
           <option>Zone D</option>
         </select>
+
         <select class="filter-select" aria-label="Filter by date range">
           <option>Last 30 days</option>
           <option>Last 90 days</option>
           <option>This quarter</option>
           <option>Year to date</option>
         </select>
-        <button class="btn-ghost"><i class="fa-solid fa-download"></i> Export</button>
+
+        <button class="btn-ghost" type="button">
+          <i class="fa-solid fa-download"></i> Export
+        </button>
       </div>
 
       <div class="subnav">
-        <a href="#ehs">EHS Dashboard</a>
-        <a href="#social-environmental">Social &amp; Environmental</a>
+        #ehsEHS Dashboard</a>
+        #social-environmentalSocial & Environmental</a>
       </div>
 
       <section id="ehs">
-        <div class="section-heading"><h2>Safety Statistics</h2><span class="section-sub">Incidents, inspections &amp; toolbox talks</span></div>
+
+        <!-- ============ EHS COMPLIANCE PROGRESS CARDS ============ -->
+        <div class="section-heading">
+          <h2>EHS Compliance Progress</h2>
+          <span class="section-sub">Compliance scorecard against target benchmarks</span>
+        </div>
+
         <div class="grid grid-4 fade-in">
-          <div class="card kpi-card card-accent card-accent--success"><div class="kpi-card__top"><div class="kpi-card__label">Man-hours (Safe)</div><div class="kpi-card__icon icon-tone-green"><i class="fa-solid fa-shield-heart"></i></div></div>
-            <div class="kpi-card__value"><span class="count-up" data-count="482">0</span><span class="unit">k</span></div>
-            <div class="kpi-card__delta up">Since last lost-time incident</div>
+
+          <div class="card kpi-card card-accent card-accent--warning">
+            <div class="kpi-card__top">
+              <div class="kpi-card__label">Overall ESHS</div>
+              <div class="kpi-card__icon icon-tone-amber">
+                <i class="fa-solid fa-shield-halved"></i>
+              </div>
+            </div>
+            <div class="kpi-card__value">
+              <span class="count-up" data-count="78">0</span><span class="unit">%</span>
+            </div>
+            <div class="kpi-card__delta flat">Target ≥ 90%</div>
           </div>
-          <div class="card kpi-card card-accent card-accent--warning"><div class="kpi-card__top"><div class="kpi-card__label">Near Misses (30d)</div><div class="kpi-card__icon icon-tone-amber"><i class="fa-solid fa-triangle-exclamation"></i></div></div>
-            <div class="kpi-card__value"><span class="count-up" data-count="7">0</span></div>
-            <div class="kpi-card__delta flat">All logged &amp; closed out</div>
+
+          <div class="card kpi-card card-accent card-accent--warning">
+            <div class="kpi-card__top">
+              <div class="kpi-card__label">PGAS / ESMP</div>
+              <div class="kpi-card__icon icon-tone-amber">
+                <i class="fa-solid fa-clipboard-check"></i>
+              </div>
+            </div>
+            <div class="kpi-card__value">
+              <span class="count-up" data-count="84">0</span><span class="unit">%</span>
+            </div>
+            <div class="kpi-card__delta flat">Target ≥ 90%</div>
           </div>
-          <div class="card kpi-card card-accent card-accent--critical"><div class="kpi-card__top"><div class="kpi-card__label">Open Incidents</div><div class="kpi-card__icon icon-tone-red"><i class="fa-solid fa-triangle-exclamation"></i></div></div>
-            <div class="kpi-card__value" style="color:var(--color-critical);"><span class="count-up" data-count="1">0</span></div>
+
+          <div class="card kpi-card card-accent card-accent--warning">
+            <div class="kpi-card__top">
+              <div class="kpi-card__label">Health & Safety Plan</div>
+              <div class="kpi-card__icon icon-tone-amber">
+                <i class="fa-solid fa-helmet-safety"></i>
+              </div>
+            </div>
+            <div class="kpi-card__value">
+              <span class="count-up" data-count="80">0</span><span class="unit">%</span>
+            </div>
+            <div class="kpi-card__delta flat">Target ≥ 90%</div>
+          </div>
+
+          <div class="card kpi-card card-accent card-accent--warning">
+            <div class="kpi-card__top">
+              <div class="kpi-card__label">Site Management Plan</div>
+              <div class="kpi-card__icon icon-tone-amber">
+                <i class="fa-solid fa-list-check"></i>
+              </div>
+            </div>
+            <div class="kpi-card__value">
+              <span class="count-up" data-count="82">0</span><span class="unit">%</span>
+            </div>
+            <div class="kpi-card__delta flat">Target ≥ 90%</div>
+          </div>
+
+          <div class="card kpi-card card-accent card-accent--critical">
+            <div class="kpi-card__top">
+              <div class="kpi-card__label">Method Statements</div>
+              <div class="kpi-card__icon icon-tone-red">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+              </div>
+            </div>
+            <div class="kpi-card__value" style="color:var(--color-critical);">
+              <span class="count-up" data-count="77">0</span><span class="unit">%</span>
+            </div>
+            <div class="kpi-card__delta flat">Target ≥ 90%</div>
+          </div>
+
+        </div>
+
+        <!-- ============ SAFETY STATISTICS ============ -->
+        <div class="section-heading">
+          <h2>Safety Statistics</h2>
+          <span class="section-sub">Incidents, inspections & toolbox talks</span>
+        </div>
+
+        <div class="grid grid-2 fade-in">
+
+          <div class="card kpi-card card-accent card-accent--critical">
+            <div class="kpi-card__top">
+              <div class="kpi-card__label">Open Incidents</div>
+              <div class="kpi-card__icon icon-tone-red">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+              </div>
+            </div>
+            <div class="kpi-card__value" style="color:var(--color-critical);">
+              <span class="count-up" data-count="1">0</span>
+            </div>
             <div class="kpi-card__delta down">Zone B trench collapse (minor)</div>
           </div>
-          <div class="card kpi-card card-accent card-accent--primary"><div class="kpi-card__top"><div class="kpi-card__label">Toolbox Talks (30d)</div><div class="kpi-card__icon icon-tone-blue"><i class="fa-solid fa-people-group"></i></div></div>
-            <div class="kpi-card__value"><span class="count-up" data-count="26">0</span></div>
+
+          <div class="card kpi-card card-accent card-accent--primary">
+            <div class="kpi-card__top">
+              <div class="kpi-card__label">Toolbox Talks (30d)</div>
+              <div class="kpi-card__icon icon-tone-blue">
+                <i class="fa-solid fa-people-group"></i>
+              </div>
+            </div>
+            <div class="kpi-card__value">
+              <span class="count-up" data-count="26">0</span>
+            </div>
             <div class="kpi-card__delta flat">Across all active work fronts</div>
+          </div>
+
+        </div>
+
+        <!-- ============ INCIDENT LOG ============ -->
+        <div class="card" style="margin-top:20px;">
+          <div class="card-header">
+            <h3>Incident & Inspection Log</h3>
+          </div>
+
+          <div class="card-body">
+
+            <div class="activity-item" data-zone="Zone B">
+              <div class="activity-dot-line">
+                <div class="activity-dot" style="background:var(--color-critical);"></div>
+                <div class="activity-line"></div>
+              </div>
+              <div>
+                <div class="activity-text">Minor trench collapse reported in Zone B, no injuries — corrective action in progress</div>
+                <div class="activity-time">2 days ago · EHS Team</div>
+              </div>
+            </div>
+
+            <div class="activity-item" data-zone="Zone C">
+              <div class="activity-dot-line">
+                <div class="activity-dot" style="background:var(--color-success);"></div>
+                <div class="activity-line"></div>
+              </div>
+              <div>
+                <div class="activity-text">Weekly site safety inspection completed — Zone C, no NCRs</div>
+                <div class="activity-time">4 days ago · Safety Officer</div>
+              </div>
+            </div>
+
+            <div class="activity-item" data-zone="Zone D">
+              <div class="activity-dot-line">
+                <div class="activity-dot" style="background:var(--color-secondary);"></div>
+              </div>
+              <div>
+                <div class="activity-text">Toolbox talk: excavation & shoring safety, Zone D crew</div>
+                <div class="activity-time">5 days ago · Site Supervisor</div>
+              </div>
+            </div>
+
           </div>
         </div>
 
-        <div class="card" style="margin-top:20px;">
-          <div class="card-header"><h3>Incident &amp; Inspection Log</h3></div>
-          <div class="card-body">
-            <div class="activity-item" data-zone="Zone B">
-              <div class="activity-dot-line"><div class="activity-dot" style="background:var(--color-critical);"></div><div class="activity-line"></div></div>
-              <div><div class="activity-text">Minor trench collapse reported in Zone B, no injuries — corrective action in progress</div><div class="activity-time">2 days ago · EHS Team</div></div>
-            </div>
-            <div class="activity-item" data-zone="Zone C">
-              <div class="activity-dot-line"><div class="activity-dot" style="background:var(--color-success);"></div><div class="activity-line"></div></div>
-              <div><div class="activity-text">Weekly site safety inspection completed — Zone C, no NCRs</div><div class="activity-time">4 days ago · Safety Officer</div></div>
-            </div>
-            <div class="activity-item" data-zone="Zone D">
-              <div class="activity-dot-line"><div class="activity-dot" style="background:var(--color-secondary);"></div></div>
-              <div><div class="activity-text">Toolbox talk: excavation &amp; shoring safety, Zone D crew</div><div class="activity-time">5 days ago · Site Supervisor</div></div>
-            </div>
-          </div>
-        </div>
       </section>
 
       <section id="social-environmental">
-        <div class="section-heading"><h2>Social &amp; Environmental Compliance</h2><span class="section-sub">Community engagement &amp; environmental safeguards</span></div>
-        <div class="grid grid-4">
-          <div class="card card-accent card-accent--primary"><div class="card-body"><div class="kpi-card__label">Grievances Logged</div><div class="kpi-card__value" style="font-size:1.5rem;">12</div><div class="kpi-card__delta flat">All acknowledged within SLA</div></div></div>
-          <div class="card card-accent card-accent--success">
+
+        <!-- ============ GRAPH CARDS ============ -->
+        <div class="section-heading">
+          <h2>Resource & Toolbox Talk Trends</h2>
+          <span class="section-sub">Monthly resource consumption and engagement themes</span>
+        </div>
+
+        <div class="grid grid-12">
+
+          <div class="card col-span-6">
+            <div class="card-header">
+              <h3>Resource Consumption (Apr → May 2026)</h3>
+            </div>
             <div class="card-body">
-              <div class="kpi-card__label">Grievances Resolved</div>
-              <div class="kpi-card__value" style="color:var(--color-success);font-size:1.5rem;">10</div>
-              <div class="mini-progress">
-                <div class="progress-track"><div class="progress-fill" data-target="83" style="width:0; background:var(--color-success);"></div></div>
-                <span class="progress-pct">83%</span>
+              <div style="height:320px; position:relative;">
+                <canvas id="ehsResourceConsumptionChart"></canvas>
               </div>
             </div>
           </div>
-          <div class="card card-accent card-accent--secondary"><div class="card-body"><div class="kpi-card__label">Tree Compensatory Plantation</div><div class="kpi-card__value" style="font-size:1.5rem;">1,240</div><div class="kpi-card__delta flat">of 1,500 planned</div></div></div>
-          <div class="card card-accent card-accent--primary"><div class="card-body"><div class="kpi-card__label">Community Meetings (Qtr)</div><div class="kpi-card__value" style="font-size:1.5rem;">9</div><div class="kpi-card__delta flat">Across affected villages</div></div></div>
+
+          <div class="card col-span-6">
+            <div class="card-header">
+              <h3>Toolbox Talks by Theme (May 2026)</h3>
+            </div>
+            <div class="card-body">
+              <div style="height:320px; position:relative;">
+                <canvas id="ehsToolboxThemeChart"></canvas>
+              </div>
+            </div>
+          </div>
+
         </div>
+
+        <!-- ============ INCIDENTS TABLE ============ -->
+        <div class="card" style="margin-top:20px;">
+          <div class="card-header">
+            <h3>Incidents & Non-Conformities (May 2026)</h3>
+          </div>
+
+          <div class="card-body">
+            <div class="table-scroll">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th class="num">Count</th>
+                    <th>Detail</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Serious Incident</td>
+                    <td class="num">1</td>
+                    <td>MV cable strike at Escola Portuguesa (09/05/2026)</td>
+                    <td><span class="status-chip ok">Closed</span></td>
+                  </tr>
+
+                  <tr>
+                    <td>Non-Conformity</td>
+                    <td class="num">2</td>
+                    <td>Toilets relocated (Casa Verde); PPE boots replaced (Escola P.)</td>
+                    <td><span class="status-chip ok">Effective</span></td>
+                  </tr>
+
+                  <tr>
+                    <td>Lost-Time Accidents</td>
+                    <td class="num">0</td>
+                    <td>—</td>
+                    <td><span class="status-chip ok">Nil</span></td>
+                  </tr>
+
+                  <tr>
+                    <td>Fatalities</td>
+                    <td class="num">0</td>
+                    <td>—</td>
+                    <td><span class="status-chip ok">Nil</span></td>
+                  </tr>
+
+                  <tr>
+                    <td>Labour Grievance</td>
+                    <td class="num">1</td>
+                    <td>MAPESS contract registration (resolved 22/05)</td>
+                    <td><span class="status-chip ok">Resolved</span></td>
+                  </tr>
+
+                  <tr>
+                    <td>SEA / SH Complaints</td>
+                    <td class="num">0</td>
+                    <td>—</td>
+                    <td><span class="status-chip ok">Nil</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============ RESOURCE TABLE ============ -->
+        <div class="card" style="margin-top:20px;">
+          <div class="card-header">
+            <h3>Resource Consumption Detail</h3>
+          </div>
+
+          <div class="card-body">
+            <div class="table-scroll">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Resource</th>
+                    <th class="num">Apr 2026</th>
+                    <th class="num">May 2026</th>
+                    <th>Trend</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Water (m³)</td>
+                    <td class="num">1,472</td>
+                    <td class="num">1,611</td>
+                    <td><span class="status-chip warn">↑ +9.4%</span></td>
+                  </tr>
+
+                  <tr>
+                    <td>Energy (kWh)</td>
+                    <td class="num">2,009.13</td>
+                    <td class="num">1,457.52</td>
+                    <td><span class="status-chip ok">↓ -27.5%</span></td>
+                  </tr>
+
+                  <tr>
+                    <td>Diesel (L)</td>
+                    <td class="num">1,034</td>
+                    <td class="num">906.2</td>
+                    <td><span class="status-chip ok">↓ -12.4%</span></td>
+                  </tr>
+
+                  <tr>
+                    <td>Petrol (L)</td>
+                    <td class="num">281</td>
+                    <td class="num">308</td>
+                    <td><span class="status-chip warn">↑ +9.6%</span></td>
+                  </tr>
+
+                  <tr>
+                    <td>Solid Waste (kg)</td>
+                    <td class="num">890</td>
+                    <td class="num">1,560</td>
+                    <td><span class="status-chip crit">↑ +75.3%</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
       </section>
 
     </main>
@@ -123,8 +393,11 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="js/api.js"></script>
 <script src="js/shell.js"></script>
 <script src="js/main.js"></script>
+<script src="js/charts.js"></script>
+
 </body>
 </html>

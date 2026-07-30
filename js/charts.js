@@ -1,6 +1,5 @@
 /* ============================================================
-   charts.js — Home dashboard charts and mini GIS map
-   Safe replacement for the redesigned PDISA-2 Lubango dashboard.
+   charts.js — Home dashboard charts, EHS charts and mini GIS map
    Existing website theme/colors are reused through CSS variables.
    ============================================================ */
 
@@ -427,6 +426,138 @@
     });
   }
 
+  function initEHSResourceConsumptionChart() {
+    var canvas = getCanvas("ehsResourceConsumptionChart");
+    if (!canvas || typeof Chart === "undefined") return;
+
+    var aprilColor = cssVar("--color-success", "#1E8449");
+    var mayColor = cssVar("--color-primary", "#0A4595");
+
+    new Chart(canvas, {
+      type: "bar",
+      data: {
+        labels: ["Water (m³)", "Energy (kWh)", "Diesel (L)", "Petrol (L)", "Solid Waste (kg)"],
+        datasets: [
+          {
+            label: "Apr 2026",
+            data: [1472, 2009.13, 1034, 281, 890],
+            backgroundColor: aprilColor,
+            borderColor: aprilColor,
+            borderWidth: 1
+          },
+          {
+            label: "May 2026",
+            data: [1611, 1457.52, 906.2, 308, 1560],
+            backgroundColor: mayColor,
+            borderColor: mayColor,
+            borderWidth: 1
+          }
+        ]
+      },
+      options: Object.assign(getCommonChartOptions(), {
+        scales: {
+          x: {
+            grid: {
+              color: "rgba(0,0,0,0.06)"
+            },
+            ticks: {
+              maxRotation: 25,
+              minRotation: 15,
+              font: {
+                size: 11
+              }
+            }
+          },
+          y: {
+            beginAtZero: true,
+            max: 2500,
+            grid: {
+              color: "rgba(0,0,0,0.06)"
+            },
+            ticks: {
+              stepSize: 500,
+              callback: function (value) {
+                return formatNumber(value);
+              },
+              font: {
+                size: 11
+              }
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            position: "top",
+            labels: {
+              boxWidth: 12,
+              boxHeight: 12,
+              font: {
+                size: 11
+              }
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                return " " + context.dataset.label + ": " + formatNumber(context.parsed.y);
+              }
+            }
+          }
+        }
+      })
+    });
+  }
+
+  function initEHSToolboxThemeChart() {
+    var canvas = getCanvas("ehsToolboxThemeChart");
+    if (!canvas || typeof Chart === "undefined") return;
+
+    var environmentalColor = cssVar("--color-success", "#1E8449");
+    var safetyColor = cssVar("--color-warning", "#B9770E");
+    var socialColor = cssVar("--color-primary", "#0A4595");
+
+    new Chart(canvas, {
+      type: "doughnut",
+      data: {
+        labels: ["Environmental", "Health & Safety", "Social"],
+        datasets: [
+          {
+            data: [4, 8, 14],
+            backgroundColor: [environmentalColor, safetyColor, socialColor],
+            borderColor: cssVar("--bg-card", "#FFFFFF"),
+            borderWidth: 2,
+            hoverOffset: 6
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: "58%",
+        plugins: {
+          legend: {
+            position: "right",
+            labels: {
+              boxWidth: 14,
+              boxHeight: 14,
+              font: {
+                size: 12
+              }
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                var value = context.parsed;
+                return " " + context.label + ": " + value + " talks";
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
   function initMiniMap() {
     var mapElement = document.getElementById("miniMap");
 
@@ -540,6 +671,10 @@
     initPhysicalSCurveChart();
     initFinancialExecutionChart();
     initESHSComplianceChart();
+
+    initEHSResourceConsumptionChart();
+    initEHSToolboxThemeChart();
+
     initMiniMap();
   });
 })();
