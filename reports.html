@@ -135,6 +135,44 @@
       grid-template-columns: 1fr;
     }
   }
+
+    .status-chip.issued {
+    background: rgba(56, 142, 60, 0.12);
+    color: #00843d;
+  }
+
+  .status-chip.pending {
+    background: rgba(245, 124, 0, 0.12);
+    color: #d98200;
+  }
+
+  .status-chip.not-submitted {
+    background: rgba(211, 47, 47, 0.12);
+    color: #d50000;
+  }
+
+  .status-chip.approved-paid {
+    background: rgba(56, 142, 60, 0.12);
+    color: #00843d;
+  }
+
+  .status-chip.certified-submitted {
+    background: rgba(21, 101, 192, 0.12);
+    color: #004b93;
+  }
+
+  .status-chip.under-employer-review {
+    background: rgba(21, 101, 192, 0.12);
+    color: #004b93;
+  }
+
+  .reports-library-section {
+    margin-top: 28px;
+  }
+
+  .reports-library-section .section-heading {
+    margin-bottom: 12px;
+  }
 </style>
 </head>
 
@@ -272,6 +310,114 @@
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div class="reports-library-section">
+        <div class="section-heading">
+          <h2>Periodic Reports</h2>
+          <span class="section-sub">Formal periodic deliverables linked with the project</span>
+        </div>
+
+        <div class="card">
+          <div class="card-body table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th scope="col">Document</th>
+                  <th scope="col">Latest Issue</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+
+              <tbody id="periodicReportsTableBody">
+                <tr>
+                  <td colspan="3" class="table-empty-message">Loading periodic reports...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="reports-library-section">
+        <div class="section-heading">
+          <h2>IPCs</h2>
+          <span class="section-sub">Interim payment certificates and submission status</span>
+        </div>
+
+        <div class="card">
+          <div class="card-body table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th scope="col">IPC</th>
+                  <th scope="col">Date</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+
+              <tbody id="ipcsTableBody">
+                <tr>
+                  <td colspan="3" class="table-empty-message">Loading IPCs...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="reports-library-section">
+        <div class="section-heading">
+          <h2>Amendments</h2>
+          <span class="section-sub">Contract amendments and related technical notes</span>
+        </div>
+
+        <div class="card">
+          <div class="card-body table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th scope="col">Amendment</th>
+                  <th scope="col">Subject</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+
+              <tbody id="amendmentsTableBody">
+                <tr>
+                  <td colspan="3" class="table-empty-message">Loading amendments...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="reports-library-section">
+        <div class="section-heading">
+          <h2>Method Statements</h2>
+          <span class="section-sub">Approved and pending method statements for construction activities</span>
+        </div>
+
+        <div class="card">
+          <div class="card-body table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th scope="col">Method Statement</th>
+                  <th scope="col">Date</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+
+              <tbody id="methodStatementsTableBody">
+                <tr>
+                  <td colspan="3" class="table-empty-message">Loading method statements...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
