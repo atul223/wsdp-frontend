@@ -3,30 +3,78 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>GIS Map — Water Supply Distribution Project</title>
+<title>GIS Map — PDISA-2 Lubango</title>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/styles.css" />
+
 <style>
-  .gis-layout { display:grid; grid-template-columns: 300px 1fr; gap: var(--sp-5); align-items:start; }
-  @media (max-width:992px) { .gis-layout { grid-template-columns: 1fr; } }
-  .filter-group { margin-bottom: var(--sp-5); }
-  .filter-group h4 { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); margin: 0 0 10px; }
-  .filter-chip { display:flex; align-items:center; gap:8px; padding:7px 4px; font-size:13px; color:var(--text-secondary); cursor:pointer; }
-  #gisMap { height: 620px; border-radius: var(--radius-md); z-index:1; }
-  .gis-popup strong { display:block; margin-bottom:2px; }
+  .gis-layout {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: var(--sp-5);
+    align-items: start;
+  }
+
+  @media (max-width: 992px) {
+    .gis-layout {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .filter-group {
+    margin-bottom: var(--sp-5);
+  }
+
+  .filter-group h4 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--text-muted);
+    margin: 0 0 10px;
+  }
+
+  .filter-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 4px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+
+  #gisMap {
+    height: 620px;
+    border-radius: var(--radius-md);
+    z-index: 1;
+  }
+
+  .gis-popup strong {
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  .legend-square {
+    display: inline-block;
+    width: 13px;
+    height: 13px;
+    border-radius: 3px;
+  }
 </style>
 </head>
+
 <body data-page="gis">
 
 <script>
   window.WSDP_PAGE = {
     title: "GIS Map",
-    breadcrumb: "Water Supply Distribution Project <span class=\"separator\">/</span> GIS Map",
+    breadcrumb: "PDISA-2 Lubango <span class=\"separator\">/</span> GIS Map",
     statusClass: "status-pill--warning",
-    statusText: "At Risk — Schedule"
+    statusText: "Notional Delay: 6.5 months"
   };
 </script>
 
@@ -39,35 +87,113 @@
     <main class="main-content">
 
       <div class="section-heading">
-        <h2>Interactive Project Map</h2>
-        <span class="section-sub">Pipeline corridor, sites &amp; village clusters — filter by zone or status</span>
+        <h2>GIS Map — 7 Intervention Areas (Lubango)</h2>
+        <span class="section-sub">Pipeline corridor, work fronts and intervention areas</span>
       </div>
 
       <div class="gis-layout">
+
         <div class="card">
           <div class="card-body">
+
             <div class="filter-group">
               <h4>Status</h4>
-              <label class="filter-chip"><input type="checkbox" class="gis-filter" data-status="completed" checked> Completed</label>
-              <label class="filter-chip"><input type="checkbox" class="gis-filter" data-status="progress" checked> In Progress</label>
-              <label class="filter-chip"><input type="checkbox" class="gis-filter" data-status="pending" checked> Pending</label>
+
+              <label class="filter-chip">
+                <input type="checkbox" class="gis-filter-status" data-status="complete" checked>
+                <span class="legend-square" style="background:var(--color-success);"></span>
+                Complete
+              </label>
+
+              <label class="filter-chip">
+                <input type="checkbox" class="gis-filter-status" data-status="progress" checked>
+                <span class="legend-square" style="background:var(--color-warning);"></span>
+                In Progress
+              </label>
+
+              <label class="filter-chip">
+                <input type="checkbox" class="gis-filter-status" data-status="mobilising" checked>
+                <span class="legend-square" style="background:#F58232;"></span>
+                Mobilising
+              </label>
+
+              <label class="filter-chip">
+                <input type="checkbox" class="gis-filter-status" data-status="notStarted" checked>
+                <span class="legend-square" style="background:var(--color-critical);"></span>
+                Not Started
+              </label>
             </div>
+
             <div class="filter-group">
-              <h4>Zone</h4>
-              <label class="filter-chip"><input type="checkbox" class="gis-filter-zone" data-zone="A" checked> Zone A</label>
-              <label class="filter-chip"><input type="checkbox" class="gis-filter-zone" data-zone="B" checked> Zone B</label>
-              <label class="filter-chip"><input type="checkbox" class="gis-filter-zone" data-zone="C" checked> Zone C</label>
-              <label class="filter-chip"><input type="checkbox" class="gis-filter-zone" data-zone="D" checked> Zone D</label>
+              <h4>Intervention Areas</h4>
+
+              <label class="filter-chip">
+                <input type="checkbox" class="gis-filter-area" data-area="Mapunda" checked>
+                Mapunda
+              </label>
+
+              <label class="filter-chip">
+                <input type="checkbox" class="gis-filter-area" data-area="Nambambe" checked>
+                Nambambe
+              </label>
+
+              <label class="filter-chip">
+                <input type="checkbox" class="gis-filter-area" data-area="Bula Matadi" checked>
+                Bula Matadi
+              </label>
+
+              <label class="filter-chip">
+                <input type="checkbox" class="gis-filter-area" data-area="Lubango Central" checked>
+                Lubango Central
+              </label>
+
+              <label class="filter-chip">
+                <input type="checkbox" class="gis-filter-area" data-area="Comandante" checked>
+                Comandante
+              </label>
+
+              <label class="filter-chip">
+                <input type="checkbox" class="gis-filter-area" data-area="Ferrovia" checked>
+                Ferrovia
+              </label>
+
+              <label class="filter-chip">
+                <input type="checkbox" class="gis-filter-area" data-area="Casa Verde / Escola Portuguesa" checked>
+                Casa Verde / Escola Portuguesa
+              </label>
             </div>
+
             <div class="filter-group">
               <h4>Legend</h4>
+
               <div class="map-legend" style="flex-direction:column;align-items:flex-start;gap:8px;">
-                <div class="item"><span class="dot" style="background:var(--color-primary);"></span> Completed pipeline</div>
-                <div class="item"><span class="dot" style="background:var(--color-warning);"></span> Under construction</div>
-                <div class="item"><span class="dot" style="background:var(--color-neutral);"></span> Pending</div>
+                <div class="item">
+                  <span class="dot" style="background:var(--color-success);"></span>
+                  Complete
+                </div>
+
+                <div class="item">
+                  <span class="dot" style="background:var(--color-warning);"></span>
+                  In Progress
+                </div>
+
+                <div class="item">
+                  <span class="dot" style="background:#F58232;"></span>
+                  Mobilising
+                </div>
+
+                <div class="item">
+                  <span class="dot" style="background:var(--color-critical);"></span>
+                  Not Started
+                </div>
               </div>
             </div>
-            <button class="btn-primary" id="resetFiltersBtn" style="width:100%;justify-content:center;"><i class="fa-solid fa-rotate-left"></i> Reset Filters</button>
+
+            <button class="btn-primary" id="resetFiltersBtn" style="width:100%;justify-content:center;">
+              <i class="fa-solid fa-rotate-left"></i>
+              Reset Filters
+            </button>
+
           </div>
         </div>
 
@@ -76,12 +202,13 @@
             <div id="gisMap"></div>
           </div>
         </div>
+
       </div>
 
     </main>
 
     <footer style="text-align:center;padding:24px;color:var(--text-muted);font-size:12px;">
-      Water Supply Distribution Project — Monitoring Dashboard · Sample data for layout demonstration
+      PDISA-2 Lubango — Construction Progress Dashboard · Contract 44W3/LUBANGO/DNA/18
     </footer>
   </div>
 </div>
@@ -90,78 +217,225 @@
 <script src="js/api.js"></script>
 <script src="js/shell.js"></script>
 <script src="js/main.js"></script>
+
 <script>
   document.addEventListener("DOMContentLoaded", function () {
-    var el = document.getElementById("gisMap");
-    if (!el || typeof L === "undefined") return;
+    var mapElement = document.getElementById("gisMap");
 
-    var map = L.map(el, { zoomControl: true }).setView([23.259933, 77.412615], 12);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18 }).addTo(map);
+    if (!mapElement || typeof L === "undefined") return;
 
-    var statusStyles = {
-      completed: { color: "#0A4595" },
-      progress: { color: "#B9770E" },
-      pending: { color: "#8C9AA8" },
-    };
+    function cssVar(name, fallback) {
+      var value = getComputedStyle(document.documentElement)
+        .getPropertyValue(name)
+        .trim();
 
-    var segments = [
-      { status: "completed", zone: "A", coords: [[23.30, 77.36], [23.28, 77.39], [23.26, 77.41]] },
-      { status: "completed", zone: "B", coords: [[23.26, 77.41], [23.245, 77.425]] },
-      { status: "progress", zone: "B", coords: [[23.245, 77.425], [23.24, 77.43], [23.22, 77.45]] },
-      { status: "progress", zone: "C", coords: [[23.22, 77.45], [23.205, 77.465]] },
-      { status: "pending", zone: "C", coords: [[23.205, 77.465], [23.20, 77.47]] },
-      { status: "pending", zone: "D", coords: [[23.20, 77.47], [23.18, 77.49]] },
+      return value || fallback;
+    }
+
+    var successColor = cssVar("--color-success", "#1E8449");
+    var warningColor = cssVar("--color-warning", "#B9770E");
+    var primaryColor = cssVar("--color-primary", "#0A4595");
+    var criticalColor = cssVar("--color-critical", "#C0392B");
+    var mobilisingColor = "#F58232";
+
+    var map = L.map(mapElement, {
+      zoomControl: true,
+      attributionControl: true
+    }).setView([-14.9177, 13.4925], 12);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap"
+    }).addTo(map);
+
+    var interventionAreas = [
+      {
+        name: "Mapunda",
+        status: "notStarted",
+        statusLabel: "Not Started",
+        color: criticalColor,
+        coords: [-14.8968, 13.4558]
+      },
+      {
+        name: "Nambambe",
+        status: "notStarted",
+        statusLabel: "Not Started",
+        color: criticalColor,
+        coords: [-14.8725, 13.5356]
+      },
+      {
+        name: "Bula Matadi",
+        status: "notStarted",
+        statusLabel: "Not Started",
+        color: criticalColor,
+        coords: [-14.9055, 13.5127]
+      },
+      {
+        name: "Lubango Central",
+        status: "progress",
+        statusLabel: "In Progress",
+        color: warningColor,
+        coords: [-14.9177, 13.4925]
+      },
+      {
+        name: "Comandante",
+        status: "progress",
+        statusLabel: "In Progress",
+        color: warningColor,
+        coords: [-14.9349, 13.4789]
+      },
+      {
+        name: "Ferrovia",
+        status: "mobilising",
+        statusLabel: "Mobilising",
+        color: mobilisingColor,
+        coords: [-14.9484, 13.5098]
+      },
+      {
+        name: "Casa Verde / Escola Portuguesa",
+        status: "complete",
+        statusLabel: "Complete",
+        color: successColor,
+        coords: [-14.9621, 13.4585]
+      }
     ];
 
-    var sites = [
-      { name: "Intake Pump Station", status: "completed", zone: "A", coords: [23.30, 77.36] },
-      { name: "Zone A Valve Chamber", status: "completed", zone: "A", coords: [23.27, 77.40] },
-      { name: "Zone B Pipeline Works", status: "progress", zone: "B", coords: [23.24, 77.43] },
-      { name: "Chainage 44+900 Canal Crossing", status: "progress", zone: "C", coords: [23.215, 77.455] },
-      { name: "Village Cluster 12 — House Connections", status: "pending", zone: "D", coords: [23.19, 77.48] },
-      { name: "Chainage 61+200 NH Road Crossing (NOC pending)", status: "pending", zone: "D", coords: [23.185, 77.485] },
+    var alignmentSegments = [
+      {
+        name: "Northern alignment",
+        area: "Mapunda",
+        status: "notStarted",
+        statusLabel: "Not Started",
+        color: criticalColor,
+        coords: [
+          [-14.8968, 13.4558],
+          [-14.9055, 13.5127],
+          [-14.8725, 13.5356]
+        ]
+      },
+      {
+        name: "Central alignment",
+        area: "Lubango Central",
+        status: "progress",
+        statusLabel: "In Progress",
+        color: warningColor,
+        coords: [
+          [-14.9177, 13.4925],
+          [-14.9349, 13.4789],
+          [-14.9484, 13.5098]
+        ]
+      },
+      {
+        name: "South-west alignment",
+        area: "Casa Verde / Escola Portuguesa",
+        status: "complete",
+        statusLabel: "Complete",
+        color: successColor,
+        coords: [
+          [-14.9349, 13.4789],
+          [-14.9621, 13.4585]
+        ]
+      }
     ];
 
-    var segLayers = segments.map(function (seg) {
-      var layer = L.polyline(seg.coords, {
-        color: statusStyles[seg.status].color,
+    var segmentLayers = alignmentSegments.map(function (segment) {
+      var layer = L.polyline(segment.coords, {
+        color: segment.color || primaryColor,
         weight: 5,
         opacity: 0.85,
-        dashArray: seg.status === "progress" ? "2 8" : seg.status === "pending" ? "1 6" : null,
-      });
-      layer._status = seg.status;
-      layer._zone = seg.zone;
+        dashArray: segment.status === "progress" ? "8 7" : segment.status === "mobilising" ? "4 7" : null
+      }).bindPopup(
+        '<div class="gis-popup">' +
+          '<strong>' + segment.name + '</strong>' +
+          'Area: ' + segment.area + '<br>' +
+          'Status: ' + segment.statusLabel +
+        '</div>'
+      );
+
+      layer._status = segment.status;
+      layer._area = segment.area;
+
       return layer.addTo(map);
     });
 
-    var siteLayers = sites.map(function (s) {
-      var layer = L.circleMarker(s.coords, {
-        radius: 8, color: "#fff", weight: 2,
-        fillColor: statusStyles[s.status].color, fillOpacity: 1,
-      }).bindPopup('<div class="gis-popup"><strong>' + s.name + '</strong>Zone ' + s.zone + ' · <span style="text-transform:capitalize">' + s.status + '</span></div>');
-      layer._status = s.status;
-      layer._zone = s.zone;
-      return layer.addTo(map);
+    var areaLayers = interventionAreas.map(function (area) {
+      var marker = L.circleMarker(area.coords, {
+        radius: 12,
+        color: "#ffffff",
+        weight: 2,
+        fillColor: area.color,
+        fillOpacity: 0.85
+      }).bindPopup(
+        '<div class="gis-popup">' +
+          '<strong>' + area.name + '</strong>' +
+          'Status: ' + area.statusLabel +
+        '</div>'
+      );
+
+      marker._status = area.status;
+      marker._area = area.name;
+
+      return marker.addTo(map);
     });
 
-    function applyFilters() {
-      var activeStatuses = Array.from(document.querySelectorAll(".gis-filter:checked")).map(function (c) { return c.dataset.status; });
-      var activeZones = Array.from(document.querySelectorAll(".gis-filter-zone:checked")).map(function (c) { return c.dataset.zone; });
-      segLayers.concat(siteLayers).forEach(function (layer) {
-        var visible = activeStatuses.indexOf(layer._status) !== -1 && activeZones.indexOf(layer._zone) !== -1;
-        if (visible && !map.hasLayer(layer)) layer.addTo(map);
-        if (!visible && map.hasLayer(layer)) map.removeLayer(layer);
+    L.marker([-14.9177, 13.4925])
+      .bindPopup("<strong>Lubango</strong><br>Project city center")
+      .addTo(map);
+
+    var bounds = L.latLngBounds(
+      interventionAreas.map(function (area) {
+        return area.coords;
+      })
+    );
+
+    map.fitBounds(bounds.pad(0.25));
+
+    function getCheckedValues(selector, dataKey) {
+      return Array.from(document.querySelectorAll(selector + ":checked")).map(function (checkbox) {
+        return checkbox.dataset[dataKey];
       });
     }
 
-    document.querySelectorAll(".gis-filter, .gis-filter-zone").forEach(function (cb) {
-      cb.addEventListener("change", applyFilters);
+    function applyFilters() {
+      var activeStatuses = getCheckedValues(".gis-filter-status", "status");
+      var activeAreas = getCheckedValues(".gis-filter-area", "area");
+
+      areaLayers.concat(segmentLayers).forEach(function (layer) {
+        var visible =
+          activeStatuses.indexOf(layer._status) !== -1 &&
+          activeAreas.indexOf(layer._area) !== -1;
+
+        if (visible && !map.hasLayer(layer)) {
+          layer.addTo(map);
+        }
+
+        if (!visible && map.hasLayer(layer)) {
+          map.removeLayer(layer);
+        }
+      });
+    }
+
+    document.querySelectorAll(".gis-filter-status, .gis-filter-area").forEach(function (checkbox) {
+      checkbox.addEventListener("change", applyFilters);
     });
-    document.getElementById("resetFiltersBtn")?.addEventListener("click", function () {
-      document.querySelectorAll(".gis-filter, .gis-filter-zone").forEach(function (cb) { cb.checked = true; });
-      applyFilters();
-    });
+
+    var resetBtn = document.getElementById("resetFiltersBtn");
+
+    if (resetBtn) {
+      resetBtn.addEventListener("click", function () {
+        document.querySelectorAll(".gis-filter-status, .gis-filter-area").forEach(function (checkbox) {
+          checkbox.checked = true;
+        });
+
+        applyFilters();
+      });
+    }
+
+    setTimeout(function () {
+      map.invalidateSize();
+    }, 300);
   });
 </script>
+
 </body>
 </html>

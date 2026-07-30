@@ -1,262 +1,545 @@
 /* ============================================================
-   charts.js — Executive Summary visualizations
-   NOTE: All figures are SAMPLE DATA for layout/demo purposes.
-   Replace the arrays below with values from the monthly
-   progress import once the data pipeline (see /docs) is wired.
+   charts.js — Home dashboard charts and mini GIS map
+   Safe replacement for the redesigned PDISA-2 Lubango dashboard.
+   Existing website theme/colors are reused through CSS variables.
    ============================================================ */
 
 (function () {
   "use strict";
 
-  function getCSSVar(name) {
-    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  function cssVar(name, fallback) {
+    var value = getComputedStyle(document.documentElement)
+      .getPropertyValue(name)
+      .trim();
+    return value || fallback;
   }
 
-  /* ---------- Chart.js plugin: direct center label on donuts ----------
-     Per the improvement notes ("add direct data labels instead of
-     relying only on a legend"), this draws the lead figure straight
-     into the hole of the doughnut rather than only in a legend/tooltip. */
-  const centerTextPlugin = {
-    id: "centerText",
-    afterDraw(chart) {
-      const opts = chart.config.options?.plugins?.centerText;
-      if (!opts || !opts.enabled) return;
-      const { ctx, chartArea } = chart;
-      if (!chartArea) return;
-      const cx = chartArea.left + chartArea.width / 2;
-      const cy = chartArea.top + chartArea.height / 2;
-      ctx.save();
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.font = "800 22px Inter, -apple-system, sans-serif";
-      ctx.fillStyle = getCSSVar("--text-primary") || "#16232F";
-      ctx.fillText(opts.text || "", cx, cy - 9);
-      ctx.font = "600 10.5px Inter, -apple-system, sans-serif";
-      ctx.fillStyle = getCSSVar("--text-muted") || "#8C9AA8";
-      ctx.fillText(opts.subtext || "", cx, cy + 12);
-      ctx.restore();
-    },
-  };
-  if (typeof Chart !== "undefined") Chart.register(centerTextPlugin);
+  function getCanvas(id) {
+    return document.getElementById(id);
+  }
 
-  /* ---------- Donut: Physical Progress Split ---------- */
-  function initProgressDonut() {
-    const ctx = document.getElementById("progressDonut");
-    if (!ctx || typeof Chart === "undefined") return;
+  function formatNumber(value) {
+    return Number(value).toLocaleString("en-US");
+  }
 
-    // Order matches the legend rendered underneath the chart in the markup
-    // (Completed / In Progress / Not Started) so click-to-highlight below
-    // can map index -> legend item directly.
-    const data = {
-      labels: ["Completed", "In Progress", "Not Started"],
-      datasets: [
-        {
-          data: [61.4, 18.2, 20.4],
-          backgroundColor: [getCSSVar("--color-primary"), getCSSVar("--color-warning"), getCSSVar("--color-neutral-light")],
-          borderWidth: 0,
-          borderRadius: 6,
-          spacing: 3,
-        },
-      ],
-    };
-
-    new Chart(ctx, {
-      type: "doughnut",
-      data,
-      options: {
-        cutout: "72%",
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: { label: (c) => ` ${c.label}: ${c.parsed}%` },
-          },
-          centerText: { enabled: true, text: "61.4%", subtext: "PHYSICAL PROGRESS" },
-        },
-        animation: { animateRotate: true, duration: 900 },
-        maintainAspectRatio: false,
-        // Clicking a slice draws attention to the matching row in the
-        // legend directly beneath the chart — a lightweight version of
-        // "clicking a status filters the view below it".
-        onClick: (evt, elements) => {
-          if (!elements.length) return;
-          const legendItems = document.querySelectorAll(".corridor-legend .item");
-          const target = legendItems[elements[0].index];
-          if (!target) return;
-          target.scrollIntoView({ behavior: "smooth", block: "center" });
-          target.style.transition = "background 300ms ease, border-radius 300ms ease";
-          target.style.background = getCSSVar("--color-primary-light") || "rgba(10,69,149,0.12)";
-          target.style.borderRadius = "6px";
-          setTimeout(() => {
-            target.style.background = "";
-          }, 1400);
-        },
-        onHover: (evt, elements) => {
-          evt.native.target.style.cursor = elements.length ? "pointer" : "default";
-        },
+  function getCommonChartOptions() {
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: "index",
+        intersect: false
       },
-    });
+      plugins: {
+        legend: {
+          position: "top",
+          labels: {
+            boxWidth: 12,
+            boxHeight: 12,
+            usePointStyle: false,
+            font: {
+              size: 11
+            }
+          }
+        },
+        tooltip: {
+          enabled: true
+        }
+      },
+      scales: {
+        x: {
+          grid: {
+            color: "rgba(0,0,0,0.06)"
+          },
+          ticks: {
+            font: {
+              size: 11
+            }
+          }
+        },
+        y: {
+          beginAtZero: true,
+          grid: {
+            color: "rgba(0,0,0,0.06)"
+          },
+          ticks: {
+            font: {
+              size: 11
+            }
+          }
+        }
+      }
+    };
   }
 
-  /* ---------- Line: Planned vs Actual (Physical %) ---------- */
-  function initPlannedVsActual() {
-    const ctx = document.getElementById("plannedActualChart");
-    if (!ctx || typeof Chart === "undefined") return;
+  function initMonthlyPipeChart() {
+    var canvas = getCanvas("monthlyPipeChart");
+    if (!canvas || typeof Chart === "undefined") return;
 
-    const months = ["Feb", "Mar", "Apr", "May", "Jun", "Jul"];
-    const planned = [38, 45, 52, 60, 68, 76];
-    const actual = [35, 40, 45, 51, 57, 61.4];
+    var plannedColor = cssVar("--color-success", "#1E8449");
+    var actualColor = cssVar("--color-warning", "#B9770E");
 
-    new Chart(ctx, {
-      type: "line",
+    new Chart(canvas, {
+      type: "bar",
       data: {
-        labels: months,
+        labels: ["Jan-26", "Feb-26", "Mar-26", "Apr-26", "May-26", "Jun-26"],
         datasets: [
           {
-            label: "Planned",
-            data: planned,
-            borderColor: getCSSVar("--color-neutral"),
-            borderDash: [5, 5],
-            backgroundColor: "transparent",
-            tension: 0.35,
-            pointRadius: 3,
-            borderWidth: 2,
+            label: "Planned (m)",
+            data: [1100, 2050, 2900, 8050, 10250, 9800],
+            backgroundColor: plannedColor,
+            borderColor: plannedColor,
+            borderWidth: 1
           },
           {
-            label: "Actual",
-            data: actual,
-            borderColor: getCSSVar("--color-primary"),
-            backgroundColor: (context) => {
-              const chart = context.chart;
-              const { ctx, chartArea } = chart;
-              if (!chartArea) return null;
-              const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-              gradient.addColorStop(0, "rgba(10, 69, 149, 0.25)");
-              gradient.addColorStop(1, "rgba(10, 69, 149, 0.0)");
-              return gradient;
-            },
-            fill: true,
-            tension: 0.35,
-            pointRadius: 3,
-            borderWidth: 3,
-          },
-        ],
+            label: "Actual (m)",
+            data: [520, 1250, 4550, 8900, 8200, 0],
+            backgroundColor: actualColor,
+            borderColor: actualColor,
+            borderWidth: 1
+          }
+        ]
       },
-      options: {
-        maintainAspectRatio: false,
-        interaction: { mode: "index", intersect: false },
+      options: Object.assign(getCommonChartOptions(), {
+        scales: {
+          x: {
+            grid: {
+              color: "rgba(0,0,0,0.06)"
+            },
+            ticks: {
+              font: {
+                size: 11
+              }
+            }
+          },
+          y: {
+            beginAtZero: true,
+            max: 12000,
+            grid: {
+              color: "rgba(0,0,0,0.06)"
+            },
+            ticks: {
+              stepSize: 2000,
+              callback: function (value) {
+                return formatNumber(value);
+              },
+              font: {
+                size: 11
+              }
+            }
+          }
+        },
         plugins: {
           legend: {
             position: "top",
-            align: "end",
-            labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true, pointStyle: "circle", font: { size: 11.5 } },
+            labels: {
+              boxWidth: 12,
+              boxHeight: 12,
+              font: {
+                size: 11
+              }
+            }
           },
-          tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${c.parsed.y}%` } },
-        },
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                return " " + context.dataset.label + ": " + formatNumber(context.parsed.y) + " m";
+              }
+            }
+          }
+        }
+      })
+    });
+  }
+
+  function initPhysicalSCurveChart() {
+    var canvas = getCanvas("physicalSCurveChart");
+    if (!canvas || typeof Chart === "undefined") return;
+
+    var plannedColor = cssVar("--color-success", "#1E8449");
+    var actualColor = cssVar("--color-primary", "#0A4595");
+
+    new Chart(canvas, {
+      type: "line",
+      data: {
+        labels: [
+          "Jul-25",
+          "Aug-25",
+          "Sep-25",
+          "Oct-25",
+          "Nov-25",
+          "Dec-25",
+          "Jan-26",
+          "Feb-26",
+          "Mar-26",
+          "Apr-26",
+          "May-26",
+          "Jun-26",
+          "Jul-26",
+          "Jan-27"
+        ],
+        datasets: [
+          {
+            label: "Planned %",
+            data: [0, 2, 5, 9, 14, 20, 28, 36, 44, 52, 60, 68, 76, 100],
+            borderColor: plannedColor,
+            backgroundColor: "transparent",
+            borderDash: [6, 5],
+            borderWidth: 2.5,
+            tension: 0.28,
+            pointRadius: 3
+          },
+          {
+            label: "Actual %",
+            data: [0, 0.5, 1.2, 2.4, 3.8, 5.3, 6.8, 8.6, 11.1, 14.1, 17.0, null, null, null],
+            borderColor: actualColor,
+            backgroundColor: "rgba(10, 69, 149, 0.14)",
+            borderWidth: 3,
+            fill: true,
+            tension: 0.28,
+            pointRadius: 3,
+            spanGaps: false
+          }
+        ]
+      },
+      options: Object.assign(getCommonChartOptions(), {
         scales: {
+          x: {
+            grid: {
+              color: "rgba(0,0,0,0.06)"
+            },
+            ticks: {
+              maxRotation: 45,
+              minRotation: 35,
+              font: {
+                size: 11
+              }
+            }
+          },
           y: {
             min: 0,
             max: 100,
-            ticks: { callback: (v) => v + "%", font: { size: 11 } },
-            grid: { color: "rgba(0,0,0,0.05)" },
-          },
-          x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-        },
-      },
-    });
-  }
-
-  /* ---------- Sparkline generator for KPI cards ---------- */
-  function initSparklines() {
-    document.querySelectorAll("[data-sparkline]").forEach((canvas) => {
-      if (typeof Chart === "undefined") return;
-      const raw = canvas.getAttribute("data-sparkline").split(",").map(Number);
-      const color = canvas.getAttribute("data-color") || getCSSVar("--color-primary");
-      new Chart(canvas, {
-        type: "line",
-        data: {
-          labels: raw.map((_, i) => i),
-          datasets: [
-            {
-              data: raw,
-              borderColor: color,
-              borderWidth: 2,
-              pointRadius: 0,
-              tension: 0.4,
-              fill: false,
+            grid: {
+              color: "rgba(0,0,0,0.06)"
             },
-          ],
+            ticks: {
+              stepSize: 10,
+              callback: function (value) {
+                return value + "%";
+              },
+              font: {
+                size: 11
+              }
+            }
+          }
         },
-        options: {
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: { enabled: false } },
-          scales: { x: { display: false }, y: { display: false } },
-          elements: { line: { borderJoinStyle: "round" } },
-        },
-      });
+        plugins: {
+          legend: {
+            position: "top",
+            labels: {
+              boxWidth: 12,
+              boxHeight: 12,
+              font: {
+                size: 11
+              }
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                return " " + context.dataset.label + ": " + context.parsed.y + "%";
+              }
+            }
+          }
+        }
+      })
     });
   }
 
-  /* ---------- Mini GIS map (Leaflet) ---------- */
-  function initMiniMap() {
-    const el = document.getElementById("miniMap");
-    if (!el || typeof L === "undefined") return;
+  function initFinancialExecutionChart() {
+    var canvas = getCanvas("financialExecutionChart");
+    if (!canvas || typeof Chart === "undefined") return;
 
-    // Approximate project corridor coordinates (sample placeholder area).
-    const center = [23.259933, 77.412615];
-    const map = L.map(el, { zoomControl: false, attributionControl: false, scrollWheelZoom: false }).setView(center, 12);
+    var plannedColor = cssVar("--color-success", "#1E8449");
+    var actualColor = cssVar("--color-primary", "#0A4595");
+
+    new Chart(canvas, {
+      type: "line",
+      data: {
+        labels: ["Jul-25", "Sep-25", "Nov-25", "Jan-26", "Feb-26", "Apr-26", "Jun-26 (Plan)"],
+        datasets: [
+          {
+            label: "Planned (M AOA)",
+            data: [0, 180, 540, 900, 1100, 1450, 1750],
+            borderColor: plannedColor,
+            backgroundColor: "transparent",
+            borderDash: [6, 5],
+            borderWidth: 2.5,
+            tension: 0.28,
+            pointRadius: 3
+          },
+          {
+            label: "Invoiced (M AOA)",
+            data: [0, 0, 0, 0, 410, 650.99, null],
+            borderColor: actualColor,
+            backgroundColor: "rgba(10, 69, 149, 0.14)",
+            borderWidth: 3,
+            fill: true,
+            tension: 0.28,
+            pointRadius: 3,
+            spanGaps: false
+          }
+        ]
+      },
+      options: Object.assign(getCommonChartOptions(), {
+        scales: {
+          x: {
+            grid: {
+              color: "rgba(0,0,0,0.06)"
+            },
+            ticks: {
+              maxRotation: 35,
+              minRotation: 25,
+              font: {
+                size: 11
+              }
+            }
+          },
+          y: {
+            beginAtZero: true,
+            max: 1800,
+            grid: {
+              color: "rgba(0,0,0,0.06)"
+            },
+            ticks: {
+              stepSize: 200,
+              callback: function (value) {
+                return formatNumber(value);
+              },
+              font: {
+                size: 11
+              }
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            position: "top",
+            labels: {
+              boxWidth: 12,
+              boxHeight: 12,
+              font: {
+                size: 11
+              }
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                return " " + context.dataset.label + ": " + formatNumber(context.parsed.y) + " M AOA";
+              }
+            }
+          }
+        }
+      })
+    });
+  }
+
+  function initESHSComplianceChart() {
+    var canvas = getCanvas("eshsComplianceChart");
+    if (!canvas || typeof Chart === "undefined") return;
+
+    var targetColor = cssVar("--color-success", "#1E8449");
+    var actualColor = cssVar("--color-primary", "#0A4595");
+
+    new Chart(canvas, {
+      type: "bar",
+      data: {
+        labels: ["Overall ESHS", "PGAS / ESMP", "H&S Plan", "Site Mgmt", "Method Statements"],
+        datasets: [
+          {
+            label: "Target %",
+            data: [90, 90, 90, 90, 90],
+            backgroundColor: targetColor,
+            borderColor: targetColor,
+            borderWidth: 1
+          },
+          {
+            label: "Actual %",
+            data: [78, 84, 80, 82, 77],
+            backgroundColor: actualColor,
+            borderColor: actualColor,
+            borderWidth: 1
+          }
+        ]
+      },
+      options: Object.assign(getCommonChartOptions(), {
+        scales: {
+          x: {
+            grid: {
+              color: "rgba(0,0,0,0.06)"
+            },
+            ticks: {
+              maxRotation: 20,
+              minRotation: 10,
+              font: {
+                size: 11
+              }
+            }
+          },
+          y: {
+            beginAtZero: true,
+            max: 100,
+            grid: {
+              color: "rgba(0,0,0,0.06)"
+            },
+            ticks: {
+              stepSize: 10,
+              callback: function (value) {
+                return value + "%";
+              },
+              font: {
+                size: 11
+              }
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            position: "top",
+            labels: {
+              boxWidth: 12,
+              boxHeight: 12,
+              font: {
+                size: 11
+              }
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                return " " + context.dataset.label + ": " + context.parsed.y + "%";
+              }
+            }
+          }
+        }
+      })
+    });
+  }
+
+  function initMiniMap() {
+    var mapElement = document.getElementById("miniMap");
+
+    if (!mapElement || typeof L === "undefined") return;
+
+    var map = L.map(mapElement, {
+      zoomControl: true,
+      attributionControl: true,
+      scrollWheelZoom: false
+    }).setView([-14.9177, 13.4925], 12);
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 18,
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap"
     }).addTo(map);
 
-    L.control.zoom({ position: "bottomright" }).addTo(map);
+    var successColor = cssVar("--color-success", "#1E8449");
+    var warningColor = cssVar("--color-warning", "#B9770E");
+    var criticalColor = cssVar("--color-critical", "#C0392B");
+    var mobilisingColor = "#F58232";
 
-    const statusStyles = {
-      completed: { color: "#0A4595", fillColor: "#0A4595" },
-      progress: { color: "#B9770E", fillColor: "#B9770E" },
-      pending: { color: "#8C9AA8", fillColor: "#8C9AA8" },
-    };
-
-    // Sample corridor polyline segments (placeholder geometry).
-    const segments = [
-      { status: "completed", coords: [[23.30, 77.36], [23.28, 77.39], [23.26, 77.41]] },
-      { status: "progress", coords: [[23.26, 77.41], [23.24, 77.43], [23.22, 77.45]] },
-      { status: "pending", coords: [[23.22, 77.45], [23.20, 77.47], [23.18, 77.49]] },
+    var areas = [
+      {
+        name: "Mapunda",
+        status: "Not Started",
+        color: criticalColor,
+        coords: [-14.8968, 13.4558]
+      },
+      {
+        name: "Nambambe",
+        status: "Not Started",
+        color: criticalColor,
+        coords: [-14.8725, 13.5356]
+      },
+      {
+        name: "Bula Matadi",
+        status: "Not Started",
+        color: criticalColor,
+        coords: [-14.9055, 13.5127]
+      },
+      {
+        name: "Lubango Central",
+        status: "In Progress",
+        color: warningColor,
+        coords: [-14.9177, 13.4925]
+      },
+      {
+        name: "Comandante",
+        status: "In Progress",
+        color: warningColor,
+        coords: [-14.9349, 13.4789]
+      },
+      {
+        name: "Ferrovia",
+        status: "Mobilising",
+        color: mobilisingColor,
+        coords: [-14.9484, 13.5098]
+      },
+      {
+        name: "Casa Verde / Escola Portuguesa",
+        status: "Complete",
+        color: successColor,
+        coords: [-14.9621, 13.4585]
+      }
     ];
 
-    segments.forEach((seg) => {
-      L.polyline(seg.coords, {
-        color: statusStyles[seg.status].color,
-        weight: 5,
-        opacity: 0.85,
-        dashArray: seg.status === "progress" ? "2 8" : null,
-      }).addTo(map);
-    });
-
-    const sites = [
-      { name: "Intake Pump Station", status: "completed", coords: [23.30, 77.36] },
-      { name: "Zone A Valve Chamber", status: "completed", coords: [23.27, 77.40] },
-      { name: "Zone B Pipeline Works", status: "progress", coords: [23.24, 77.43] },
-      { name: "Village Cluster 12 — House Connections", status: "pending", coords: [23.19, 77.48] },
+    var route = [
+      [-14.8968, 13.4558],
+      [-14.9177, 13.4925],
+      [-14.9055, 13.5127],
+      [-14.8725, 13.5356]
     ];
 
-    sites.forEach((s) => {
-      L.circleMarker(s.coords, {
-        radius: 7,
-        color: "#fff",
+    L.polyline(route, {
+      color: cssVar("--color-primary", "#0A4595"),
+      weight: 4,
+      opacity: 0.7,
+      dashArray: "7 7"
+    }).addTo(map);
+
+    areas.forEach(function (area) {
+      L.circleMarker(area.coords, {
+        radius: 12,
+        color: "#ffffff",
         weight: 2,
-        fillColor: statusStyles[s.status].fillColor,
-        fillOpacity: 1,
+        fillColor: area.color,
+        fillOpacity: 0.85
       })
         .addTo(map)
-        .bindPopup(`<strong>${s.name}</strong><br><span style="text-transform:capitalize">${s.status}</span>`);
+        .bindPopup(
+          "<strong>" + area.name + "</strong><br>" +
+          "Status: " + area.status
+        );
     });
+
+    var bounds = L.latLngBounds(
+      areas.map(function (area) {
+        return area.coords;
+      })
+    );
+
+    map.fitBounds(bounds.pad(0.25));
+
+    setTimeout(function () {
+      map.invalidateSize();
+    }, 300);
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
-    initProgressDonut();
-    initPlannedVsActual();
-    initSparklines();
+  document.addEventListener("DOMContentLoaded", function () {
+    initMonthlyPipeChart();
+    initPhysicalSCurveChart();
+    initFinancialExecutionChart();
+    initESHSComplianceChart();
     initMiniMap();
   });
 })();

@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Executive Summary — Water Supply Distribution Project</title>
-<meta name="description" content="Enterprise dashboard for monitoring construction progress of the Water Supply Distribution Project." />
+<title>PDISA-2 Lubango — Landing Dashboard</title>
+<meta name="description" content="Construction progress dashboard for PDISA-2 Lubango water supply distribution project." />
 
 <!-- Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -17,17 +17,167 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
 <!-- App styles -->
-<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/styles.css" />
+
+<style>
+  /*
+    Home dashboard only additions.
+    Existing website colors, cards, shell, sidebar, topbar and layout style are preserved.
+  */
+
+  body[data-page="home"] .home-project-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-4);
+    margin-bottom: var(--sp-5);
+  }
+
+  body[data-page="home"] .home-project-title {
+    margin: 0;
+    font-size: 1.45rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+  }
+
+  body[data-page="home"] .home-project-subtitle {
+    margin-top: 4px;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  body[data-page="home"] .home-project-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  body[data-page="home"] .headline-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: var(--sp-5);
+  }
+
+  body[data-page="home"] .headline-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 13px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    border: 1px solid var(--border-color);
+    background: var(--surface-card);
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+
+  body[data-page="home"] .headline-pill.info {
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+  }
+
+  body[data-page="home"] .headline-pill.success {
+    background: var(--color-success-light);
+    color: var(--color-success);
+  }
+
+  body[data-page="home"] .headline-pill.warning {
+    background: var(--color-warning-light);
+    color: var(--color-warning);
+  }
+
+  body[data-page="home"] .headline-pill.critical {
+    background: var(--color-critical-light);
+    color: var(--color-critical);
+  }
+
+  body[data-page="home"] .lubango-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--sp-5);
+  }
+
+  @media (max-width: 1200px) {
+    body[data-page="home"] .lubango-kpi-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 640px) {
+    body[data-page="home"] .lubango-kpi-grid {
+      grid-template-columns: 1fr;
+    }
+
+    body[data-page="home"] .home-project-strip {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+  }
+
+  body[data-page="home"] .kpi-card.kpi-card--compact {
+    min-height: 120px;
+    height: auto;
+    padding: 18px 20px;
+  }
+
+  body[data-page="home"] .kpi-card.kpi-card--compact .kpi-card__value {
+    margin-top: 12px;
+    font-size: 2rem;
+    line-height: 1;
+  }
+
+  body[data-page="home"] .kpi-card.kpi-card--compact .kpi-card__delta {
+    margin-top: 9px;
+    font-size: 12px;
+  }
+
+  body[data-page="home"] .kpi-card.kpi-card--compact .kpi-card__spark {
+    display: none;
+  }
+
+  body[data-page="home"] .chart-card-height {
+    height: 300px;
+    position: relative;
+  }
+
+  body[data-page="home"] #miniMap {
+    height: 420px;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    z-index: 1;
+  }
+
+  body[data-page="home"] .lubango-sidebar-logo {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    flex: 0 0 auto;
+  }
+
+  body[data-page="home"] .lubango-sidebar-logo i {
+    font-size: 20px;
+  }
+</style>
 </head>
+
 <body data-page="home">
 
 <script>
-  // Per-page header config, read by shell.js when it builds the topbar.
   window.WSDP_PAGE = {
-    title: "Executive Summary",
-    breadcrumb: "Water Supply Distribution Project <span class=\"separator\">/</span> Home Dashboard",
+    title: "Landing Dashboard",
+    breadcrumb: "PDISA-2 Lubango <span class=\"separator\">/</span> Contract 44W3/LUBANGO/DNA/18",
     statusClass: "status-pill--warning",
-    statusText: "At Risk — Schedule"
+    statusText: "Notional Delay: 6.5 months"
   };
 </script>
 
@@ -39,264 +189,258 @@
 
     <header class="topbar" id="topbarMount"><!-- injected by js/shell.js --></header>
 
-    <!-- MAIN CONTENT -->
     <main class="main-content">
 
-      <!-- ============ KPI ROW ============ -->
-      <div class="grid grid-4 fade-in">
+      <!-- ============ PROJECT NAME / CONTRACT HEADER ============ -->
+      <div class="home-project-strip fade-in">
+        <div>
+          <h1 class="home-project-title">PDISA-2 LUBANGO</h1>
+          <div class="home-project-subtitle">
+            Construction Progress Dashboard &nbsp;|&nbsp; Contract 44W3/LUBANGO/DNA/18
+          </div>
+        </div>
 
-        <a class="card kpi-card" href="construction-progress.html" data-tooltip="Click to view Construction Progress module">
+        <div class="home-project-actions">
+          <button class="btn-ghost" type="button">
+            <i class="fa-solid fa-upload"></i> Import
+          </button>
+          <button class="btn-ghost" type="button">
+            <i class="fa-solid fa-download"></i> Export
+          </button>
+        </div>
+      </div>
+
+      <!-- ============ HEADLINE INDICATORS ============ -->
+      <div class="headline-strip fade-in" aria-label="Headline indicators">
+        <span class="headline-pill info">
+          <i class="fa-solid fa-ruler-horizontal"></i>
+          Revised DDR: 92,677 m / 5,303 HSC
+        </span>
+
+        <span class="headline-pill info">
+          <i class="fa-solid fa-file-contract"></i>
+          Contract: 3,625.58 M AOA (USD 5.6 M)
+        </span>
+
+        <span class="headline-pill success">
+          <i class="fa-solid fa-circle-check"></i>
+          IPC-01 Approved &amp; IPC-02 Submitted (17.96%)
+        </span>
+
+        <span class="headline-pill warning">
+          <i class="fa-solid fa-calendar-days"></i>
+          Notional Delay: 6.5 months
+        </span>
+
+        <span class="headline-pill critical">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          EOT &amp; Recovery Plan: Pending CTCE
+        </span>
+      </div>
+
+      <!-- ============ KPI CARDS ============ -->
+      <div class="lubango-kpi-grid fade-in">
+
+        <a class="card kpi-card kpi-card--compact" href="construction-progress.html" data-tooltip="Click to view Construction Progress module">
           <div class="kpi-card__top">
-            <div>
-              <div class="kpi-card__label">Overall Physical Progress</div>
+            <div class="kpi-card__label">Overall Physical Progress</div>
+            <div class="kpi-card__icon icon-tone-amber">
+              <i class="fa-solid fa-circle-check"></i>
             </div>
-            <div class="kpi-card__icon icon-tone-blue"><i class="fa-solid fa-chart-simple"></i></div>
           </div>
-          <div class="kpi-card__value"><span class="count-up" data-count="61.4" data-decimals="1">0</span><span class="unit">%</span></div>
-          <div class="kpi-card__delta up"><i class="fa-solid fa-arrow-trend-up"></i> +4.4% this month</div>
-          <canvas class="kpi-card__spark" data-sparkline="35,40,45,51,57,61.4" data-color="#0A4595"></canvas>
+          <div class="kpi-card__value">
+            <span class="count-up" data-count="17">0</span><span class="unit">%</span>
+          </div>
+          <div class="kpi-card__delta flat">Weighted across 6 activities</div>
         </a>
 
-        <a class="card kpi-card" href="financial-dashboard.html" data-tooltip="Click to view Financial Dashboard">
+        <a class="card kpi-card kpi-card--compact" href="construction-progress.html#pipeline" data-tooltip="Click to view Pipeline Progress">
           <div class="kpi-card__top">
-            <div class="kpi-card__label">Financial Progress</div>
-            <div class="kpi-card__icon icon-tone-teal"><i class="fa-solid fa-sack-dollar"></i></div>
+            <div class="kpi-card__label">Pipe Laying</div>
+            <div class="kpi-card__icon icon-tone-amber">
+              <i class="fa-solid fa-grip-lines"></i>
+            </div>
           </div>
-          <div class="kpi-card__value"><span class="count-up" data-count="54.2" data-decimals="1">0</span><span class="unit">%</span></div>
-          <div class="kpi-card__delta up"><i class="fa-solid fa-arrow-trend-up"></i> +3.1% this month</div>
-          <canvas class="kpi-card__spark" data-sparkline="30,35,41,46,50,54.2" data-color="#0E7C86"></canvas>
+          <div class="kpi-card__value">
+            <span class="count-up" data-count="25.5" data-decimals="1">0</span><span class="unit">%</span>
+          </div>
+          <div class="kpi-card__delta flat">23,628.5 / 92,677 m (DDR)</div>
         </a>
 
-        <a class="card kpi-card" href="construction-progress.html#pipeline" data-tooltip="Click to view Pipeline Progress">
+        <a class="card kpi-card kpi-card--compact" href="construction-progress.html#house-connections" data-tooltip="Click to view House Connections">
           <div class="kpi-card__top">
-            <div class="kpi-card__label">Pipeline Laid</div>
-            <div class="kpi-card__icon icon-tone-green"><i class="fa-solid fa-road"></i></div>
+            <div class="kpi-card__label">Household Connections</div>
+            <div class="kpi-card__icon icon-tone-red">
+              <i class="fa-solid fa-faucet-drip"></i>
+            </div>
           </div>
-          <div class="kpi-card__value"><span class="count-up" data-count="59.1" data-decimals="1">0</span><span class="unit">km</span></div>
-          <div class="kpi-card__delta flat"><i class="fa-solid fa-ruler-horizontal"></i> of 92.677 km total</div>
-          <canvas class="kpi-card__spark" data-sparkline="30,36,42,48,54,59.1" data-color="#1E8449"></canvas>
+          <div class="kpi-card__value" style="color:var(--color-critical);">
+            <span class="count-up" data-count="0">0</span><span class="unit">%</span>
+          </div>
+          <div class="kpi-card__delta flat">0 / 5,303 (DDR)</div>
         </a>
 
-        <a class="card kpi-card" href="construction-progress.html#house-connections" data-tooltip="Click to view House Connections">
+        <a class="card kpi-card kpi-card--compact" href="risk-delay.html#delay-analysis" data-tooltip="Click to view Delay Analysis">
           <div class="kpi-card__top">
-            <div class="kpi-card__label">House Connections</div>
-            <div class="kpi-card__icon icon-tone-amber"><i class="fa-solid fa-house-chimney"></i></div>
+            <div class="kpi-card__label">Months Elapsed / Remaining</div>
+            <div class="kpi-card__icon icon-tone-amber">
+              <i class="fa-solid fa-calendar-days"></i>
+            </div>
           </div>
-          <div class="kpi-card__value"><span class="count-up" data-count="3120">0</span></div>
-          <div class="kpi-card__delta flat"><i class="fa-solid fa-list-check"></i> of 5,303 planned</div>
-          <canvas class="kpi-card__spark" data-sparkline="1600,1950,2300,2650,2900,3120" data-color="#B9770E"></canvas>
+          <div class="kpi-card__value">04 / 07</div>
+          <div class="kpi-card__delta flat">Delay accrued 6.5 months</div>
+        </a>
+
+        <a class="card kpi-card kpi-card--compact" href="financial-dashboard.html" data-tooltip="Click to view Financial Dashboard">
+          <div class="kpi-card__top">
+            <div class="kpi-card__label">Cumulative Billing</div>
+            <div class="kpi-card__icon icon-tone-blue">
+              <i class="fa-regular fa-money-bill-1"></i>
+            </div>
+          </div>
+          <div class="kpi-card__value">
+            <span class="count-up" data-count="17.96" data-decimals="2">0</span><span class="unit">%</span>
+          </div>
+          <div class="kpi-card__delta flat">650.99 M AOA of 3,625.58 M</div>
+        </a>
+
+        <a class="card kpi-card kpi-card--compact" href="financial-dashboard.html" data-tooltip="Click to view IPC Status">
+          <div class="kpi-card__top">
+            <div class="kpi-card__label">IPC Status</div>
+            <div class="kpi-card__icon icon-tone-green">
+              <i class="fa-regular fa-circle-check"></i>
+            </div>
+          </div>
+          <div class="kpi-card__value">01 ✓ / 02 ✓</div>
+          <div class="kpi-card__delta flat">IPC-02: 246.34 M AOA Submitted</div>
+        </a>
+
+        <a class="card kpi-card kpi-card--compact" href="ehs-dashboard.html#ehs" data-tooltip="Click to view EHS Dashboard">
+          <div class="kpi-card__top">
+            <div class="kpi-card__label">ESHS Compliance</div>
+            <div class="kpi-card__icon icon-tone-amber">
+              <i class="fa-solid fa-shield-halved"></i>
+            </div>
+          </div>
+          <div class="kpi-card__value">
+            <span class="count-up" data-count="78">0</span><span class="unit">%</span>
+          </div>
+          <div class="kpi-card__delta flat">Target ≥ 90%</div>
+        </a>
+
+        <a class="card kpi-card kpi-card--compact" href="ehs-dashboard.html#ehs" data-tooltip="Click to view Lost-Time Accidents">
+          <div class="kpi-card__top">
+            <div class="kpi-card__label">Lost-Time Accidents</div>
+            <div class="kpi-card__icon icon-tone-green">
+              <i class="fa-regular fa-circle-check"></i>
+            </div>
+          </div>
+          <div class="kpi-card__value">
+            <span class="count-up" data-count="0">0</span>
+          </div>
+          <div class="kpi-card__delta flat">Zero injuries</div>
+        </a>
+
+        <a class="card kpi-card kpi-card--compact" href="social-environmental.html" data-tooltip="Click to view Social & Environmental module">
+          <div class="kpi-card__top">
+            <div class="kpi-card__label">Grievances Resolved</div>
+            <div class="kpi-card__icon icon-tone-green">
+              <i class="fa-solid fa-people-group"></i>
+            </div>
+          </div>
+          <div class="kpi-card__value">1 / 1</div>
+          <div class="kpi-card__delta flat">100% — Satisfied</div>
+        </a>
+
+        <a class="card kpi-card kpi-card--compact" href="construction-progress.html" data-tooltip="Click to view Active Work Fronts">
+          <div class="kpi-card__top">
+            <div class="kpi-card__label">Active Work Fronts</div>
+            <div class="kpi-card__icon icon-tone-amber">
+              <i class="fa-solid fa-location-dot"></i>
+            </div>
+          </div>
+          <div class="kpi-card__value">2 / 7</div>
+          <div class="kpi-card__delta flat">Casa Verde, Escola Portuguesa</div>
         </a>
 
       </div>
 
-      <!-- ============ HEALTH / TRAFFIC LIGHT STRIP ============ -->
+      <!-- ============ GRAPH CARDS ============ -->
       <div class="section-heading">
-        <h2>Project Health &amp; Status</h2>
-        <span class="section-sub">Updated as of today, based on latest weekly import</span>
+        <h2>Progress & Compliance Trends</h2>
+        <span class="section-sub">Headline indicators for PDISA Client</span>
       </div>
 
       <div class="grid grid-12">
-        <div class="card col-span-4">
-          <div class="card-body" style="text-align:center;">
-            <div class="kpi-card__label" style="margin-bottom:8px;">Project Health Score</div>
-            <div style="font-size:2.75rem;font-weight:800;color:var(--color-warning);line-height:1;">
-              <span class="count-up" data-count="72">0</span><span style="font-size:1.1rem;color:var(--text-muted);"> /100</span>
+
+        <div class="card col-span-6">
+          <div class="card-header">
+            <h3>Monthly Pipe Laying — Planned vs Actual (m)</h3>
+          </div>
+          <div class="card-body">
+            <div class="chart-card-height">
+              <canvas id="monthlyPipeChart"></canvas>
             </div>
-            <div class="progress-track" style="margin-top:14px;">
-              <div class="progress-fill" data-target="72" style="width:0; background:linear-gradient(90deg,var(--color-warning),var(--color-secondary));"></div>
-            </div>
-            <p style="font-size:12px;color:var(--text-muted);margin:10px 0 0;">Fair — schedule slippage is the main drag on score</p>
           </div>
         </div>
 
-        <div class="card col-span-8">
+        <div class="card col-span-6">
+          <div class="card-header">
+            <h3>Cumulative Physical Progress — S-Curve (%)</h3>
+          </div>
           <div class="card-body">
-            <div class="kpi-card__label" style="margin-bottom:14px;">Traffic Light Status by Category</div>
-            <div class="health-strip">
-              <a class="health-item" href="risk-delay.html#delay-analysis"><span class="health-light amber"></span> Schedule — Delayed 18 days</a>
-              <a class="health-item" href="financial-dashboard.html"><span class="health-light green"></span> Cost — Within budget</a>
-              <a class="health-item" href="construction-progress.html"><span class="health-light green"></span> Quality — No major NCRs</a>
-              <a class="health-item" href="ehs-dashboard.html#ehs"><span class="health-light red pulse"></span> Safety — 1 open incident</a>
-              <a class="health-item" href="risk-delay.html#risk-register"><span class="health-light green"></span> Stakeholder — On track</a>
+            <div class="chart-card-height">
+              <canvas id="physicalSCurveChart"></canvas>
             </div>
           </div>
         </div>
+
+        <div class="card col-span-6">
+          <div class="card-header">
+            <h3>Cumulative Financial Execution (Million AOA)</h3>
+          </div>
+          <div class="card-body">
+            <div class="chart-card-height">
+              <canvas id="financialExecutionChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="card col-span-6">
+          <div class="card-header">
+            <h3>ESHS Compliance by Plan (%)</h3>
+          </div>
+          <div class="card-body">
+            <div class="chart-card-height">
+              <canvas id="eshsComplianceChart"></canvas>
+            </div>
+          </div>
+        </div>
+
       </div>
 
-      <!-- ============ PIPELINE CORRIDOR (SIGNATURE ELEMENT) ============ -->
+      <!-- ============ GIS MAP ============ -->
       <div class="section-heading">
-        <h2>Pipeline Corridor Progress</h2>
-        <span class="section-sub">92.677 km total alignment · click a segment to drill down</span>
-      </div>
-
-      <a class="card" href="construction-progress.html#pipeline" style="display:block;">
-        <div class="card-body corridor">
-          <div class="corridor-track" role="img" aria-label="Pipeline progress corridor, 63.8 percent complete, 15 percent in progress, remainder pending">
-            <div class="corridor-seg" data-status="done" style="width:63.8%;" data-tooltip="Completed — 59.1 km"></div>
-            <div class="corridor-seg" data-status="progress" style="width:15%;" data-tooltip="In Progress — 13.9 km"></div>
-            <div class="corridor-seg" data-status="pending" style="width:21.2%;" data-tooltip="Not Started — 19.6 km"></div>
-          </div>
-          <div class="corridor-markers">
-            <div class="corridor-marker" style="left:0%;"><span class="km">0 km</span><span class="label">Intake</span></div>
-            <div class="corridor-marker" style="left:25%;"><span class="km">23.2 km</span><span class="label">Zone A</span></div>
-            <div class="corridor-marker" style="left:50%;"><span class="km">46.3 km</span><span class="label">Zone B</span></div>
-            <div class="corridor-marker" style="left:75%;"><span class="km">69.5 km</span><span class="label">Zone C</span></div>
-            <div class="corridor-marker" style="left:100%;"><span class="km">92.7 km</span><span class="label">Terminal</span></div>
-          </div>
-          <div class="corridor-legend">
-            <div class="item"><span class="swatch" style="background:linear-gradient(90deg,var(--color-secondary),var(--color-primary));"></span> Completed</div>
-            <div class="item"><span class="swatch" style="background:repeating-linear-gradient(135deg,var(--color-warning) 0 4px,#d99a3d 4px 8px);"></span> In Progress</div>
-            <div class="item"><span class="swatch" style="background:var(--border-color-strong);opacity:0.6;"></span> Not Started</div>
-          </div>
-        </div>
-      </a>
-
-      <!-- ============ CHARTS ROW ============ -->
-      <div class="section-heading">
-        <h2>Progress Trends</h2>
-        <span class="section-sub">Physical completion vs. plan</span>
-      </div>
-
-      <div class="grid grid-12">
-        <div class="card col-span-5">
-          <div class="card-header">
-            <div>
-              <h3>Physical Progress Split</h3>
-              <div class="card-header-sub">Share of total scope</div>
-            </div>
-            <button class="btn-ghost" data-tooltip="Export chart"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>
-          </div>
-          <div class="card-body">
-            <div style="height:220px; position:relative;">
-              <canvas id="progressDonut"></canvas>
-            </div>
-            <div class="corridor-legend" style="justify-content:center;margin-top:16px;">
-              <div class="item"><span class="swatch" style="background:var(--color-primary);"></span> Completed 61.4%</div>
-              <div class="item"><span class="swatch" style="background:var(--color-warning);"></span> In Progress 18.2%</div>
-              <div class="item"><span class="swatch" style="background:var(--color-neutral-light);border:1px solid var(--border-color-strong);"></span> Not Started 20.4%</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="card col-span-7">
-          <div class="card-header">
-            <div>
-              <h3>Planned vs. Actual Progress</h3>
-              <div class="card-header-sub">Monthly physical completion, last 6 months</div>
-            </div>
-            <button class="btn-ghost"><i class="fa-solid fa-download"></i> Export</button>
-          </div>
-          <div class="card-body">
-            <div style="height:260px;">
-              <canvas id="plannedActualChart"></canvas>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ============ ALERTS / FORECAST / MAP ROW ============ -->
-      <div class="section-heading">
-        <h2>What Needs Attention</h2>
-        <span class="section-sub">Critical alerts, forecast, and site location</span>
-      </div>
-
-      <div class="grid grid-12">
-
-        <div class="card col-span-4">
-          <div class="card-header">
-            <h3>Critical Alerts</h3>
-            <span class="badge-tag" style="background:var(--color-critical-light);color:var(--color-critical);">3 Open</span>
-          </div>
-          <div class="card-body">
-            <a class="alert-item" href="ehs-dashboard.html#ehs" style="display:flex;">
-              <div class="alert-icon" style="background:var(--color-critical-light);color:var(--color-critical);"><i class="fa-solid fa-triangle-exclamation"></i></div>
-              <div>
-                <div class="alert-title">Safety incident — Zone B trench collapse (minor)</div>
-                <div class="alert-meta">EHS Dashboard · 2 days ago</div>
-              </div>
-            </a>
-            <a class="alert-item" href="resource-dashboard.html#materials" style="display:flex;">
-              <div class="alert-icon" style="background:var(--color-warning-light);color:var(--color-warning);"><i class="fa-solid fa-truck-ramp-box"></i></div>
-              <div>
-                <div class="alert-title">DI pipe stock below reorder threshold</div>
-                <div class="alert-meta">Materials · 5 days ago</div>
-              </div>
-            </a>
-            <a class="alert-item" href="risk-delay.html#delay-analysis" style="display:flex;">
-              <div class="alert-icon" style="background:var(--color-warning-light);color:var(--color-warning);"><i class="fa-solid fa-clock-rotate-left"></i></div>
-              <div>
-                <div class="alert-title">Zone C road-crossing NOC pending 18 days</div>
-                <div class="alert-meta">Delay Analysis · 6 days ago</div>
-              </div>
-            </a>
-          </div>
-        </div>
-
-        <div class="card col-span-4">
-          <div class="card-header">
-            <h3>Completion Forecast</h3>
-          </div>
-          <div class="card-body">
-            <div class="forecast-row"><span class="forecast-label">Original Completion Date</span><span class="forecast-value">31 Dec 2026</span></div>
-            <div class="forecast-row"><span class="forecast-label">Forecast Completion Date</span><span class="forecast-value" style="color:var(--color-warning);">22 Jan 2027</span></div>
-            <div class="forecast-row"><span class="forecast-label">Projected Slippage</span><span class="forecast-value" style="color:var(--color-critical);">22 days</span></div>
-            <div class="forecast-row"><span class="forecast-label">Remaining Pipeline Work</span><span class="forecast-value">33.6 km</span></div>
-            <div class="forecast-row"><span class="forecast-label">Remaining House Connections</span><span class="forecast-value">2,183</span></div>
-            <div class="forecast-row"><span class="forecast-label">IPC Status</span><span class="forecast-value">IPC-01 Received · IPC-02 Ready</span></div>
-          </div>
-        </div>
-
-        <div class="card col-span-4">
-          <div class="card-header">
-            <h3>Project Location</h3>
-            <a class="btn-ghost" href="gis-map.html"><i class="fa-solid fa-expand"></i> Full GIS Map</a>
-          </div>
-          <div class="card-body">
-            <div id="miniMap"></div>
-            <div class="map-legend">
-              <div class="item"><span class="dot" style="background:var(--color-primary);"></span> Completed</div>
-              <div class="item"><span class="dot" style="background:var(--color-warning);"></span> In Progress</div>
-              <div class="item"><span class="dot" style="background:var(--color-neutral);"></span> Pending</div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- ============ RECENT ACTIVITY ============ -->
-      <div class="section-heading">
-        <h2>Recent Updates</h2>
-        <span class="section-sub">Latest site &amp; office activity</span>
+        <h2>GIS Map — 7 Intervention Areas (Lubango)</h2>
+        <span class="section-sub">Location view using Lubango intervention areas</span>
       </div>
 
       <div class="card">
         <div class="card-body">
-          <div class="activity-item">
-            <div class="activity-dot-line"><div class="activity-dot"></div><div class="activity-line"></div></div>
-            <div>
-              <div class="activity-text"><strong>Zone A</strong> — 1.2 km of pipeline laying completed and backfilled</div>
-              <div class="activity-time">Today, 9:40 AM · Site Engineer</div>
+          <div id="miniMap"></div>
+
+          <div class="map-legend" style="margin-top:14px;">
+            <div class="item">
+              <span class="dot" style="background:var(--color-success);"></span> Complete
             </div>
-          </div>
-          <div class="activity-item">
-            <div class="activity-dot-line"><div class="activity-dot" style="background:var(--color-success);"></div><div class="activity-line"></div></div>
-            <div>
-              <div class="activity-text">Hydro-testing passed for Chainage 12+300 to 14+100</div>
-              <div class="activity-time">Yesterday, 4:15 PM · Testing &amp; Commissioning</div>
+            <div class="item">
+              <span class="dot" style="background:var(--color-warning);"></span> In Progress
             </div>
-          </div>
-          <div class="activity-item">
-            <div class="activity-dot-line"><div class="activity-dot" style="background:var(--color-warning);"></div><div class="activity-line"></div></div>
-            <div>
-              <div class="activity-text">IPC-02 submitted for client review</div>
-              <div class="activity-time">2 days ago · Finance Team</div>
+            <div class="item">
+              <span class="dot" style="background:#F58232;"></span> Mobilising
             </div>
-          </div>
-          <div class="activity-item">
-            <div class="activity-dot-line"><div class="activity-dot" style="background:var(--color-critical);"></div></div>
-            <div>
-              <div class="activity-text">Minor trench collapse reported in Zone B, no injuries — corrective action in progress</div>
-              <div class="activity-time">2 days ago · EHS Team</div>
+            <div class="item">
+              <span class="dot" style="background:var(--color-critical);"></span> Not Started
             </div>
           </div>
         </div>
@@ -305,18 +449,60 @@
     </main>
 
     <footer style="text-align:center;padding:24px;color:var(--text-muted);font-size:12px;">
-      Water Supply Distribution Project — Monitoring Dashboard · Sample data for layout demonstration
+      PDISA-2 Lubango — Construction Progress Dashboard · Contract 44W3/LUBANGO/DNA/18
     </footer>
 
   </div>
 </div>
 
-<!-- Scripts (order matters: shell first, then main, then page-specific charts) -->
+<!-- Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="js/api.js"></script>
 <script src="js/shell.js"></script>
 <script src="js/main.js"></script>
 <script src="js/charts.js"></script>
+
+<script>
+  /*
+    Home page sidebar brand override.
+    This changes only the sidebar logo/title area after shell.js injects it.
+    No navigation, auth, module links, or layout behavior is changed.
+  */
+  document.addEventListener("DOMContentLoaded", function () {
+    var sidebar = document.getElementById("sidebarMount");
+    if (!sidebar) return;
+
+    function replaceSidebarBrand() {
+      var brand =
+        sidebar.querySelector(".sidebar-brand") ||
+        sidebar.querySelector(".brand") ||
+        sidebar.querySelector(".sidebar-header") ||
+        sidebar.firstElementChild;
+
+      if (!brand) return;
+
+      brand.innerHTML =
+        '<div class="lubango-sidebar-logo">' +
+          '<i class="fa-solid fa-house-flood-water"></i>' +
+        '</div>' +
+        '<div>' +
+          '<div style="font-weight:800;font-size:15px;line-height:1.1;color:#ffffff;">PDISA-2 LUBANGO</div>' +
+          '<div style="font-size:12px;line-height:1.35;color:rgba(255,255,255,.76);margin-top:4px;">' +
+            'Construction Progress Dashboard<br>' +
+            'Contract 44W3/LUBANGO/DNA/18' +
+          '</div>' +
+        '</div>';
+
+      brand.style.display = "flex";
+      brand.style.alignItems = "center";
+      brand.style.gap = "12px";
+    }
+
+    replaceSidebarBrand();
+    setTimeout(replaceSidebarBrand, 150);
+  });
+</script>
+
 </body>
 </html>
