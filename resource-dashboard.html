@@ -4,11 +4,11 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Resource Dashboard — Water Supply Distribution Project</title>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="css/styles.css">
-<!-- subnav / data-table / status-chip are now defined once in css/styles.css -->
 
 </head>
 <body data-page="resources">
@@ -57,6 +57,7 @@
           <div class="kpi-card__value"><span class="count-up" data-count="1">0</span></div>
           <div class="kpi-card__delta down"><i class="fa-solid fa-arrow-down"></i> DI Pipe 600mm critical</div>
         </div>
+
         <div class="card kpi-card card-accent card-accent--success">
           <div class="kpi-card__top">
             <div class="kpi-card__label">Equipment Utilization</div>
@@ -65,6 +66,7 @@
           <div class="kpi-card__value"><span class="count-up" data-count="80">0</span><span class="unit">%</span></div>
           <div class="kpi-card__delta up"><i class="fa-solid fa-arrow-trend-up"></i> Fleet-wide average</div>
         </div>
+
         <div class="card kpi-card card-accent card-accent--primary">
           <div class="kpi-card__top">
             <div class="kpi-card__label">Manpower Deployed</div>
@@ -73,6 +75,7 @@
           <div class="kpi-card__value"><span class="count-up" data-count="973">0</span></div>
           <div class="kpi-card__delta flat"><i class="fa-solid fa-users"></i> Across all categories</div>
         </div>
+
         <div class="card kpi-card card-accent card-accent--warning">
           <div class="kpi-card__top">
             <div class="kpi-card__label">Idle / Maintenance</div>
@@ -84,13 +87,17 @@
       </div>
 
       <div class="subnav">
-        <a href="#materials">Materials</a>
-        <a href="#equipment">Equipment</a>
-        <a href="#manpower">Manpower</a>
+        #materialsMaterials</a>
+        #equipmentEquipment</a>
+        #manpowerManpower</a>
       </div>
 
       <section id="materials">
-        <div class="section-heading"><h2>Materials</h2><span class="section-sub">Stock, consumption &amp; critical inventory</span></div>
+        <div class="section-heading">
+          <h2>Materials</h2>
+          <span class="section-sub">Stock, consumption &amp; critical inventory</span>
+        </div>
+
         <div class="card">
           <div class="card-body table-scroll">
             <table class="data-table">
@@ -105,11 +112,46 @@
                 </tr>
               </thead>
               <tbody>
-                <tr data-zone="Zone A"><td>DI Pipe — 600mm</td><td>m</td><td class="num">1,200</td><td class="num">2,400</td><td class="num">1,500</td><td><span class="status-chip crit"><i class="fa-solid fa-circle-exclamation"></i> Below Reorder</span></td></tr>
-                <tr data-zone="Zone B"><td>DI Pipe — 450mm</td><td>m</td><td class="num">3,100</td><td class="num">2,900</td><td class="num">2,000</td><td><span class="status-chip ok"><i class="fa-solid fa-circle-check"></i> Adequate</span></td></tr>
-                <tr data-zone="Zone C"><td>HDPE Pipe — 315mm</td><td>m</td><td class="num">5,400</td><td class="num">1,800</td><td class="num">2,500</td><td><span class="status-chip ok"><i class="fa-solid fa-circle-check"></i> Adequate</span></td></tr>
-                <tr data-zone="Zone A"><td>Cement (OPC 53)</td><td>bags</td><td class="num">2,850</td><td class="num">3,200</td><td class="num">3,000</td><td><span class="status-chip warn"><i class="fa-solid fa-triangle-exclamation"></i> Watch</span></td></tr>
-                <tr data-zone="Zone D"><td>Sluice Valves</td><td>nos</td><td class="num">34</td><td class="num">18</td><td class="num">25</td><td><span class="status-chip ok"><i class="fa-solid fa-circle-check"></i> Adequate</span></td></tr>
+                <tr data-zone="Zone A">
+                  <td>DI Pipe — 600mm</td>
+                  <td>m</td>
+                  <td class="num">1,200</td>
+                  <td class="num">2,400</td>
+                  <td class="num">1,500</td>
+                  <td><span class="status-chip crit"><i class="fa-solid fa-circle-exclamation"></i> Below Reorder</span></td>
+                </tr>
+                <tr data-zone="Zone B">
+                  <td>DI Pipe — 450mm</td>
+                  <td>m</td>
+                  <td class="num">3,100</td>
+                  <td class="num">2,900</td>
+                  <td class="num">2,000</td>
+                  <td><span class="status-chip ok"><i class="fa-solid fa-circle-check"></i> Adequate</span></td>
+                </tr>
+                <tr data-zone="Zone C">
+                  <td>HDPE Pipe — 315mm</td>
+                  <td>m</td>
+                  <td class="num">5,400</td>
+                  <td class="num">1,800</td>
+                  <td class="num">2,500</td>
+                  <td><span class="status-chip ok"><i class="fa-solid fa-circle-check"></i> Adequate</span></td>
+                </tr>
+                <tr data-zone="Zone A">
+                  <td>Cement (OPC 53)</td>
+                  <td>bags</td>
+                  <td class="num">2,850</td>
+                  <td class="num">3,200</td>
+                  <td class="num">3,000</td>
+                  <td><span class="status-chip warn"><i class="fa-solid fa-triangle-exclamation"></i> Watch</span></td>
+                </tr>
+                <tr data-zone="Zone D">
+                  <td>Sluice Valves</td>
+                  <td>nos</td>
+                  <td class="num">34</td>
+                  <td class="num">18</td>
+                  <td class="num">25</td>
+                  <td><span class="status-chip ok"><i class="fa-solid fa-circle-check"></i> Adequate</span></td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -117,18 +159,59 @@
       </section>
 
       <section id="equipment">
-        <div class="section-heading"><h2>Equipment</h2><span class="section-sub">Availability, utilization &amp; maintenance</span></div>
+        <div class="section-heading">
+          <h2>Equipment</h2>
+          <span class="section-sub">Availability, utilization &amp; maintenance</span>
+        </div>
+
         <div class="grid grid-4">
-          <div class="card card-accent card-accent--success"><div class="card-body"><div class="kpi-card__label">Excavators</div><div class="kpi-card__value" style="font-size:1.5rem;">8 / 10</div><div class="kpi-card__delta up">80% utilization</div></div></div>
-          <div class="card card-accent card-accent--secondary"><div class="card-body"><div class="kpi-card__label">HDD Rigs</div><div class="kpi-card__value" style="font-size:1.5rem;">2 / 3</div><div class="kpi-card__delta flat">67% utilization</div></div></div>
-          <div class="card card-accent card-accent--success"><div class="card-body"><div class="kpi-card__label">Dewatering Pumps</div><div class="kpi-card__value" style="font-size:1.5rem;">11 / 12</div><div class="kpi-card__delta up">92% utilization</div></div></div>
-          <div class="card card-accent card-accent--warning"><div class="card-body"><div class="kpi-card__label">Idle / Under Maintenance</div><div class="kpi-card__value" style="font-size:1.5rem;color:var(--color-warning);">6</div><div class="kpi-card__delta flat">Across all categories</div></div></div>
+          <div class="card card-accent card-accent--success">
+            <div class="card-body">
+              <div class="kpi-card__label">Excavators</div>
+              <div class="kpi-card__value" style="font-size:1.5rem;">8 / 10</div>
+              <div class="kpi-card__delta up">80% utilization</div>
+            </div>
+          </div>
+
+          <div class="card card-accent card-accent--secondary">
+            <div class="card-body">
+              <div class="kpi-card__label">HDD Rigs</div>
+              <div class="kpi-card__value" style="font-size:1.5rem;">2 / 3</div>
+              <div class="kpi-card__delta flat">67% utilization</div>
+            </div>
+          </div>
+
+          <div class="card card-accent card-accent--success">
+            <div class="card-body">
+              <div class="kpi-card__label">Dewatering Pumps</div>
+              <div class="kpi-card__value" style="font-size:1.5rem;">11 / 12</div>
+              <div class="kpi-card__delta up">92% utilization</div>
+            </div>
+          </div>
+
+          <div class="card card-accent card-accent--warning">
+            <div class="card-body">
+              <div class="kpi-card__label">Idle / Under Maintenance</div>
+              <div class="kpi-card__value" style="font-size:1.5rem;color:var(--color-warning);">6</div>
+              <div class="kpi-card__delta flat">Across all categories</div>
+            </div>
+          </div>
         </div>
       </section>
 
       <section id="manpower">
-        <div class="section-heading"><h2>Manpower</h2><span class="section-sub">Deployment, category &amp; productivity</span></div>
-        <div class="card"><div class="card-body"><div style="height:260px;"><canvas id="manpowerChart"></canvas></div></div></div>
+        <div class="section-heading">
+          <h2>Manpower</h2>
+          <span class="section-sub">Deployment, category &amp; productivity</span>
+        </div>
+
+        <div class="card manpower-chart-card">
+          <div class="card-body">
+            <div style="height:260px;">
+              <canvas id="manpowerChart"></canvas>
+            </div>
+          </div>
+        </div>
       </section>
 
     </main>
