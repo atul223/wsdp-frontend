@@ -1,14 +1,20 @@
-
 /* ============================================================
    financial-dashboard.js
-   Makes Financial Dashboard functional using existing backend:
-   - Budgets CRUD
-   - IPC / Invoice CRUD
-   - KPI cards from summary endpoint
-   - Cash Flow chart from summary endpoint
-   - Financial vs Physical chart from summary endpoint
+   Financial Dashboard page script
 
-   Load after api.js, shell.js, main.js, and Chart.js.
+   Keeps existing website theme, layout, colors and API wrapper.
+   Supports:
+   - Existing financial summary cards
+   - Added reference financial cards
+   - Cash Flow chart
+   - Financial vs Physical chart
+   - IPC Tracker table
+   - Bank Guarantees table
+   - Addenda / Amendments table
+   - Existing Budget and IPC/Invoice CRUD using current backend
+
+   Load order required:
+   api.js, shell.js, main.js, Chart.js, then this file.
    ============================================================ */
 
 (function () {
@@ -22,22 +28,109 @@
     cashFlowChart: null,
     finPhysChart: null,
     activeInvoice: null,
-    activeBudget: null,
+    activeBudget: null
   };
 
   const STATUS_LABELS = {
     pending: "Pending",
     approved: "Approved",
     paid: "Paid",
-    rejected: "Rejected",
+    rejected: "Rejected"
   };
 
   const STATUS_CLASS = {
     pending: "warn",
     approved: "ok",
     paid: "ok",
-    rejected: "danger",
+    rejected: "danger"
   };
+
+  const FALLBACK_REFERENCE_CARDS = {
+    total_contract_m_aoa: 3625.58,
+    advance_payment_20_m_aoa: 725.12,
+    contract_balance_m_aoa: 2974.59,
+    daab_prov_sum_50_m_aoa: 1.94
+  };
+
+  const FALLBACK_IPC_TRACKER = [
+    {
+      ipc: "IPC-01",
+      period: "Feb 2026",
+      aoa_amount: 404659374.56,
+      usd_amount: 624995.17,
+      percentage: 11.16,
+      ace_status: "Certified",
+      client_status: "Approved"
+    },
+    {
+      ipc: "IPC-02",
+      period: "Apr 2026",
+      aoa_amount: 246340149.83,
+      usd_amount: 380471.61,
+      percentage: 6.79,
+      ace_status: "Certified 24/06",
+      client_status: "Submitted"
+    },
+    {
+      ipc: "Cumulative",
+      period: "—",
+      aoa_amount: 650999524.39,
+      usd_amount: 1005466.78,
+      percentage: 17.96,
+      ace_status: "—",
+      client_status: "—",
+      is_cumulative: true
+    },
+    {
+      ipc: "IPC-03",
+      period: "—",
+      aoa_amount: null,
+      usd_amount: null,
+      percentage: null,
+      ace_status: "Future",
+      client_status: "—"
+    }
+  ];
+
+  const FALLBACK_BANK_GUARANTEES = [
+    {
+      guarantee: "Advance Payment Security (APG)",
+      bank: "Bank of China",
+      usd_amount: 1119940.90,
+      valid_until: "2026-08-23",
+      status: "Expires < 60d · Renew"
+    },
+    {
+      guarantee: "Performance Security (PG)",
+      bank: "Bank of China",
+      usd_amount: 559970.45,
+      valid_until: "2026-12-31",
+      status: "Valid"
+    }
+  ];
+
+  const FALLBACK_AMENDMENTS = [
+    {
+      amendment: "Amendment No. 04",
+      amendment_date: "2026-05-07",
+      scope: "Revised DDR scope: 92.677 km / 5,303 HSC (USD 6,044,736.58)",
+      status: "Under Employer review"
+    },
+    {
+      amendment: "Amendment No. 05",
+      amendment_date: "Drafting",
+      scope: "EOT + Price Adjustment",
+      status: "Pending CTCE"
+    }
+  ];
+
+  function api() {
+    if (!window.WSDP_API) {
+      throw new Error("WSDP_API is not loaded. Ensure js/api.js is loaded before financial-dashboard.js.");
+    }
+
+    return window.WSDP_API;
+  }
 
   function toast(message, icon) {
     if (window.WSDP_TOAST) {
@@ -47,11 +140,17 @@
     }
   }
 
-  function api() {
-    if (!window.WSDP_API) {
-      throw new Error("WSDP_API is not loaded. Ensure js/api.js is loaded before financial-dashboard.js.");
-    }
-    return window.WSDP_API;
+  function request(method, path, body) {
+    return api().request(method, path, body);
+  }
+
+  function escapeHtml(value) {
+    return String(value === null || value === undefined ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
   }
 
   function parseStoredProject(value) {
@@ -60,16 +159,12 @@
     try {
       const parsed = JSON.parse(value);
 
-      if (typeof parsed === "string") return parsed;
+      if (typeof parsed === "string") {
+        return parsed;
+      }
 
-      return (
-        parsed.id ||
-        parsed.project_id ||
-        parsed.projectId ||
-        parsed.value ||
-        null
-      );
-    } catch (e) {
+      return parsed.id || parsed.project_id || parsed.projectId || parsed.value || null;
+    } catch (err) {
       return value;
     }
   }
@@ -84,16 +179,53 @@
     );
   }
 
-  function moneyCr(value) {
-    const n = Number(value || 0);
-    return (n / 10000000).toFixed(1);
+  function cssVar(name, fallback) {
+    const value = getComputedStyle(document.documentElement)
+      .getPropertyValue(name)
+      .trim();
+
+    return value || fallback;
   }
 
-  function formatAmount(value) {
-    const n = Number(value || 0);
+  function toNumber(value) {
+    if (value === null || value === undefined || value === "") return 0;
+
+    const n = Number(value);
+    return Number.isNaN(n) ? 0 : n;
+  }
+
+  function formatAmount(value, decimals) {
+    if (value === null || value === undefined || value === "") return "—";
+
+    const n = Number(value);
+    if (Number.isNaN(n)) return String(value);
+
     return n.toLocaleString("en-IN", {
-      maximumFractionDigits: 2,
+      minimumFractionDigits: decimals === undefined ? 0 : decimals,
+      maximumFractionDigits: decimals === undefined ? 2 : decimals
     });
+  }
+
+  function formatM(value) {
+    const n = toNumber(value);
+    return n.toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  }
+
+  function formatPercent(value) {
+    if (value === null || value === undefined || value === "") return "—";
+
+    const n = Number(value);
+    if (Number.isNaN(n)) return String(value);
+
+    return n.toFixed(2) + "%";
+  }
+
+  function moneyCr(value) {
+    const n = toNumber(value);
+    return (n / 10000000).toFixed(1);
   }
 
   function toInputDate(value) {
@@ -101,101 +233,46 @@
     return String(value).slice(0, 10);
   }
 
-  function escapeHtml(value) {
-    return String(value ?? "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
+  function formatDisplayDate(value) {
+    if (!value) return "—";
+
+    if (String(value).toLowerCase() === "drafting") {
+      return "Drafting";
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return String(value);
+    }
+
+    return date.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
+    });
   }
 
   async function ensureSession() {
     try {
       const user = await api().restoreSession();
       return Boolean(user);
-    } catch (e) {
+    } catch (err) {
       return false;
     }
   }
 
-  async function request(method, path, body) {
-    return api().request(method, path, body);
-  }
-
-  function getTableBody() {
-    const table = document.querySelector(".data-table");
-    if (!table) return null;
-
-    let tbody = table.querySelector("tbody");
-    if (!tbody) {
-      tbody = document.createElement("tbody");
-      table.appendChild(tbody);
-    }
-
-    tbody.id = "ipcTableBody";
-    return tbody;
-  }
-
-  function getCashFlowCanvas() {
-    return document.getElementById("cashFlowChart");
-  }
-
-  function getFinPhysCanvas() {
-    return document.getElementById("finPhysChart");
-  }
-
-  function setCountValue(label, value, decimals) {
-    const cards = document.querySelectorAll(".kpi-card");
-
-    cards.forEach((card) => {
-      const labelEl = card.querySelector(".kpi-card__label");
-      if (!labelEl) return;
-
-      if (labelEl.textContent.trim().toLowerCase() !== label.toLowerCase()) return;
-
-      const countEl = card.querySelector(".count-up");
-      if (countEl) {
-        countEl.setAttribute("data-count", Number(value || 0).toFixed(decimals || 0));
-        countEl.textContent = Number(value || 0).toFixed(decimals || 0);
-      }
-    });
-  }
-
-  function setCardValue(label, html) {
-    const cards = document.querySelectorAll(".kpi-card");
-
-    cards.forEach((card) => {
-      const labelEl = card.querySelector(".kpi-card__label");
-      if (!labelEl) return;
-
-      if (labelEl.textContent.trim().toLowerCase() !== label.toLowerCase()) return;
-
-      const valueEl = card.querySelector(".kpi-card__value");
-      if (valueEl) valueEl.innerHTML = html;
-    });
-  }
-
-  function setCardDelta(label, text) {
-    const cards = document.querySelectorAll(".kpi-card");
-
-    cards.forEach((card) => {
-      const labelEl = card.querySelector(".kpi-card__label");
-      if (!labelEl) return;
-
-      if (labelEl.textContent.trim().toLowerCase() !== label.toLowerCase()) return;
-
-      const deltaEl = card.querySelector(".kpi-card__delta");
-      if (deltaEl) deltaEl.textContent = text || "";
-    });
-  }
-
   function injectStyles() {
-    if (document.getElementById("financialDashboardDynamicStyles")) return;
+    if (document.getElementById("financialDashboardDynamicStyles")) {
+      return;
+    }
 
     const style = document.createElement("style");
     style.id = "financialDashboardDynamicStyles";
     style.textContent = `
+      .financial-reference-kpis {
+        margin-top: 18px;
+      }
+
       .financial-actions {
         display: flex;
         justify-content: flex-end;
@@ -225,11 +302,6 @@
       .financial-btn-secondary {
         background: var(--color-neutral-light, #eef3f7);
         color: var(--text-primary, #16232f);
-      }
-
-      .financial-btn-danger {
-        background: #fee2e2;
-        color: #b91c1c;
       }
 
       .financial-row-actions {
@@ -356,11 +428,88 @@
     document.head.appendChild(style);
   }
 
+  function findKpiCard(label) {
+    const cards = document.querySelectorAll(".kpi-card");
+
+    for (const card of cards) {
+      const labelEl = card.querySelector(".kpi-card__label");
+      if (!labelEl) continue;
+
+      if (labelEl.textContent.trim().toLowerCase() === label.toLowerCase()) {
+        return card;
+      }
+    }
+
+    return null;
+  }
+
+  function setCountValue(label, value, decimals) {
+    const card = findKpiCard(label);
+    if (!card) return;
+
+    const countEl = card.querySelector(".count-up");
+    if (!countEl) return;
+
+    const n = toNumber(value);
+    const fixed = n.toFixed(decimals || 0);
+
+    countEl.setAttribute("data-count", fixed);
+    countEl.textContent = fixed;
+  }
+
+  function setCardValue(label, html) {
+    const card = findKpiCard(label);
+    if (!card) return;
+
+    const valueEl = card.querySelector(".kpi-card__value");
+    if (valueEl) {
+      valueEl.innerHTML = html;
+    }
+  }
+
+  function setCardDelta(label, text) {
+    const card = findKpiCard(label);
+    if (!card) return;
+
+    const deltaEl = card.querySelector(".kpi-card__delta");
+    if (deltaEl) {
+      deltaEl.textContent = text || "";
+    }
+  }
+
+  function getIpcTable() {
+    return (
+      document.getElementById("ipcTrackerTable") ||
+      document.querySelector(".data-table")
+    );
+  }
+
+  function getIpcTableBody() {
+    const table = getIpcTable();
+    if (!table) return null;
+
+    let tbody = table.querySelector("tbody");
+
+    if (!tbody) {
+      tbody = document.createElement("tbody");
+      table.appendChild(tbody);
+    }
+
+    tbody.id = "ipcTableBody";
+    return tbody;
+  }
+
   function ensureActions() {
-    const tableCard = document.querySelector(".data-table")?.closest(".card");
+    const table = getIpcTable();
+    if (!table) return;
+
+    const tableCard = table.closest(".card");
     if (!tableCard) return;
 
     if (document.getElementById("financialActions")) return;
+
+    const cardBody = tableCard.querySelector(".card-body");
+    if (!cardBody) return;
 
     const actions = document.createElement("div");
     actions.className = "financial-actions";
@@ -374,52 +523,506 @@
       </button>
     `;
 
-    const cardBody = tableCard.querySelector(".card-body");
-    if (cardBody) {
-      cardBody.insertBefore(actions, cardBody.firstChild);
+    cardBody.insertBefore(actions, cardBody.firstChild);
+
+    const addBtn = document.getElementById("addInvoiceBtn");
+    const budgetBtn = document.getElementById("manageBudgetsBtn");
+
+    if (addBtn) {
+      addBtn.addEventListener("click", function () {
+        openInvoiceModal();
+      });
     }
 
-    document.getElementById("addInvoiceBtn")?.addEventListener("click", () => openInvoiceModal());
-    document.getElementById("manageBudgetsBtn")?.addEventListener("click", () => openBudgetModal());
+    if (budgetBtn) {
+      budgetBtn.addEventListener("click", function () {
+        openBudgetModal();
+      });
+    }
   }
 
-  function ensureTableActionColumn() {
-    const table = document.querySelector(".data-table");
+  function ensureIpcTableHeader() {
+    const table = getIpcTable();
     if (!table) return;
 
     const headRow = table.querySelector("thead tr");
     if (!headRow) return;
 
-    if (!headRow.querySelector("th[data-financial-actions]")) {
-      const th = document.createElement("th");
-      th.scope = "col";
-      th.className = "num";
-      th.setAttribute("data-financial-actions", "true");
-      th.textContent = "Actions";
-      headRow.appendChild(th);
+    headRow.innerHTML = `
+      <th scope="col">IPC</th>
+      <th scope="col">Period</th>
+      <th scope="col" class="num">AOA</th>
+      <th scope="col" class="num">USD</th>
+      <th scope="col" class="num">%</th>
+      <th scope="col">ACE</th>
+      <th scope="col">Client</th>
+      <th scope="col" class="num">Actions</th>
+    `;
+  }
+
+  function renderStatusChip(label, explicitClass) {
+    if (!label || label === "—") return "—";
+
+    const text = String(label);
+    const lower = text.toLowerCase();
+
+    let cls = explicitClass || "warn";
+    let icon = "fa-clock";
+
+    if (
+      lower.includes("valid") ||
+      lower.includes("approved") ||
+      lower.includes("certified") ||
+      lower.includes("received") ||
+      lower.includes("paid")
+    ) {
+      cls = "ok";
+      icon = "fa-circle-check";
+    }
+
+    if (
+      lower.includes("expire") ||
+      lower.includes("pending") ||
+      lower.includes("submitted") ||
+      lower.includes("future") ||
+      lower.includes("review") ||
+      lower.includes("draft")
+    ) {
+      cls = "warn";
+      icon = "fa-clock";
+    }
+
+    return `
+      <span class="status-chip ${escapeHtml(cls)}">
+        <i class="fa-solid ${escapeHtml(icon)}"></i> ${escapeHtml(text)}
+      </span>
+    `;
+  }
+
+  function renderReferenceCards() {
+    const ref = (state.summary && state.summary.reference_cards) || FALLBACK_REFERENCE_CARDS;
+
+    setCardValue(
+      "Total Contract",
+      `<span>${formatM(ref.total_contract_m_aoa)}</span><span class="unit">M</span>`
+    );
+    setCardDelta("Total Contract", "AOA contract value");
+
+    setCardValue(
+      "Advance Payment 20%",
+      `<span>${formatM(ref.advance_payment_20_m_aoa)}</span><span class="unit">M</span>`
+    );
+    setCardDelta("Advance Payment 20%", "AOA disbursed");
+
+    setCardValue(
+      "Contract Balance",
+      `<span>${formatM(ref.contract_balance_m_aoa)}</span><span class="unit">M</span>`
+    );
+    setCardDelta("Contract Balance", "82.04% remaining");
+
+    setCardValue(
+      "DAAB Prov. Sum (50%)",
+      `<span>${formatM(ref.daab_prov_sum_50_m_aoa)}</span><span class="unit">M</span>`
+    );
+    setCardDelta("DAAB Prov. Sum (50%)", "AOA verified in IPC-02");
+  }
+
+  function renderSummary() {
+    const s = state.summary || {};
+
+    setCountValue("Financial Progress", s.financial_progress_pct || 54.2, 1);
+
+    if (s.remaining_budget_pct !== undefined && s.remaining_budget_pct !== null) {
+      setCardDelta(
+        "Financial Progress",
+        toNumber(s.remaining_budget_pct).toFixed(1) + "% budget remaining"
+      );
+    }
+
+    setCountValue("Physical Progress", s.physical_progress_pct || 61.4, 1);
+
+    const physical = toNumber(s.physical_progress_pct || 61.4);
+    const financial = toNumber(s.financial_progress_pct || 54.2);
+
+    setCardDelta(
+      "Physical Progress",
+      physical >= financial
+        ? "Physical ahead of financial"
+        : "Physical behind financial"
+    );
+
+    if (s.cumulative_expenditure !== undefined && s.total_budget !== undefined) {
+      setCardValue(
+        "Cumulative Expenditure",
+        `<span class="unit" style="font-size:1.4rem;">₹</span><span>${moneyCr(s.cumulative_expenditure)}</span><span class="unit">Cr</span>`
+      );
+
+      setCardDelta(
+        "Cumulative Expenditure",
+        "of ₹" + moneyCr(s.total_budget) + " Cr total budget"
+      );
+    }
+
+    if (s.latest_ipc_no) {
+      setCardValue("IPC Status", escapeHtml(s.latest_ipc_no));
+      setCardDelta(
+        "IPC Status",
+        s.latest_ipc_status
+          ? "Latest status: " + (STATUS_LABELS[s.latest_ipc_status] || s.latest_ipc_status)
+          : "Latest IPC available"
+      );
+    }
+
+    renderReferenceCards();
+  }
+
+  function destroyChart(canvas) {
+    if (!canvas || !window.Chart) return;
+
+    const existing = window.Chart.getChart(canvas);
+    if (existing) {
+      existing.destroy();
     }
   }
 
+  function renderCharts() {
+    if (!window.Chart) return;
+
+    const summary = state.summary || {};
+
+    const cashFlow = Array.isArray(summary.cash_flow) && summary.cash_flow.length
+      ? summary.cash_flow
+      : [
+          { month: "Feb", planned_cr: 14.2, actual_cr: 12.6 },
+          { month: "Mar", planned_cr: 15.8, actual_cr: 14.1 },
+          { month: "Apr", planned_cr: 16.5, actual_cr: 15.0 },
+          { month: "May", planned_cr: 17.9, actual_cr: 16.2 },
+          { month: "Jun", planned_cr: 18.4, actual_cr: 17.5 },
+          { month: "Jul", planned_cr: 19.0, actual_cr: 18.1 }
+        ];
+
+    const progress = Array.isArray(summary.financial_vs_physical) && summary.financial_vs_physical.length
+      ? summary.financial_vs_physical
+      : [
+          { month: "Feb", physical_pct: 35, financial_pct: 30 },
+          { month: "Mar", physical_pct: 40, financial_pct: 35 },
+          { month: "Apr", physical_pct: 45, financial_pct: 41 },
+          { month: "May", physical_pct: 51, financial_pct: 46 },
+          { month: "Jun", physical_pct: 57, financial_pct: 50 },
+          { month: "Jul", physical_pct: 61.4, financial_pct: 54.2 }
+        ];
+
+    const cashCanvas = document.getElementById("cashFlowChart");
+
+    if (cashCanvas) {
+      destroyChart(cashCanvas);
+
+      state.cashFlowChart = new Chart(cashCanvas, {
+        type: "bar",
+        data: {
+          labels: cashFlow.map(function (item) {
+            return item.month;
+          }),
+          datasets: [
+            {
+              label: "Planned (₹ Cr)",
+              data: cashFlow.map(function (item) {
+                return item.planned_cr;
+              }),
+              backgroundColor: cssVar("--color-neutral-light", "#dbe4ea"),
+              borderRadius: 6
+            },
+            {
+              label: "Actual (₹ Cr)",
+              data: cashFlow.map(function (item) {
+                return item.actual_cr;
+              }),
+              backgroundColor: cssVar("--color-secondary", "#0f8b8d"),
+              borderRadius: 6
+            }
+          ]
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: "top",
+              align: "end",
+              labels: {
+                boxWidth: 10,
+                boxHeight: 10,
+                usePointStyle: true,
+                pointStyle: "circle"
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: {
+                display: false
+              }
+            }
+          }
+        }
+      });
+    }
+
+    const finPhysCanvas = document.getElementById("finPhysChart");
+
+    if (finPhysCanvas) {
+      destroyChart(finPhysCanvas);
+
+      state.finPhysChart = new Chart(finPhysCanvas, {
+        type: "line",
+        data: {
+          labels: progress.map(function (item) {
+            return item.month;
+          }),
+          datasets: [
+            {
+              label: "Physical %",
+              data: progress.map(function (item) {
+                return item.physical_pct;
+              }),
+              borderColor: cssVar("--color-primary", "#0a4595"),
+              backgroundColor: "transparent",
+              tension: 0.35,
+              borderWidth: 3,
+              pointRadius: 3
+            },
+            {
+              label: "Financial %",
+              data: progress.map(function (item) {
+                return item.financial_pct;
+              }),
+              borderColor: cssVar("--color-secondary", "#0f8b8d"),
+              backgroundColor: "transparent",
+              tension: 0.35,
+              borderWidth: 3,
+              pointRadius: 3,
+              borderDash: [5, 4]
+            }
+          ]
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: "top",
+              align: "end",
+              labels: {
+                boxWidth: 10,
+                boxHeight: 10,
+                usePointStyle: true,
+                pointStyle: "circle"
+              }
+            }
+          },
+          scales: {
+            y: {
+              min: 0,
+              max: 100,
+              ticks: {
+                callback: function (value) {
+                  return value + "%";
+                }
+              }
+            },
+            x: {
+              grid: {
+                display: false
+              }
+            }
+          }
+        }
+      });
+    }
+  }
+
+  function mapInvoiceToIpcRow(invoice) {
+    const status = invoice.status || "pending";
+    const statusLabel = STATUS_LABELS[status] || status;
+    const statusClass = STATUS_CLASS[status] || "warn";
+
+    return {
+      id: invoice.id,
+      ipc: invoice.invoice_number || invoice.invoiceNumber || "IPC",
+      period: invoice.vendor_name || invoice.vendorName || (invoice.budget && invoice.budget.category) || "—",
+      aoa_amount: invoice.amount,
+      usd_amount: null,
+      percentage: null,
+      ace_status: statusLabel,
+      ace_class: statusClass,
+      client_status: status === "paid" || status === "approved" ? "Approved" : "—",
+      client_class: status === "paid" || status === "approved" ? "ok" : ""
+    };
+  }
+
+  function renderIpcTracker() {
+    ensureIpcTableHeader();
+
+    const tbody = getIpcTableBody();
+    if (!tbody) return;
+
+    let rows = [];
+
+    if (state.invoices.length) {
+      rows = state.invoices.map(mapInvoiceToIpcRow);
+    } else if (state.summary && Array.isArray(state.summary.ipc_tracker) && state.summary.ipc_tracker.length) {
+      rows = state.summary.ipc_tracker;
+    } else {
+      rows = FALLBACK_IPC_TRACKER;
+    }
+
+    tbody.innerHTML = rows.map(function (row) {
+      const isCumulative = Boolean(row.is_cumulative) || String(row.ipc).toLowerCase() === "cumulative";
+      const ipcText = isCumulative ? "<strong>" + escapeHtml(row.ipc) + "</strong>" : escapeHtml(row.ipc);
+      const aoaText = isCumulative
+        ? "<strong>" + escapeHtml(formatAmount(row.aoa_amount, 2)) + "</strong>"
+        : escapeHtml(formatAmount(row.aoa_amount, 2));
+      const usdText = isCumulative
+        ? "<strong>" + escapeHtml(formatAmount(row.usd_amount, 2)) + "</strong>"
+        : escapeHtml(formatAmount(row.usd_amount, 2));
+      const pctText = isCumulative
+        ? "<strong>" + escapeHtml(formatPercent(row.percentage)) + "</strong>"
+        : escapeHtml(formatPercent(row.percentage));
+
+      const canEdit = Boolean(row.id);
+
+      return `
+        <tr data-ipc-id="${escapeHtml(row.id || "")}">
+          <td>${ipcText}</td>
+          <td>${escapeHtml(row.period || "—")}</td>
+          <td class="num">${aoaText}</td>
+          <td class="num">${usdText}</td>
+          <td class="num">${pctText}</td>
+          <td>${renderStatusChip(row.ace_status, row.ace_class)}</td>
+          <td>${renderStatusChip(row.client_status, row.client_class)}</td>
+          <td class="num">
+            ${
+              canEdit
+                ? `
+                  <div class="financial-row-actions">
+                    <button type="button" class="financial-icon-btn" data-action="edit-invoice" data-id="${escapeHtml(row.id)}" title="Edit IPC">
+                      <i class="fa-solid fa-pen"></i>
+                    </button>
+                    <button type="button" class="financial-icon-btn danger" data-action="delete-invoice" data-id="${escapeHtml(row.id)}" title="Delete IPC">
+                      <i class="fa-solid fa-trash"></i>
+                    </button>
+                  </div>
+                `
+                : "—"
+            }
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    tbody.querySelectorAll("[data-action='edit-invoice']").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const id = btn.getAttribute("data-id");
+        const invoice = state.invoices.find(function (item) {
+          return item.id === id;
+        });
+
+        if (invoice) {
+          openInvoiceModal(invoice);
+        }
+      });
+    });
+
+    tbody.querySelectorAll("[data-action='delete-invoice']").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        deleteInvoice(btn.getAttribute("data-id"));
+      });
+    });
+  }
+
+  function renderBankGuarantees() {
+    const table = document.getElementById("bankGuaranteesTable");
+    if (!table) return;
+
+    const tbody = table.querySelector("tbody");
+    if (!tbody) return;
+
+    const rows = state.summary && Array.isArray(state.summary.bank_guarantees) && state.summary.bank_guarantees.length
+      ? state.summary.bank_guarantees
+      : FALLBACK_BANK_GUARANTEES;
+
+    tbody.innerHTML = rows.map(function (row) {
+      const statusText = row.status === "valid"
+        ? "Valid"
+        : row.status === "expires_soon"
+          ? "Expires < 60d · Renew"
+          : row.status;
+
+      return `
+        <tr>
+          <td>${escapeHtml(row.guarantee || "—")}</td>
+          <td>${escapeHtml(row.bank || "—")}</td>
+          <td class="num">${escapeHtml(formatAmount(row.usd_amount, 2))}</td>
+          <td>${escapeHtml(formatDisplayDate(row.valid_until))}</td>
+          <td>${renderStatusChip(statusText || "—")}</td>
+        </tr>
+      `;
+    }).join("");
+  }
+
+  function renderAmendments() {
+    const table = document.getElementById("addendaAmendmentsTable");
+    if (!table) return;
+
+    const tbody = table.querySelector("tbody");
+    if (!tbody) return;
+
+    const rows = state.summary && Array.isArray(state.summary.amendments) && state.summary.amendments.length
+      ? state.summary.amendments
+      : FALLBACK_AMENDMENTS;
+
+    tbody.innerHTML = rows.map(function (row) {
+      const statusText = row.status === "under_employer_review"
+        ? "Under Employer review"
+        : row.status === "pending_ctce"
+          ? "Pending CTCE"
+          : row.status;
+
+      return `
+        <tr>
+          <td>${escapeHtml(row.amendment || "—")}</td>
+          <td>${escapeHtml(formatDisplayDate(row.amendment_date))}</td>
+          <td>${escapeHtml(row.scope || row.subject || "—")}</td>
+          <td>${renderStatusChip(statusText || "—")}</td>
+        </tr>
+      `;
+    }).join("");
+  }
+
   async function loadSummary() {
-    const result = await request("GET", `/projects/${state.projectId}/financial-summary`);
-    state.summary = result.data;
-    renderSummary();
-    renderCharts();
+    const result = await request("GET", "/projects/" + state.projectId + "/financial-summary");
+    state.summary = result.data || {};
   }
 
   async function loadBudgets() {
-    const result = await request("GET", `/projects/${state.projectId}/budgets?limit=100&sort=fiscal_year`);
-    state.budgets = result.data || [];
+    const result = await request(
+      "GET",
+      "/projects/" + state.projectId + "/budgets?limit=100&sort=fiscal_year"
+    );
+
+    state.budgets = Array.isArray(result.data) ? result.data : [];
   }
 
   async function loadInvoices() {
     const all = [];
 
     for (const budget of state.budgets) {
-      const result = await request("GET", `/budgets/${budget.id}/invoices?limit=100&sort=invoiceDate`);
-      const rows = result.data || [];
+      const result = await request(
+        "GET",
+        "/budgets/" + budget.id + "/invoices?limit=100&sort=invoiceDate"
+      );
 
-      rows.forEach((invoice) => {
+      const rows = Array.isArray(result.data) ? result.data : [];
+
+      rows.forEach(function (invoice) {
         invoice.budget = budget;
         all.push(invoice);
       });
@@ -430,225 +1033,24 @@
 
   async function reloadAll() {
     await loadBudgets();
-    await Promise.all([loadInvoices(), loadSummary()]);
-    renderInvoices();
-  }
+    await Promise.all([
+      loadInvoices(),
+      loadSummary()
+    ]);
 
-  function renderSummary() {
-    const s = state.summary || {};
-
-    setCountValue("Financial Progress", Number(s.financial_progress_pct || 0), 1);
-    setCardDelta("Financial Progress", `${Number(s.remaining_budget_pct || 0).toFixed(1)}% budget remaining`);
-
-    setCountValue("Physical Progress", Number(s.physical_progress_pct || 0), 1);
-    setCardDelta(
-      "Physical Progress",
-      `Physical ${Number(s.physical_progress_pct || 0) >= Number(s.financial_progress_pct || 0) ? "ahead of" : "behind"} financial`
-    );
-
-    setCardValue(
-      "Cumulative Expenditure",
-      `<span class="unit" style="font-size:1.4rem;">₹</span><span>${moneyCr(s.cumulative_expenditure || 0)}</span><span class="unit">Cr</span>`
-    );
-    setCardDelta(
-      "Cumulative Expenditure",
-      `of ₹${moneyCr(s.total_budget || 0)} Cr total budget`
-    );
-
-    setCardValue("IPC Status", escapeHtml(s.latest_ipc_no || "No IPC"));
-    setCardDelta("IPC Status", s.latest_ipc_status ? `Latest status: ${STATUS_LABELS[s.latest_ipc_status] || s.latest_ipc_status}` : "No IPC submitted");
-  }
-
-  function cssVar(name) {
-    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  }
-
-  function destroyChart(canvas) {
-    if (!canvas || !window.Chart) return;
-
-    const existing = window.Chart.getChart(canvas);
-    if (existing) existing.destroy();
-  }
-
-  function renderCharts() {
-    if (!window.Chart) return;
-
-    const s = state.summary || {};
-
-    const cashFlow = s.cash_flow || [];
-    const progress = s.financial_vs_physical || [];
-
-    const cashCanvas = getCashFlowCanvas();
-    if (cashCanvas) {
-      destroyChart(cashCanvas);
-
-      state.cashFlowChart = new Chart(cashCanvas, {
-        type: "bar",
-        data: {
-          labels: cashFlow.map((x) => x.month),
-          datasets: [
-            {
-              label: "Planned (₹ Cr)",
-              data: cashFlow.map((x) => x.planned_cr),
-              backgroundColor: cssVar("--color-neutral-light") || "#dbe4ea",
-              borderRadius: 6,
-            },
-            {
-              label: "Actual (₹ Cr)",
-              data: cashFlow.map((x) => x.actual_cr),
-              backgroundColor: cssVar("--color-secondary") || "#10b981",
-              borderRadius: 6,
-            },
-          ],
-        },
-        options: {
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              position: "top",
-              align: "end",
-              labels: {
-                boxWidth: 10,
-                boxHeight: 10,
-                usePointStyle: true,
-                pointStyle: "circle",
-              },
-            },
-          },
-          scales: {
-            x: { grid: { display: false } },
-          },
-        },
-      });
-    }
-
-    const finPhysCanvas = getFinPhysCanvas();
-    if (finPhysCanvas) {
-      destroyChart(finPhysCanvas);
-
-      state.finPhysChart = new Chart(finPhysCanvas, {
-        type: "line",
-        data: {
-          labels: progress.map((x) => x.month),
-          datasets: [
-            {
-              label: "Physical %",
-              data: progress.map((x) => x.physical_pct),
-              borderColor: cssVar("--color-primary") || "#2563eb",
-              backgroundColor: "transparent",
-              tension: 0.35,
-              borderWidth: 3,
-              pointRadius: 3,
-            },
-            {
-              label: "Financial %",
-              data: progress.map((x) => x.financial_pct),
-              borderColor: cssVar("--color-secondary") || "#10b981",
-              backgroundColor: "transparent",
-              tension: 0.35,
-              borderWidth: 3,
-              pointRadius: 3,
-              borderDash: [5, 4],
-            },
-          ],
-        },
-        options: {
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              position: "top",
-              align: "end",
-              labels: {
-                boxWidth: 10,
-                boxHeight: 10,
-                usePointStyle: true,
-                pointStyle: "circle",
-              },
-            },
-          },
-          scales: {
-            y: {
-              min: 0,
-              max: 100,
-              ticks: {
-                callback: function (v) {
-                  return v + "%";
-                },
-              },
-            },
-            x: { grid: { display: false } },
-          },
-        },
-      });
-    }
-  }
-
-  function renderInvoices() {
-    ensureTableActionColumn();
-
-    const tbody = getTableBody();
-    if (!tbody) return;
-
-    if (!state.invoices.length) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="6">
-            <div class="financial-empty">
-              No IPC records found. Use <strong>Add IPC</strong> to create the first record.
-            </div>
-          </td>
-        </tr>
-      `;
-      return;
-    }
-
-    tbody.innerHTML = state.invoices
-      .sort((a, b) => new Date(a.invoice_date) - new Date(b.invoice_date))
-      .map((invoice) => {
-        const status = invoice.status || "pending";
-        const statusClass = STATUS_CLASS[status] || "warn";
-        const statusLabel = STATUS_LABELS[status] || status;
-
-        return `
-          <tr data-invoice-id="${escapeHtml(invoice.id)}">
-            <td>${escapeHtml(invoice.invoice_number)}</td>
-            <td>${escapeHtml(invoice.vendor_name || invoice.budget?.category || "-")}</td>
-            <td class="num">${moneyCr(invoice.amount)}</td>
-            <td>${escapeHtml(invoice.invoice_date || "-")}</td>
-            <td>
-              <span class="status-chip ${statusClass}">
-                <i class="fa-solid fa-circle-check"></i> ${escapeHtml(statusLabel)}
-              </span>
-            </td>
-            <td class="num">
-              <div class="financial-row-actions">
-                edit-invoice
-                  <i class="fa-solid fa-pen"></i>
-                </button>
-                delete-invoice
-                  <i class="fa-solid fa-trash"></i>
-                </button>
-              </div>
-            </td>
-          </tr>
-        `;
-      })
-      .join("");
-
-    tbody.querySelectorAll("[data-action='edit-invoice']").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const invoice = state.invoices.find((x) => x.id === btn.getAttribute("data-id"));
-        openInvoiceModal(invoice);
-      });
-    });
-
-    tbody.querySelectorAll("[data-action='delete-invoice']").forEach((btn) => {
-      btn.addEventListener("click", () => deleteInvoice(btn.getAttribute("data-id")));
-    });
+    renderSummary();
+    renderCharts();
+    renderIpcTracker();
+    renderBankGuarantees();
+    renderAmendments();
   }
 
   function closeModal() {
-    document.querySelector(".financial-modal-backdrop")?.remove();
+    const modal = document.querySelector(".financial-modal-backdrop");
+    if (modal) {
+      modal.remove();
+    }
+
     state.activeInvoice = null;
     state.activeBudget = null;
   }
@@ -667,9 +1069,11 @@
               <i class="fa-solid fa-xmark"></i>
             </button>
           </div>
+
           <div class="financial-modal__body">
             ${bodyHtml}
           </div>
+
           <div class="financial-modal__foot">
             <button type="button" class="financial-btn financial-btn-secondary" id="financialModalCancel">
               Cancel
@@ -684,24 +1088,37 @@
 
     document.body.appendChild(backdrop);
 
-    document.getElementById("financialModalClose")?.addEventListener("click", closeModal);
-    document.getElementById("financialModalCancel")?.addEventListener("click", closeModal);
+    const closeBtn = document.getElementById("financialModalClose");
+    const cancelBtn = document.getElementById("financialModalCancel");
+    const form = document.getElementById("financialModalForm");
 
-    backdrop.addEventListener("click", (e) => {
-      if (e.target === backdrop) closeModal();
-    });
+    if (closeBtn) {
+      closeBtn.addEventListener("click", closeModal);
+    }
 
-    document.getElementById("financialModalForm")?.addEventListener("submit", async (e) => {
-      e.preventDefault();
+    if (cancelBtn) {
+      cancelBtn.addEventListener("click", closeModal);
+    }
 
-      try {
-        await onSubmit(new FormData(e.target));
+    backdrop.addEventListener("click", function (event) {
+      if (event.target === backdrop) {
         closeModal();
-        await reloadAll();
-      } catch (err) {
-        toast(err.message || "Save failed", "fa-triangle-exclamation");
       }
     });
+
+    if (form) {
+      form.addEventListener("submit", async function (event) {
+        event.preventDefault();
+
+        try {
+          await onSubmit(new FormData(form));
+          closeModal();
+          await reloadAll();
+        } catch (err) {
+          toast(err.message || "Save failed", "fa-triangle-exclamation");
+        }
+      });
+    }
   }
 
   function openInvoiceModal(invoice) {
@@ -713,12 +1130,16 @@
 
     state.activeInvoice = invoice || null;
 
-    const budgetOptions = state.budgets
-      .map((budget) => {
-        const selected = invoice && invoice.budget_id === budget.id ? "selected" : "";
-        return `<option value="${escapeHtml(budget.id)}" ${selected}>${escapeHtml(budget.category)} - FY ${escapeHtml(budget.fiscal_year)}</option>`;
-      })
-      .join("");
+    const budgetOptions = state.budgets.map(function (budget) {
+      const selected = invoice && invoice.budget_id === budget.id ? "selected" : "";
+      const label = (budget.category || "Budget") + " - FY " + (budget.fiscal_year || budget.fiscalYear || "");
+
+      return `
+        <option value="${escapeHtml(budget.id)}" ${selected}>
+          ${escapeHtml(label)}
+        </option>
+      `;
+    }).join("");
 
     const body = `
       <div class="financial-form-grid">
@@ -731,66 +1152,67 @@
 
         <div class="financial-field">
           <label>IPC / Invoice Number</label>
-          <input name="invoice_number" required maxlength="50" value="${escapeHtml(invoice?.invoice_number || "")}" ${invoice ? "readonly" : ""}>
+          <input name="invoice_number" required maxlength="50" value="${escapeHtml(invoice ? invoice.invoice_number || invoice.invoiceNumber || "" : "")}" ${invoice ? "readonly" : ""}>
         </div>
 
         <div class="financial-field">
-          <label>Vendor / Period</label>
-          <input name="vendor_name" required maxlength="200" value="${escapeHtml(invoice?.vendor_name || "")}">
+          <label>Period / Description</label>
+          <input name="vendor_name" required maxlength="200" value="${escapeHtml(invoice ? invoice.vendor_name || invoice.vendorName || "" : "")}">
         </div>
 
         <div class="financial-field">
-          <label>Amount</label>
-          <input name="amount" type="number" min="0.01" step="0.01" required value="${escapeHtml(invoice?.amount || "")}">
+          <label>AOA Amount</label>
+          <input name="amount" type="number" min="0.01" step="0.01" required value="${escapeHtml(invoice ? invoice.amount || "" : "")}">
         </div>
 
         <div class="financial-field">
           <label>Invoice Date</label>
-          <input name="invoice_date" type="date" required value="${escapeHtml(toInputDate(invoice?.invoice_date))}">
+          <input name="invoice_date" type="date" required value="${escapeHtml(toInputDate(invoice ? invoice.invoice_date || invoice.invoiceDate : ""))}">
         </div>
 
         <div class="financial-field">
           <label>Due Date</label>
-          <input name="due_date" type="date" value="${escapeHtml(toInputDate(invoice?.due_date))}">
+          <input name="due_date" type="date" value="${escapeHtml(toInputDate(invoice ? invoice.due_date || invoice.dueDate : ""))}">
         </div>
 
         <div class="financial-field">
           <label>Status</label>
           <select name="status">
-            ${["pending", "approved", "paid", "rejected"]
-              .map((status) => `<option value="${status}" ${invoice?.status === status ? "selected" : ""}>${STATUS_LABELS[status]}</option>`)
-              .join("")}
+            <option value="pending" ${invoice && invoice.status === "pending" ? "selected" : ""}>Pending</option>
+            <option value="approved" ${invoice && invoice.status === "approved" ? "selected" : ""}>Approved</option>
+            <option value="paid" ${invoice && invoice.status === "paid" ? "selected" : ""}>Paid</option>
+            <option value="rejected" ${invoice && invoice.status === "rejected" ? "selected" : ""}>Rejected</option>
           </select>
         </div>
       </div>
     `;
 
-    openModal(invoice ? "Edit IPC" : "Add IPC", body, async (form) => {
+    openModal(invoice ? "Edit IPC" : "Add IPC", body, async function (form) {
       const payload = {
         invoice_number: String(form.get("invoice_number") || "").trim(),
         vendor_name: String(form.get("vendor_name") || "").trim(),
         amount: Number(form.get("amount")),
-        invoice_date: String(form.get("invoice_date")),
+        invoice_date: String(form.get("invoice_date") || ""),
         due_date: form.get("due_date") ? String(form.get("due_date")) : null,
-        attachment_ids: [],
+        attachment_ids: []
       };
 
       const status = String(form.get("status") || "pending");
 
       if (invoice) {
-        await request("PUT", `/invoices/${invoice.id}`, payload);
+        await request("PUT", "/invoices/" + invoice.id, payload);
 
         if (status !== invoice.status) {
-          await request("PATCH", `/invoices/${invoice.id}`, { status });
+          await request("PATCH", "/invoices/" + invoice.id, { status: status });
         }
 
         toast("IPC updated successfully");
       } else {
         const budgetId = String(form.get("budget_id"));
-        const created = await request("POST", `/budgets/${budgetId}/invoices`, payload);
+        const created = await request("POST", "/budgets/" + budgetId + "/invoices", payload);
 
-        if (status !== "pending") {
-          await request("PATCH", `/invoices/${created.data.id}`, { status });
+        if (status !== "pending" && created && created.data && created.data.id) {
+          await request("PATCH", "/invoices/" + created.data.id, { status: status });
         }
 
         toast("IPC created successfully");
@@ -799,14 +1221,21 @@
   }
 
   async function deleteInvoice(id) {
-    const invoice = state.invoices.find((x) => x.id === id);
+    if (!id) return;
+
+    const invoice = state.invoices.find(function (item) {
+      return item.id === id;
+    });
+
     if (!invoice) return;
 
-    const yes = window.confirm(`Delete ${invoice.invoice_number}?`);
+    const invoiceNumber = invoice.invoice_number || invoice.invoiceNumber || "this IPC";
+    const yes = window.confirm("Delete " + invoiceNumber + "?");
+
     if (!yes) return;
 
     try {
-      await request("DELETE", `/invoices/${id}`);
+      await request("DELETE", "/invoices/" + id);
       toast("IPC deleted successfully", "fa-trash");
       await reloadAll();
     } catch (err) {
@@ -817,109 +1246,122 @@
   function openBudgetModal(budget) {
     state.activeBudget = budget || null;
 
-    const body = `
-      <div class="financial-form-grid">
-        <div class="financial-field">
-          <label>Category</label>
-          <input name="category" required maxlength="100" value="${escapeHtml(budget?.category || "")}">
-        </div>
-
-        <div class="financial-field">
-          <label>Fiscal Year</label>
-          <input name="fiscal_year" type="number" min="2000" max="2100" required value="${escapeHtml(budget?.fiscal_year || new Date().getFullYear())}">
-        </div>
-
-        <div class="financial-field">
-          <label>Allocated Amount</label>
-          <input name="allocated_amount" type="number" min="0.01" step="0.01" required value="${escapeHtml(budget?.allocated_amount || "")}">
-        </div>
-
-        <div class="financial-field">
-          <label>Currency</label>
-          <input name="currency" maxlength="3" required value="${escapeHtml(budget?.currency || "INR")}">
-        </div>
-
+    const existingBudgetRows = state.budgets.length
+      ? `
         <div class="financial-field full">
-          <label>Notes</label>
-          <textarea name="notes" rows="3">${escapeHtml(budget?.notes || "")}</textarea>
-        </div>
-
-        ${state.budgets.length ? `
-          <div class="financial-field full">
-            <label>Existing Budgets</label>
-            <div class="table-scroll">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Category</th>
-                    <th>FY</th>
-                    <th class="num">Allocated</th>
-                    <th class="num">Utilized</th>
-                    <th class="num">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${state.budgets.map((b) => `
+          <label>Existing Budgets</label>
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>FY</th>
+                  <th class="num">Allocated</th>
+                  <th class="num">Utilized</th>
+                  <th class="num">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${state.budgets.map(function (item) {
+                  return `
                     <tr>
-                      <td>${escapeHtml(b.category)}</td>
-                      <td>${escapeHtml(b.fiscal_year)}</td>
-                      <td class="num">${formatAmount(b.allocated_amount)}</td>
-                      <td class="num">${formatAmount(b.utilized_amount || 0)}</td>
+                      <td>${escapeHtml(item.category)}</td>
+                      <td>${escapeHtml(item.fiscal_year || item.fiscalYear || "")}</td>
+                      <td class="num">${escapeHtml(formatAmount(item.allocated_amount || item.allocatedAmount, 2))}</td>
+                      <td class="num">${escapeHtml(formatAmount(item.utilized_amount || item.utilizedAmount || 0, 2))}</td>
                       <td class="num">
-                        <button type="button" class="financial-icon-btn" data-budget-edit="${escapeHtml(b.id)}">
+                        <button type="button" class="financial-icon-btn" data-budget-edit="${escapeHtml(item.id)}" title="Edit Budget">
                           <i class="fa-solid fa-pen"></i>
                         </button>
-                        <button type="button" class="financial-icon-btn danger" data-budget-delete="${escapeHtml(b.id)}">
+                        <button type="button" class="financial-icon-btn danger" data-budget-delete="${escapeHtml(item.id)}" title="Delete Budget">
                           <i class="fa-solid fa-trash"></i>
                         </button>
                       </td>
                     </tr>
-                  `).join("")}
-                </tbody>
-              </table>
-            </div>
+                  `;
+                }).join("")}
+              </tbody>
+            </table>
           </div>
-        ` : ""}
+        </div>
+      `
+      : "";
+
+    const body = `
+      <div class="financial-form-grid">
+        <div class="financial-field">
+          <label>Category</label>
+          <input name="category" required maxlength="100" value="${escapeHtml(budget ? budget.category || "" : "")}">
+        </div>
+
+        <div class="financial-field">
+          <label>Fiscal Year</label>
+          <input name="fiscal_year" type="number" min="2000" max="2100" required value="${escapeHtml(budget ? budget.fiscal_year || budget.fiscalYear || new Date().getFullYear() : new Date().getFullYear())}">
+        </div>
+
+        <div class="financial-field">
+          <label>Allocated Amount</label>
+          <input name="allocated_amount" type="number" min="0.01" step="0.01" required value="${escapeHtml(budget ? budget.allocated_amount || budget.allocatedAmount || "" : "")}">
+        </div>
+
+        <div class="financial-field">
+          <label>Currency</label>
+          <input name="currency" maxlength="3" required value="${escapeHtml(budget ? budget.currency || "INR" : "INR")}">
+        </div>
+
+        <div class="financial-field full">
+          <label>Notes</label>
+          <textarea name="notes" rows="3">${escapeHtml(budget ? budget.notes || "" : "")}</textarea>
+        </div>
+
+        ${existingBudgetRows}
       </div>
     `;
 
-    openModal(budget ? "Edit Budget" : "Manage Budgets", body, async (form) => {
+    openModal(budget ? "Edit Budget" : "Manage Budgets", body, async function (form) {
       const payload = {
         category: String(form.get("category") || "").trim(),
         fiscal_year: Number(form.get("fiscal_year")),
         allocated_amount: Number(form.get("allocated_amount")),
         currency: String(form.get("currency") || "INR").trim().toUpperCase(),
-        notes: String(form.get("notes") || "").trim() || undefined,
+        notes: String(form.get("notes") || "").trim() || undefined
       };
 
       if (budget) {
-        await request("PUT", `/budgets/${budget.id}`, payload);
+        await request("PUT", "/budgets/" + budget.id, payload);
         toast("Budget updated successfully");
       } else {
-        await request("POST", `/projects/${state.projectId}/budgets`, payload);
+        await request("POST", "/projects/" + state.projectId + "/budgets", payload);
         toast("Budget created successfully");
       }
     });
 
-    document.querySelectorAll("[data-budget-edit]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const b = state.budgets.find((x) => x.id === btn.getAttribute("data-budget-edit"));
+    document.querySelectorAll("[data-budget-edit]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const id = btn.getAttribute("data-budget-edit");
+        const selected = state.budgets.find(function (item) {
+          return item.id === id;
+        });
+
         closeModal();
-        openBudgetModal(b);
+        openBudgetModal(selected);
       });
     });
 
-    document.querySelectorAll("[data-budget-delete]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
+    document.querySelectorAll("[data-budget-delete]").forEach(function (btn) {
+      btn.addEventListener("click", async function () {
         const id = btn.getAttribute("data-budget-delete");
-        const b = state.budgets.find((x) => x.id === id);
-        if (!b) return;
+        const item = state.budgets.find(function (budgetItem) {
+          return budgetItem.id === id;
+        });
 
-        const yes = window.confirm(`Delete budget "${b.category}"?`);
+        if (!item) return;
+
+        const yes = window.confirm('Delete budget "' + item.category + '"?');
         if (!yes) return;
 
         try {
-          await request("DELETE", `/budgets/${id}`);
+          await request("DELETE", "/budgets/" + id);
           toast("Budget deleted successfully", "fa-trash");
           closeModal();
           await reloadAll();
@@ -931,19 +1373,34 @@
     });
   }
 
+  function renderFallbackOnly() {
+    renderReferenceCards();
+    renderCharts();
+    renderIpcTracker();
+    renderBankGuarantees();
+    renderAmendments();
+  }
+
   async function init() {
     injectStyles();
+    ensureIpcTableHeader();
     ensureActions();
-    ensureTableActionColumn();
+
+    renderFallbackOnly();
 
     const sessionOk = await ensureSession();
-    if (!sessionOk) return;
+
+    if (!sessionOk) {
+      return;
+    }
 
     state.projectId = getProjectId();
 
     if (!state.projectId) {
-      toast("Project is missing. Set current_project in localStorage before using Financial Dashboard.", "fa-triangle-exclamation");
-      renderInvoices();
+      toast(
+        "Project is missing. Set current_project in localStorage before using Financial Dashboard.",
+        "fa-triangle-exclamation"
+      );
       return;
     }
 
@@ -952,6 +1409,7 @@
     } catch (err) {
       console.error(err);
       toast(err.message || "Failed to load financial dashboard", "fa-triangle-exclamation");
+      renderFallbackOnly();
     }
   }
 
