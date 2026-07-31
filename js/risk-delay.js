@@ -365,7 +365,6 @@
 
       renderDelays();
       renderRisks();
-      renderRiskMatrix();
       renderKpis();
 
       toast("Risk-delay data loaded", "fa-database");

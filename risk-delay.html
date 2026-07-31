@@ -9,10 +9,6 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="css/styles.css">
 <!-- subnav / data-table / status-chip are now defined once in css/styles.css -->
-<style>
-  .risk-matrix { display:grid; grid-template-columns: repeat(5, 1fr); gap:4px; max-width:520px; }
-  .risk-cell { aspect-ratio:1; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#fff; }
-</style>
 </head>
 <body data-page="delay">
 
@@ -94,40 +90,271 @@
       </section>
 
       <section id="risk-register">
-        <div class="section-heading"><h2>Risk Register</h2><span class="section-sub">Likelihood vs. impact &amp; corrective actions</span></div>
 
-        <div class="grid grid-12">
-          <div class="card col-span-5">
-            <div class="card-header"><h3>Risk Matrix</h3></div>
-            <div class="card-body">
-              <div class="risk-matrix" id="riskMatrix"></div>
-              <p style="font-size:11.5px;color:var(--text-muted);margin-top:12px;">Rows = Impact (top = highest) · Columns = Likelihood (left = lowest)</p>
-            </div>
+        <div class="section-heading">
+          <h2>Risk Register</h2>
+          <span class="section-sub">
+            Risk ownership, compliance tracking &amp; corrective actions
+          </span>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>Top Risks</h3>
           </div>
-          <div class="card col-span-7">
-            <div class="card-header"><h3>Top Risks</h3></div>
-            <div class="card-body table-scroll">
-              <table class="data-table">
-                <thead><tr><th scope="col">Risk</th><th scope="col">Category</th><th scope="col">Rating</th><th scope="col">Owner</th></tr></thead>
-                <tbody>
-                  <tr><td>Further NOC delays on remaining road crossings</td><td>Regulatory</td><td><span class="status-chip crit"><i class="fa-solid fa-circle-exclamation"></i> High</span></td><td>Project Director</td></tr>
-                  <tr><td>Cost escalation on imported DI fittings</td><td>Financial</td><td><span class="status-chip warn"><i class="fa-solid fa-triangle-exclamation"></i> Medium</span></td><td>Procurement Lead</td></tr>
-                  <tr><td>Labour shortage during peak season</td><td>Resource</td><td><span class="status-chip warn"><i class="fa-solid fa-triangle-exclamation"></i> Medium</span></td><td>Site Manager</td></tr>
-                  <tr data-zone="Zone D"><td>Groundwater ingress in Zone D trenching</td><td>Technical</td><td><span class="status-chip ok"><i class="fa-solid fa-circle-check"></i> Low</span></td><td>Site Engineer</td></tr>
-                </tbody>
-              </table>
-            </div>
+
+          <div class="card-body table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Risk</th>
+                  <th>Category</th>
+                  <th>Rating</th>
+                  <th>Owner</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Further NOC delays on remaining road crossings</td>
+                  <td>Regulatory</td>
+                  <td><span class="status-chip crit">High</span></td>
+                  <td>Project Director</td>
+                </tr>
+
+                <tr>
+                  <td>Cost escalation on imported DI fittings</td>
+                  <td>Financial</td>
+                  <td><span class="status-chip warn">Medium</span></td>
+                  <td>Procurement Lead</td>
+                </tr>
+
+                <tr>
+                  <td>Labour shortage during peak season</td>
+                  <td>Resource</td>
+                  <td><span class="status-chip warn">Medium</span></td>
+                  <td>Site Manager</td>
+                </tr>
+
+                <tr>
+                  <td>Groundwater ingress in Zone D trenching</td>
+                  <td>Technical</td>
+                  <td><span class="status-chip ok">Low</span></td>
+                  <td>Site Engineer</td>
+                </tr>
+
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+      <section id="activity-progress">
+        <div class="section-heading">
+          <h2>Activity-wise Progress (vs Revised DDR Scope)</h2>
+          <span class="section-sub">
+            Progress against revised scope
+          </span>
+        </div>
+
+        <div class="card">
+          <div class="card-body table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Activity</th>
+                  <th>DDR Scope</th>
+                  <th>Completed</th>
+                  <th>Balance</th>
+                  <th>% Progress</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Pipe Laying</td>
+                  <td>180 km</td>
+                  <td>145 km</td>
+                  <td>35 km</td>
+                  <td>80.6%</td>
+                </tr>
+                <tr>
+                  <td>House Connections</td>
+                  <td>12,500</td>
+                  <td>9,850</td>
+                  <td>2,650</td>
+                  <td>78.8%</td>
+                </tr>
+                <tr>
+                  <td>Reservoir Construction</td>
+                  <td>8</td>
+                  <td>6</td>
+                  <td>2</td>
+                  <td>75%</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
 
-    </main>
+      <section id="pipe-laying-matrix">
+        <div class="section-heading">
+          <h2>Area-wise Pipe Laying Matrix (May 2026)</h2>
+          <span class="section-sub">
+            Area performance overview
+          </span>
+        </div>
 
-    <footer style="text-align:center;padding:24px;color:var(--text-muted);font-size:12px;">
-      Water Supply Distribution Project — Monitoring Dashboard · Sample data for layout demonstration
-    </footer>
+        <div class="card">
+          <div class="card-body table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Area</th>
+                  <th>Planned (m)</th>
+                  <th>Achieved (m)</th>
+                  <th>Variance</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                <tr>
+                  <td>1</td>
+                  <td>Casa Verde</td>
+                  <td>600</td>
+                  <td>520</td>
+                  <td>-80</td>
+                </tr>
+                <tr>
+                  <td>2</td>
+                  <td>Escola Portuguesa</td>
+                  <td>800</td>
+                  <td>770</td>
+                  <td>-30</td>
+                </tr>
+                <tr>
+                  <td>3</td>
+                  <td>Cow Boy I</td>
+                  <td>600</td>
+                  <td>600</td>
+                  <td>0</td>
+                </tr>
+                <tr>
+                  <td>4</td>
+                  <td>Sofrio</td>
+                  <td>5006</td>
+                  <td>4750</td>
+                  <td>-256</td>
+                </tr>
+                <tr>
+                  <td>5</td>
+                  <td>Caixote / Socombar</td>
+                  <td>2830</td>
+                  <td>2600</td>
+                  <td>-230</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="ncr-register">
+        <div class="section-heading">
+          <h2>Non-Conformity Register (Open)</h2>
+          <span class="section-sub">
+            Outstanding NCR observations
+          </span>
+        </div>
+        <div class="card">
+          <div class="card-body table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Description</th>
+                  <th>Owner</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>1</td>
+                  <td>Pipe alignment deviation</td>
+                  <td>Contractor</td>
+                  <td><span class="status-chip crit">Open</span></td>
+                </tr>
+                <tr>
+                  <td>2</td>
+                  <td>Compaction test pending</td>
+                  <td>QA/QC Team</td>
+                  <td><span class="status-chip warn">Action Plan Requested</span></td>
+                </tr>
+                <tr>
+                  <td>3</td>
+                  <td>Missing inspection records</td>
+                  <td>Site Engineer</td>
+                  <td><span class="status-chip warn">Pending</span></td>
+                </tr>
+                <tr>
+                  <td>4</td>
+                  <td>Trench depth non-compliance</td>
+                  <td>Construction Manager</td>
+                  <td><span class="status-chip crit">Open</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="corrective-actions">
+        <div class="section-heading">
+          <h2>Corrective Actions Tracker</h2>
+          <span class="section-sub">
+            Mitigation and compliance actions
+          </span>
+        </div>
+        <div class="card">
+          <div class="card-body table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Action</th>
+                  <th>Owner</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Mandatory utility surveys before trenching</td>
+                  <td>Contractor</td>
+                  <td><span class="status-chip warn">In Progress</span></td>
+                </tr>
+                <tr>
+                  <td>Recovery Plan Submission</td>
+                  <td>Project Management Team</td>
+                  <td><span class="status-chip crit">Pending</span></td>
+                </tr>
+                <tr>
+                  <td>QA/QC Audit Closure</td>
+                  <td>QA Team</td>
+                  <td><span class="status-chip ok">Completed</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      </main>
+
+      <footer style="text-align:center;padding:24px;color:var(--text-muted);font-size:12px;">
+        Water Supply Distribution Project — Monitoring Dashboard · Sample data for layout demonstration
+      </footer>
+    </div>
   </div>
-</div>
 
 <script src="js/api.js"></script>
 <script src="js/shell.js"></script>
