@@ -58,17 +58,16 @@
       <!-- ============ PIPELINE ============ -->
       <section id="pipeline">
         <div class="section-heading">
-          <button
-            id="addPipelineSectionBtn"
-            class="btn-ghost">
-
-            <i class="fa-solid fa-plus"></i>
-            Add Section
-
-          </button>
+        <div>
           <h2>Pipeline Progress</h2>
           <span class="section-sub">92.677 km total alignment</span>
         </div>
+
+        <button id="addPipelineSectionBtn" class="btn-ghost">
+          <i class="fa-solid fa-plus"></i>
+          Add Section
+        </button>
+      </div>
         <div class="grid grid-12">
           <div class="card card-accent card-accent--success col-span-4"><div class="card-body">
             <div class="kpi-card__label">Laid</div>
@@ -88,8 +87,10 @@
         </div>
 
         <div class="card" style="margin-top:20px;">
-          <div class="card-header"><h3>Pipeline Progress by Zone</h3></div>
-          <div class="card-body"><div style="height:260px;"><canvas id="pipelineByZoneChart"></canvas></div></div>
+                    <div class="card-header"><h3>Pipeline Progress by Zone</h3></div>
+          <div class="card-body">
+            <div style="height:260px;"><canvas id="pipelineByZoneChart"></canvas></div>
+          </div>
         </div>
 
         <div class="card" style="margin-top:20px;">
@@ -105,7 +106,7 @@
                   <th scope="col" class="actions-col">Actions</th>
                 </tr>
               </thead>
-              <tbody id="testingActivityTableBody"></tbody>
+              <tbody id="pipelineTableBody"></tbody>
             </table>
           </div>
         </div>
@@ -114,29 +115,40 @@
       <!-- ============ HOUSE CONNECTIONS ============ -->
       <section id="house-connections">
         <div class="section-heading">
-            <button id="addHouseClusterBtn" class="btn-ghost" type="button">
-                <i class="fa-solid fa-plus"></i>
-                Add Cluster
-            </button>
+          <div>
             <h2>House Connections</h2>
-            <span class="section-sub">Village cluster-wise connection progress</span>
+            <span class="section-sub">
+              Village cluster-wise connection progress
+            </span>
+          </div>
+
+          <button id="addHouseClusterBtn" class="btn-ghost" type="button">
+            <i class="fa-solid fa-plus"></i>
+            Add Cluster
+          </button>
         </div>
         <div class="grid grid-12">
-          <div class="card card-accent card-accent--success col-span-4"><div class="card-body">
-            <div class="kpi-card__label">Completed</div>
-            <div class="kpi-card__value"><span id="houseCompletedCount" class="count-up" data-count="0">0</span></div>
-            <div class="kpi-card__delta up">58.8% of scope</div>
-          </div></div>
-          <div class="card card-accent card-accent--warning col-span-4"><div class="card-body">
-            <div class="kpi-card__label">In Progress</div>
-            <div class="kpi-card__value"><span id="houseInProgressCount" class="count-up" data-count="640">0</span></div>
-            <div class="kpi-card__delta flat">12.1% of scope</div>
-          </div></div>
-          <div class="card card-accent card-accent--critical col-span-4"><div class="card-body">
-            <div class="kpi-card__label">Remaining</div>
-            <div class="kpi-card__value"><span id="houseRemainingCount" class="count-up" data-count="1543">0</span></div>
-            <div class="kpi-card__delta down">29.1% of scope</div>
-          </div></div>
+          <div class="card card-accent card-accent--success col-span-4">
+            <div class="card-body">
+              <div class="kpi-card__label">Completed</div>
+              <div class="kpi-card__value"><span id="houseCompletedCount" class="count-up" data-count="0">0</span></div>
+              <div class="kpi-card__delta up">58.8% of scope</div>
+            </div>
+          </div>
+          <div class="card card-accent card-accent--warning col-span-4">
+            <div class="card-body">
+              <div class="kpi-card__label">In Progress</div>
+              <div class="kpi-card__value"><span id="houseInProgressCount" class="count-up" data-count="640">0</span></div>
+              <div class="kpi-card__delta flat">12.1% of scope</div>
+            </div>
+          </div>
+          <div class="card card-accent card-accent--critical col-span-4">
+            <div class="card-body">
+              <div class="kpi-card__label">Remaining</div>
+              <div class="kpi-card__value"><span id="houseRemainingCount" class="count-up" data-count="1543">0</span></div>
+              <div class="kpi-card__delta down">29.1% of scope</div>
+            </div>
+          </div>
         </div>
         <div class="card" style="margin-top:20px;">
           <div class="card-header">
@@ -169,26 +181,6 @@
             </div>
           </div>
         </div>
-        <div class="card" style="margin-top:20px;">
-          <div class="card-header">
-            <h3>House Connection Clusters</h3>
-          </div>
-          <div class="card-body table-scroll">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th scope="col">Cluster</th>
-                  <th scope="col" class="num">Planned</th>
-                  <th scope="col" class="num">Completed</th>
-                  <th scope="col" class="num">In Progress</th>
-                  <th scope="col" class="num">Remaining</th>
-                  <th scope="col" class="actions-col">Actions</th>
-                </tr>
-              </thead>
-              <tbody id="houseClusterTableBody"></tbody>
-            </table>
-          </div>
-        </div>
       </section>
 
       <!-- ============ TESTING & COMMISSIONING ============ -->
@@ -198,8 +190,11 @@
             <i class="fa-solid fa-plus"></i>
             Add Activity
           </button>
-          <h2>Testing &amp; Commissioning</h2>
-          <span class="section-sub">Hydro-testing, disinfection &amp; handover readiness</span>
+
+          <h2>Testing & Commissioning</h2>
+          <span class="section-sub">
+            Hydro-testing, disinfection & handover readiness
+          </span>
         </div>
         <div class="card">
           <div class="card-body table-scroll">
@@ -222,12 +217,17 @@
       <!-- ============ VALVE CHAMBERS ============ -->
       <section id="valve-chambers">
         <div class="section-heading">
+          <div>
+            <h2>Valve Chambers</h2>
+            <span class="section-sub">
+              Air valves, scour valves & sluice chambers
+            </span>
+          </div>
+
           <button id="editValveSummaryBtn" class="btn-ghost" type="button">
             <i class="fa-solid fa-pen"></i>
             Update Summary
           </button>
-          <h2>Valve Chambers</h2>
-          <span class="section-sub">Air valves, scour valves &amp; sluice chambers</span>
         </div>
         <div class="grid grid-4">
           <div class="card card-accent card-accent--primary">
@@ -259,14 +259,19 @@
 
       <!-- ============ BRIDGE CROSSINGS ============ -->
       <section id="bridge-crossings">
-                <div class="section-heading">
-                  <button id="addBridgeCrossingBtn" class="btn-ghost" type="button">
-                    <i class="fa-solid fa-plus"></i>
-                    Add Crossing
-                  </button>
-                  <h2>Bridge Crossings</h2>
-                  <span class="section-sub">River, canal &amp; road crossing structures</span>
-                </div>
+        <div class="section-heading">
+          <div>
+            <h2>Bridge Crossings</h2>
+            <span class="section-sub">
+              River, canal & road crossing structures
+            </span>
+          </div>
+
+          <button id="addBridgeCrossingBtn" class="btn-ghost" type="button">
+            <i class="fa-solid fa-plus"></i>
+            Add Crossing
+          </button>
+        </div>
         <div class="card">
           <div class="card-body table-scroll">
             <table class="data-table">
