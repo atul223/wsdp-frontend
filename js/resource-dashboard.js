@@ -254,9 +254,18 @@
       .resource-heading-row {
         display: flex;
         justify-content: space-between;
-        align-items: flex-start;
-        gap: 16px;
-        margin-top: 28px;
+        align-items: center;
+        width: 100%;
+      }
+
+      .resource-heading-row .section-heading {
+        flex: 1;
+      }
+
+      .resource-actions {
+        display: flex;
+        margin-left: auto;
+        gap: 10px;
       }
 
       .resource-heading-row .section-heading {
@@ -870,7 +879,7 @@
       return value || fallback;
     };
 
-    state.chart = new Chart(canvas, {
+    state.chart = new Chart(ctx,{
       type: "doughnut",
       data: {
         labels: labels.length ? labels : ["No manpower data"],
