@@ -23,6 +23,11 @@
   async function request(method, path, body, opts) {
     opts = opts || {};
     const headers = Object.assign({ "Content-Type": "application/json" }, opts.headers || {});
+
+    if (!accessToken) {
+      accessToken = sessionStorage.getItem("wsdp_access_token");
+    }
+
     if (accessToken && !opts.skipAuth) {
       headers["Authorization"] = "Bearer " + accessToken;
     }
@@ -83,7 +88,15 @@
     accessToken = result.data.access_token;
     currentUser = result.data.user;
 
-    sessionStorage.setItem("wsdp_user", JSON.stringify(currentUser));
+    sessionStorage.setItem(
+      "wsdp_access_token",
+      accessToken
+    );
+
+    sessionStorage.setItem(
+      "wsdp_user",
+      JSON.stringify(currentUser)
+    );
 
     return currentUser;
   }
@@ -108,6 +121,11 @@
         });
 
         accessToken = result.data.access_token;
+
+        sessionStorage.setItem(
+          "wsdp_access_token",
+          accessToken
+        );
 
         if (result.data.user) {
           currentUser = result.data.user;
@@ -139,6 +157,7 @@
     accessToken = null;
     currentUser = null;
     sessionStorage.removeItem("wsdp_user");
+    sessionStorage.removeItem("wsdp_access_token");
   }
 
   /** GET /auth/me — refreshes the cached currentUser from the server. */
@@ -149,11 +168,21 @@
   }
 
   function getAccessToken() {
+    if (!accessToken) {
+      accessToken = sessionStorage.getItem("wsdp_access_token");
+    }
+
     return accessToken;
   }
 
   function getCurrentUser() {
-    if (currentUser) return currentUser;
+    if (!accessToken) {
+      accessToken = sessionStorage.getItem("wsdp_access_token");
+    }
+
+    if (currentUser) {
+      return currentUser;
+    }
 
     try {
       const stored = sessionStorage.getItem("wsdp_user");
@@ -172,9 +201,19 @@
    * callers decide what to do with null (usually: redirect to login).
    */
   async function restoreSession() {
-    const ok = await refreshSession();
-    if (!ok) return null;
+    let user = getCurrentUser();
+
+    if (user && accessToken) {
+      return user;
+    }
+
     try {
+      const ok = await refreshSession();
+
+      if (!ok) {
+        return null;
+      }
+
       return await fetchMe();
     } catch (e) {
       return null;
