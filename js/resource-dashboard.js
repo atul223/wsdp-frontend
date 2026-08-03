@@ -1400,12 +1400,5 @@
   document.addEventListener("wsdp:authready", function () {
     init();
   });
-
-  document.addEventListener("DOMContentLoaded", function () {
-    setTimeout(function () {
-      if (!state.initialized && window.WSDP_API) {
-        init();
-      }
-    }, 300);
-  });
+  
 })();
