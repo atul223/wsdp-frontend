@@ -1,9 +1,21 @@
 /* ============================================================
    resource-dashboard.js
-   Resource Dashboard
-   - DB-backed CRUD for Materials, Equipment and Manpower
-   - Static monthly reporting sections from reference dashboard
-   - Auth-safe initialization using wsdp:authready
+   DB-backed Resource Dashboard CRUD for:
+   - Materials
+   - Equipment
+   - Manpower
+
+   Added reporting sections:
+   - HDPE Pipe Stock (May 2026)
+   - Equipment Deployment (May 2026)
+   - Manpower KPI cards
+   - Workforce By Employer
+
+   Requires:
+   - js/api.js
+   - js/shell.js
+   - js/main.js
+   - Chart.js
    ============================================================ */
 
 (function () {
@@ -13,39 +25,22 @@
     material: {
       label: "Material",
       plural: "Materials",
+      icon: "fa-boxes-stacked",
       defaultUnit: "nos"
     },
     equipment: {
       label: "Equipment",
       plural: "Equipment",
+      icon: "fa-truck-monster",
       defaultUnit: "nos"
     },
     manpower: {
       label: "Manpower",
       plural: "Manpower",
+      icon: "fa-people-group",
       defaultUnit: "persons"
     }
   };
-
-  const SAMPLE_MATERIALS = [
-    { name: "DI Pipe — 600mm", unit: "m", total_capacity: 1200, allocated_quantity: 2400, remaining_capacity: 1200, reorder_level: 1500, statusText: "Below Reorder" },
-    { name: "DI Pipe — 450mm", unit: "m", total_capacity: 3100, allocated_quantity: 2900, remaining_capacity: 3100, reorder_level: 2000, statusText: "Adequate" },
-    { name: "HDPE Pipe — 315mm", unit: "m", total_capacity: 5400, allocated_quantity: 1800, remaining_capacity: 5400, reorder_level: 2500, statusText: "Adequate" },
-    { name: "Cement (OPC 53)", unit: "bags", total_capacity: 2850, allocated_quantity: 3200, remaining_capacity: 2850, reorder_level: 3000, statusText: "Watch" },
-    { name: "Sluice Valves", unit: "nos", total_capacity: 34, allocated_quantity: 18, remaining_capacity: 34, reorder_level: 25, statusText: "Adequate" }
-  ];
-
-  const SAMPLE_EQUIPMENT = [
-    { name: "Excavators", unit: "nos", total_capacity: 10, allocated_quantity: 8, remaining_capacity: 2 },
-    { name: "HDD Rigs", unit: "nos", total_capacity: 3, allocated_quantity: 2, remaining_capacity: 1 },
-    { name: "Dewatering Pumps", unit: "nos", total_capacity: 12, allocated_quantity: 11, remaining_capacity: 1 },
-    { name: "Idle / Under Maintenance", unit: "nos", total_capacity: 6, allocated_quantity: 6, remaining_capacity: 0, fixedWarning: true }
-  ];
-
-  const SAMPLE_MANPOWER = [
-    { name: "Supervisory", unit: "persons", total_capacity: 65, allocated_quantity: 0, remaining_capacity: 65 },
-    { name: "Unskilled", unit: "persons", total_capacity: 520, allocated_quantity: 0, remaining_capacity: 520 }
-  ];
 
   const HDPE_PIPE_STOCK = [
     { diameter: "De20 PN16", received: 41100, used: 1200, stock: 39900, cover: "OK" },
@@ -75,12 +70,54 @@
   ];
 
   const MANPOWER_PROGRESS = [
-    { label: "Planned", value: "133", note: "Per Month-5 plan", icon: "fa-helmet-safety", accent: "warning", iconTone: "icon-tone-amber" },
-    { label: "Deployed", value: "115", note: "CTCE + 2 Subcontractors", icon: "fa-helmet-safety", accent: "primary", iconTone: "icon-tone-blue" },
-    { label: "Gap", value: "-18", note: "Shortfall", icon: "fa-triangle-exclamation", accent: "warning", iconTone: "icon-tone-amber" },
-    { label: "Female %", value: "4.8%", note: "5 of 115", icon: "fa-people-group", accent: "warning", iconTone: "icon-tone-amber" },
-    { label: "Local Nationals", value: "90", note: "Subcontracted unqualified", icon: "fa-users", accent: "success", iconTone: "icon-tone-green" },
-    { label: "Foreign Workers", value: "8", note: "Subcontracted specialists", icon: "fa-user-group", accent: "primary", iconTone: "icon-tone-blue" }
+    {
+      label: "Planned",
+      value: "133",
+      note: "Per Month-5 plan",
+      icon: "fa-helmet-safety",
+      accent: "warning",
+      iconTone: "icon-tone-amber"
+    },
+    {
+      label: "Deployed",
+      value: "115",
+      note: "CTCE + 2 Subcontractors",
+      icon: "fa-helmet-safety",
+      accent: "primary",
+      iconTone: "icon-tone-blue"
+    },
+    {
+      label: "Gap",
+      value: "-18",
+      note: "Shortfall",
+      icon: "fa-triangle-exclamation",
+      accent: "warning",
+      iconTone: "icon-tone-amber"
+    },
+    {
+      label: "Female %",
+      value: "4.8%",
+      note: "5 of 115",
+      icon: "fa-people-group",
+      accent: "warning",
+      iconTone: "icon-tone-amber"
+    },
+    {
+      label: "Local Nationals",
+      value: "90",
+      note: "Subcontracted unqualified",
+      icon: "fa-users",
+      accent: "success",
+      iconTone: "icon-tone-green"
+    },
+    {
+      label: "Foreign Workers",
+      value: "8",
+      note: "Subcontracted specialists",
+      icon: "fa-user-group",
+      accent: "primary",
+      iconTone: "icon-tone-blue"
+    }
   ];
 
   const WORKFORCE_BY_EMPLOYER = [
@@ -97,16 +134,17 @@
     { group: "Grand Total", category: "", headcount: 115, isTotal: true }
   ];
 
-  const state = {
+  let state = {
     projectId: null,
     resources: [],
+    editingResourceId: null,
     chart: null,
     initialized: false
   };
 
   function api() {
     if (!window.WSDP_API) {
-      throw new Error("WSDP_API is not loaded.");
+      throw new Error("WSDP_API is not loaded. Ensure js/api.js is loaded before resource-dashboard.js.");
     }
 
     return window.WSDP_API;
@@ -115,47 +153,15 @@
   function toast(message, icon) {
     if (window.WSDP_TOAST) {
       window.WSDP_TOAST(message, { icon: icon || "fa-circle-check" });
-      return;
+    } else {
+      console.log(message);
     }
-
-    console.log(message);
   }
 
   function showError(error, fallback) {
     const message = error && error.message ? error.message : fallback || "Something went wrong";
-    console.error(error);
     toast(message, "fa-triangle-exclamation");
-  }
-
-  function escapeHTML(value) {
-    return String(value === null || value === undefined ? "" : value)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-  }
-
-  function escapeAttr(value) {
-    return escapeHTML(value).replace(/"/g, "&quot;");
-  }
-
-  function formatNumber(value) {
-    if (value === null || value === undefined || value === "") return "—";
-
-    const num = Number(value);
-
-    if (Number.isNaN(num)) return String(value);
-
-    return Number.isInteger(num)
-      ? num.toLocaleString()
-      : num.toLocaleString(undefined, { maximumFractionDigits: 2 });
-  }
-
-  function cssVar(name, fallback) {
-    const value = getComputedStyle(document.documentElement)
-      .getPropertyValue(name)
-      .trim();
-
-    return value || fallback;
+    console.error(error);
   }
 
   function extractProjectId(value) {
@@ -177,21 +183,18 @@
       localStorage.getItem("projectId");
 
     const fromStorage = extractProjectId(storedProject);
-
-    if (fromStorage) {
-      return fromStorage;
-    }
+    if (fromStorage) return fromStorage;
 
     try {
       const result = await api().request("GET", "/projects");
       const projects = Array.isArray(result && result.data) ? result.data : [];
 
       if (projects.length > 0) {
-        const firstProject = projects[0];
-        const projectId = firstProject.id || firstProject.project_id;
+        const first = projects[0];
+        const projectId = first.id || first.project_id;
 
         if (projectId) {
-          localStorage.setItem("current_project", JSON.stringify(firstProject));
+          localStorage.setItem("current_project", JSON.stringify(first));
           return projectId;
         }
       }
@@ -202,76 +205,12 @@
     return null;
   }
 
-  function byType(type) {
-    return state.resources.filter(function (resource) {
-      return resource.type === type;
-    });
-  }
-
-  function getDisplayMaterials() {
-    const rows = byType("material");
-    return rows.length ? rows : SAMPLE_MATERIALS;
-  }
-
-  function getDisplayEquipment() {
-    const rows = byType("equipment");
-    return rows.length ? rows : SAMPLE_EQUIPMENT;
-  }
-
-  function getDisplayManpower() {
-    const rows = byType("manpower");
-    return rows.length ? rows : SAMPLE_MANPOWER;
-  }
-
-  function getRemaining(resource) {
-    if (resource.remaining_capacity !== undefined && resource.remaining_capacity !== null) {
-      return Number(resource.remaining_capacity || 0);
-    }
-
-    return Number(resource.total_capacity || 0) - Number(resource.allocated_quantity || 0);
-  }
-
-  function getStatusForMaterial(resource) {
-    if (resource.statusText) {
-      const normalized = String(resource.statusText).toLowerCase();
-
-      if (normalized.indexOf("below") !== -1 || normalized.indexOf("critical") !== -1 || normalized.indexOf("re-order") !== -1) {
-        return { className: "crit", icon: "fa-circle-exclamation", text: resource.statusText };
-      }
-
-      if (normalized.indexOf("watch") !== -1) {
-        return { className: "warn", icon: "fa-triangle-exclamation", text: resource.statusText };
-      }
-
-      return { className: "ok", icon: "fa-circle-check", text: resource.statusText };
-    }
-
-    const total = Number(resource.total_capacity || 0);
-    const remaining = getRemaining(resource);
-
-    if (remaining <= 0) {
-      return { className: "crit", icon: "fa-circle-exclamation", text: "Below Reorder" };
-    }
-
-    if (total > 0 && remaining <= total * 0.25) {
-      return { className: "warn", icon: "fa-triangle-exclamation", text: "Watch" };
-    }
-
-    return { className: "ok", icon: "fa-circle-check", text: "Adequate" };
-  }
-
-  function getCoverStatus(cover) {
-    const normalized = String(cover || "").toLowerCase();
-
-    if (normalized.indexOf("re-order") !== -1 || normalized.indexOf("reorder") !== -1) {
-      return { className: "crit", icon: "fa-circle-exclamation" };
-    }
-
-    if (normalized.indexOf("watch") !== -1) {
-      return { className: "warn", icon: "fa-triangle-exclamation" };
-    }
-
-    return { className: "ok", icon: "fa-circle-check" };
+  function buttonHTML(icon, text, className, attrs) {
+    return `
+      <button type="button" class="${className || "btn-ghost"}" ${attrs || ""}>
+        <i class="fa-solid ${icon}"></i> ${text}
+      </button>
+    `;
   }
 
   function ensureStyles() {
@@ -279,54 +218,25 @@
 
     const style = document.createElement("style");
     style.id = "resourceDashboardStyles";
-
     style.textContent = `
+      .resource-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        margin-bottom: 12px;
+      }
+
       .resource-heading-row {
         display: flex;
         justify-content: space-between;
-        align-items: center;
+        align-items: flex-start;
         gap: 16px;
-        width: 100%;
         margin-top: 28px;
-        margin-bottom: 12px;
       }
 
       .resource-heading-row .section-heading {
         margin: 0;
-        flex: 1;
-      }
-
-      .resource-actions {
-        display: flex;
-        justify-content: flex-end;
-        align-items: center;
-        gap: 10px;
-        margin-left: auto;
-        flex-shrink: 0;
-      }
-
-      .btn-primary-lite {
-        border: none;
-        background: var(--color-primary, #0A4595);
-        color: #fff;
-        border-radius: 10px;
-        padding: 10px 14px;
-        font-weight: 800;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        line-height: 1;
-      }
-
-      .btn-primary-lite:hover {
-        filter: brightness(0.96);
-      }
-
-      .btn-primary-lite:disabled,
-      .btn-ghost:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
       }
 
       .resource-action-cell {
@@ -337,9 +247,9 @@
       }
 
       .resource-action-cell button {
-        border: 1px solid var(--border-color, #e3e7eb);
-        background: var(--card-bg, #ffffff);
-        color: var(--text-primary, #16232f);
+        border: 1px solid var(--border-color, #E3E7EB);
+        background: var(--card-bg, #fff);
+        color: var(--text-primary, #16232F);
         border-radius: 8px;
         padding: 6px 8px;
         cursor: pointer;
@@ -350,79 +260,13 @@
       }
 
       .resource-action-cell .danger {
-        color: var(--color-critical, #c0392b);
-      }
-
-      .resource-report-card {
-        margin-top: 18px;
-      }
-
-      .resource-report-heading {
-        padding: 18px 20px 0;
-      }
-
-      .resource-report-heading h3 {
-        margin: 0;
-        color: var(--color-primary, #0a4595);
-        font-size: 18px;
-        font-weight: 800;
-        letter-spacing: 0.01em;
-      }
-
-      .resource-report-heading p {
-        margin: 4px 0 0;
-        color: var(--text-muted, #8a99aa);
-        font-size: 13px;
-      }
-
-      .resource-report-table tbody tr:nth-child(even) {
-        background: rgba(10, 69, 149, 0.06);
-      }
-
-      .resource-total-row {
-        background: rgba(10, 69, 149, 0.12) !important;
-        font-weight: 800;
-        color: var(--color-primary, #0a4595);
-      }
-
-      .resource-manpower-kpis {
-        margin-bottom: 16px;
-      }
-
-      .resource-manpower-kpis .kpi-card__value {
-        font-size: 1.75rem;
-      }
-
-      .resource-manpower-kpis .kpi-card__delta {
-        font-size: 12px;
-        font-style: italic;
-      }
-
-      .manpower-chart-card {
-        margin-top: 0;
-      }
-
-      .manpower-chart-wrap {
-        height: 300px;
-        min-height: 300px;
-        position: relative;
-      }
-
-      .resource-empty {
-        padding: 24px;
-        text-align: center;
-        color: var(--text-muted, #6b7280);
-      }
-
-      .resource-empty i {
-        font-size: 24px;
-        margin-bottom: 8px;
+        color: var(--color-critical, #C0392B);
       }
 
       .resource-modal-backdrop {
         position: fixed;
         inset: 0;
-        z-index: 10000;
+        z-index: 100;
         background: rgba(15, 23, 42, 0.42);
         display: flex;
         align-items: center;
@@ -432,11 +276,11 @@
 
       .resource-modal {
         width: min(560px, 100%);
-        background: var(--card-bg, #ffffff);
-        color: var(--text-primary, #16232f);
+        background: var(--card-bg, #fff);
+        color: var(--text-primary, #16232F);
         border-radius: 16px;
         box-shadow: 0 20px 60px rgba(15, 23, 42, 0.22);
-        border: 1px solid var(--border-color, #e3e7eb);
+        border: 1px solid var(--border-color, #E3E7EB);
         overflow: hidden;
       }
 
@@ -445,7 +289,7 @@
         justify-content: space-between;
         align-items: center;
         padding: 18px 20px;
-        border-bottom: 1px solid var(--border-color, #e3e7eb);
+        border-bottom: 1px solid var(--border-color, #E3E7EB);
       }
 
       .resource-modal__header h3 {
@@ -476,18 +320,18 @@
       .resource-form-field label {
         font-size: 12px;
         font-weight: 700;
-        color: var(--text-muted, #6b7280);
+        color: var(--text-muted, #6B7280);
       }
 
       .resource-form-field input,
       .resource-form-field select,
       .resource-form-field textarea {
         width: 100%;
-        border: 1px solid var(--border-color, #e3e7eb);
+        border: 1px solid var(--border-color, #E3E7EB);
         border-radius: 10px;
         padding: 10px 11px;
-        background: var(--card-bg, #ffffff);
-        color: var(--text-primary, #16232f);
+        background: var(--card-bg, #fff);
+        color: var(--text-primary, #16232F);
         font-family: inherit;
       }
 
@@ -501,19 +345,92 @@
         justify-content: flex-end;
         gap: 10px;
         padding: 16px 20px;
-        border-top: 1px solid var(--border-color, #e3e7eb);
+        border-top: 1px solid var(--border-color, #E3E7EB);
+      }
+
+      .btn-primary-lite {
+        border: none;
+        background: var(--color-primary, #2563EB);
+        color: #fff;
+        border-radius: 10px;
+        padding: 10px 14px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .btn-primary-lite:disabled,
+      .btn-ghost:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .resource-empty {
+        padding: 24px;
+        text-align: center;
+        color: var(--text-muted, #6B7280);
+      }
+
+      .resource-empty i {
+        font-size: 24px;
+        margin-bottom: 8px;
+      }
+
+      .resource-report-card {
+        margin-top: 18px;
+      }
+
+      .resource-report-heading {
+        padding: 18px 20px 0;
+      }
+
+      .resource-report-heading h3 {
+        margin: 0;
+        color: var(--color-primary, #0A4595);
+        font-size: 18px;
+        font-weight: 800;
+        letter-spacing: 0.01em;
+      }
+
+      .resource-report-heading p {
+        margin: 4px 0 0;
+        color: var(--text-muted, #8A99AA);
+        font-size: 13px;
+      }
+
+      .resource-report-table tbody tr:nth-child(even) {
+        background: rgba(10, 69, 149, 0.06);
+      }
+
+      .resource-total-row {
+        background: rgba(10, 69, 149, 0.12) !important;
+        font-weight: 800;
+        color: var(--color-primary, #0A4595);
+      }
+
+      .resource-manpower-kpis {
+        margin-bottom: 16px;
+      }
+
+      .resource-manpower-kpis .kpi-card__value {
+        font-size: 1.75rem;
+      }
+
+      .resource-manpower-kpis .kpi-card__delta {
+        font-size: 12px;
+        font-style: italic;
+      }
+
+      .manpower-chart-card {
+        margin-top: 0;
       }
 
       @media (max-width: 720px) {
         .resource-heading-row {
           flex-direction: column;
-          align-items: flex-start;
         }
 
         .resource-actions {
-          width: 100%;
           justify-content: flex-start;
-          margin-left: 0;
         }
 
         .resource-form-grid {
@@ -525,296 +442,383 @@
     document.head.appendChild(style);
   }
 
-  function computeKPIs() {
-    const materials = getDisplayMaterials();
-    const equipment = getDisplayEquipment();
-    const manpower = getDisplayManpower();
+  function getStatusForMaterial(resource) {
+    const total = Number(resource.total_capacity || 0);
+    const remaining = Number(resource.remaining_capacity ?? total);
 
-    const materialsBelowReorder = materials.filter(function (resource) {
-      const status = getStatusForMaterial(resource);
-      return status.className === "crit";
+    if (remaining <= 0) {
+      return {
+        className: "crit",
+        icon: "fa-circle-exclamation",
+        text: "Below Reorder"
+      };
+    }
+
+    if (remaining <= total * 0.25) {
+      return {
+        className: "warn",
+        icon: "fa-triangle-exclamation",
+        text: "Watch"
+      };
+    }
+
+    return {
+      className: "ok",
+      icon: "fa-circle-check",
+      text: "Adequate"
+    };
+  }
+
+  function getCoverStatusClass(cover) {
+    const normalized = String(cover || "").toLowerCase();
+
+    if (normalized.includes("re-order") || normalized.includes("reorder")) return "crit";
+    if (normalized.includes("watch")) return "warn";
+    return "ok";
+  }
+
+  function getCoverStatusIcon(cover) {
+    const normalized = String(cover || "").toLowerCase();
+
+    if (normalized.includes("re-order") || normalized.includes("reorder")) return "fa-circle-exclamation";
+    if (normalized.includes("watch")) return "fa-triangle-exclamation";
+    return "fa-circle-check";
+  }
+
+  function formatNumber(value) {
+    if (value === null || value === undefined || value === "") return "—";
+
+    const num = Number(value || 0);
+    return Number.isInteger(num)
+      ? num.toLocaleString()
+      : num.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  }
+
+  function byType(type) {
+    return state.resources.filter(function (r) {
+      return r.type === type;
+    });
+  }
+
+  function computeKPIs() {
+    const materials = byType("material");
+    const equipment = byType("equipment");
+    const manpower = byType("manpower");
+
+    const materialsBelowReorder = materials.filter(function (r) {
+      const total = Number(r.total_capacity || 0);
+      const remaining = Number(r.remaining_capacity ?? total);
+      return remaining <= total * 0.25;
     }).length;
 
-    const equipmentCapacity = equipment.reduce(function (sum, resource) {
-      if (resource.fixedWarning) return sum;
-      return sum + Number(resource.total_capacity || 0);
+    const equipmentCapacity = equipment.reduce(function (sum, r) {
+      return sum + Number(r.total_capacity || 0);
     }, 0);
 
-    const equipmentAllocated = equipment.reduce(function (sum, resource) {
-      if (resource.fixedWarning) return sum;
-      return sum + Number(resource.allocated_quantity || 0);
+    const equipmentAllocated = equipment.reduce(function (sum, r) {
+      return sum + Number(r.allocated_quantity || 0);
     }, 0);
 
     const equipmentUtilization = equipmentCapacity > 0
       ? Math.round((equipmentAllocated / equipmentCapacity) * 100)
       : 0;
 
-    const manpowerDeployed = manpower.reduce(function (sum, resource) {
-      return sum + Number(resource.total_capacity || 0);
+    const manpowerDeployed = manpower.reduce(function (sum, r) {
+      return sum + Number(r.total_capacity || 0);
     }, 0);
 
-    const idleOrMaintenance = equipment.reduce(function (sum, resource) {
-      if (resource.fixedWarning) return sum + Number(resource.total_capacity || 0);
-      return sum + Number(resource.remaining_capacity || 0);
+    const idleOrMaintenance = equipment.reduce(function (sum, r) {
+      const remaining = Number(r.remaining_capacity || 0);
+      return sum + remaining;
     }, 0);
 
     return {
-      materialsBelowReorder,
-      equipmentUtilization,
-      manpowerDeployed,
-      idleOrMaintenance
+      materialsBelowReorder: materialsBelowReorder,
+      equipmentUtilization: equipmentUtilization,
+      manpowerDeployed: manpowerDeployed,
+      idleOrMaintenance: idleOrMaintenance
     };
   }
 
   function updateKPIs() {
     const kpis = computeKPIs();
+    const countEls = document.querySelectorAll(".kpi-card .count-up");
 
-    setText("materialsBelowReorderCount", formatNumber(kpis.materialsBelowReorder));
-    setText("equipmentUtilizationCount", formatNumber(kpis.equipmentUtilization));
-    setText("manpowerDeployedCount", formatNumber(kpis.manpowerDeployed));
-    setText("idleMaintenanceCount", formatNumber(kpis.idleOrMaintenance));
+    if (countEls[0]) countEls[0].textContent = formatNumber(kpis.materialsBelowReorder);
+    if (countEls[1]) countEls[1].textContent = formatNumber(kpis.equipmentUtilization);
+    if (countEls[2]) countEls[2].textContent = formatNumber(kpis.manpowerDeployed);
+    if (countEls[3]) countEls[3].textContent = formatNumber(kpis.idleOrMaintenance);
 
-    const delta = document.getElementById("materialsBelowReorderDelta");
+    const criticalDelta = document.querySelector(".card-accent--critical .kpi-card__delta");
 
-    if (delta) {
-      if (kpis.materialsBelowReorder > 0) {
-        delta.innerHTML = '<i class="fa-solid fa-arrow-down"></i> DI Pipe 600mm critical';
-      } else {
-        delta.innerHTML = '<i class="fa-solid fa-circle-check"></i> No material below reorder';
-      }
+    if (criticalDelta) {
+      criticalDelta.innerHTML =
+        kpis.materialsBelowReorder > 0
+          ? `<i class="fa-solid fa-arrow-down"></i> ${kpis.materialsBelowReorder} material item(s) need attention`
+          : `<i class="fa-solid fa-circle-check"></i> No material below reorder`;
     }
   }
 
   function renderMaterialsTable() {
-    const mount = document.getElementById("materialsTableMount");
-    if (!mount) return;
+    const section = document.getElementById("materials");
+    if (!section) return;
 
-    const materials = getDisplayMaterials();
+    const cardBody = section.querySelector(".card-body");
+    if (!cardBody) return;
 
-    let html = "";
-    html += '<table class="data-table">';
-    html += "<thead>";
-    html += "<tr>";
-    html += "<th>Material</th>";
-    html += "<th>Unit</th>";
-    html += '<th class="num">In Stock</th>';
-    html += '<th class="num">Monthly Consumption</th>';
-    html += '<th class="num">Reorder Level</th>';
-    html += "<th>Status</th>";
+    const materials = byType("material");
 
-    if (byType("material").length) {
-      html += '<th class="num">Actions</th>';
+    if (!materials.length) {
+      cardBody.innerHTML = `
+        <div class="resource-empty">
+          <i class="fa-solid fa-box-open"></i>
+          <p>No material records found.</p>
+          ${buttonHTML("fa-plus", "Add Material", "btn-primary-lite", 'data-resource-add="material"')}
+        </div>
+      `;
+      return;
     }
 
-    html += "</tr>";
-    html += "</thead>";
-    html += "<tbody>";
+    cardBody.innerHTML = `
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th scope="col">Material</th>
+            <th scope="col">Unit</th>
+            <th scope="col" class="num">Total Capacity</th>
+            <th scope="col" class="num">Allocated</th>
+            <th scope="col" class="num">Remaining</th>
+            <th scope="col">Status</th>
+            <th scope="col" class="num">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${materials
+            .map(function (item) {
+              const status = getStatusForMaterial(item);
 
-    materials.forEach(function (item) {
-      const status = getStatusForMaterial(item);
-      const stock = item.remaining_capacity !== undefined && item.remaining_capacity !== null
-        ? item.remaining_capacity
-        : item.total_capacity;
-
-      const consumption = item.allocated_quantity || 0;
-      const reorderLevel = item.reorder_level || Math.round(Number(item.total_capacity || 0) * 0.25);
-
-      html += '<tr data-resource-id="' + escapeAttr(item.id || "") + '">';
-      html += "<td>" + escapeHTML(item.name) + "</td>";
-      html += "<td>" + escapeHTML(item.unit || "") + "</td>";
-      html += '<td class="num">' + formatNumber(stock) + "</td>";
-      html += '<td class="num">' + formatNumber(consumption) + "</td>";
-      html += '<td class="num">' + formatNumber(reorderLevel) + "</td>";
-      html += "<td>";
-      html += '<span class="status-chip ' + status.className + '">';
-      html += '<i class="fa-solid ' + status.icon + '"></i> ' + escapeHTML(status.text);
-      html += "</span>";
-      html += "</td>";
-
-      if (byType("material").length) {
-        html += "<td>";
-        html += renderActionButtons(item.id);
-        html += "</td>";
-      }
-
-      html += "</tr>";
-    });
-
-    html += "</tbody>";
-    html += "</table>";
-
-    mount.innerHTML = html;
-  }
-
-  function renderActionButtons(id) {
-    if (!id) return "";
-
-    let html = "";
-    html += '<div class="resource-action-cell">';
-    html += '<button type="button" title="Edit" data-resource-edit="' + escapeAttr(id) + '">';
-    html += '<i class="fa-solid fa-pen"></i>';
-    html += "</button>";
-    html += '<button type="button" title="Delete" class="danger" data-resource-delete="' + escapeAttr(id) + '">';
-    html += '<i class="fa-solid fa-trash"></i>';
-    html += "</button>";
-    html += "</div>";
-
-    return html;
+              return `
+                <tr data-resource-id="${escapeAttr(item.id)}">
+                  <td>${escapeHTML(item.name)}</td>
+                  <td>${escapeHTML(item.unit || "")}</td>
+                  <td class="num">${formatNumber(item.total_capacity)}</td>
+                  <td class="num">${formatNumber(item.allocated_quantity || 0)}</td>
+                  <td class="num">${formatNumber(item.remaining_capacity ?? item.total_capacity)}</td>
+                  <td>
+                    <span class="status-chip ${status.className}">
+                      <i class="fa-solid ${status.icon}"></i> ${status.text}
+                    </span>
+                  </td>
+                  <td>
+                    <div class="resource-action-cell">
+                      <button type="button" title="Edit" data-resource-edit="${escapeAttr(item.id)}">
+                        <i class="fa-solid fa-pen"></i>
+                      </button>
+                      <button type="button" title="Delete" class="danger" data-resource-delete="${escapeAttr(item.id)}">
+                        <i class="fa-solid fa-trash"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              `;
+            })
+            .join("")}
+        </tbody>
+      </table>
+    `;
   }
 
   function renderHdpePipeStockTable() {
-    const card = document.getElementById("hdpePipeStockCard");
-    if (!card) return;
+    const section = document.getElementById("materials");
+    if (!section) return;
 
-    let html = "";
-    html += '<div class="resource-report-heading">';
-    html += "<h3>HDPE Pipe Stock (May 2026)</h3>";
-    html += "<p>Received, used and available HDPE pipe stock summary</p>";
-    html += "</div>";
-    html += '<div class="card-body table-scroll">';
-    html += '<table class="data-table resource-report-table">';
-    html += "<thead>";
-    html += "<tr>";
-    html += "<th>Diameter</th>";
-    html += '<th class="num">Received (m)</th>';
-    html += '<th class="num">Used (m)</th>';
-    html += '<th class="num">Stock (m)</th>';
-    html += "<th>Cover</th>";
-    html += "</tr>";
-    html += "</thead>";
-    html += "<tbody>";
+    let card = document.getElementById("hdpePipeStockCard");
 
-    HDPE_PIPE_STOCK.forEach(function (item) {
-      const status = getCoverStatus(item.cover);
+    if (!card) {
+      card = document.createElement("div");
+      card.id = "hdpePipeStockCard";
+      card.className = "card resource-report-card";
+      section.appendChild(card);
+    }
 
-      html += "<tr>";
-      html += "<td>" + escapeHTML(item.diameter) + "</td>";
-      html += '<td class="num">' + formatNumber(item.received) + "</td>";
-      html += '<td class="num">' + formatNumber(item.used) + "</td>";
-      html += '<td class="num">' + formatNumber(item.stock) + "</td>";
-      html += "<td>";
-      html += '<span class="status-chip ' + status.className + '">';
-      html += '<i class="fa-solid ' + status.icon + '"></i> ' + escapeHTML(item.cover);
-      html += "</span>";
-      html += "</td>";
-      html += "</tr>";
-    });
+    card.innerHTML = `
+      <div class="resource-report-heading">
+        <h3>HDPE Pipe Stock (May 2026)</h3>
+        <p>Received, used and available HDPE pipe stock summary</p>
+      </div>
 
-    html += "</tbody>";
-    html += "</table>";
-    html += "</div>";
+      <div class="card-body table-scroll">
+        <table class="data-table resource-report-table">
+          <thead>
+            <tr>
+              <th scope="col">Diameter</th>
+              <th scope="col" class="num">Received (m)</th>
+              <th scope="col" class="num">Used (m)</th>
+              <th scope="col" class="num">Stock (m)</th>
+              <th scope="col">Cover</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${HDPE_PIPE_STOCK.map(function (item) {
+              const statusClass = getCoverStatusClass(item.cover);
+              const statusIcon = getCoverStatusIcon(item.cover);
 
-    card.innerHTML = html;
+              return `
+                <tr>
+                  <td>${escapeHTML(item.diameter)}</td>
+                  <td class="num">${formatNumber(item.received)}</td>
+                  <td class="num">${formatNumber(item.used)}</td>
+                  <td class="num">${formatNumber(item.stock)}</td>
+                  <td>
+                    <span class="status-chip ${statusClass}">
+                      <i class="fa-solid ${statusIcon}"></i> ${escapeHTML(item.cover)}
+                    </span>
+                  </td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
   }
 
   function renderEquipmentCards() {
-    const mount = document.getElementById("equipmentCardsMount");
-    if (!mount) return;
+    const section = document.getElementById("equipment");
+    if (!section) return;
 
-    const equipment = getDisplayEquipment();
-    const hasDbRecords = byType("equipment").length > 0;
+    const grid = section.querySelector(".grid");
+    if (!grid) return;
 
-    let html = "";
+    const equipment = byType("equipment");
 
-    equipment.forEach(function (item) {
-      const total = Number(item.total_capacity || 0);
-      const allocated = Number(item.allocated_quantity || 0);
-      const utilization = total > 0 ? Math.round((allocated / total) * 100) : 0;
-      const accent = item.fixedWarning ? "warning" : utilization >= 80 ? "success" : utilization >= 50 ? "secondary" : "warning";
+    if (!equipment.length) {
+      grid.innerHTML = `
+        <div class="card" style="grid-column:1/-1;">
+          <div class="resource-empty">
+            <i class="fa-solid fa-truck-monster"></i>
+            <p>No equipment records found.</p>
+            ${buttonHTML("fa-plus", "Add Equipment", "btn-primary-lite", 'data-resource-add="equipment"')}
+          </div>
+        </div>
+      `;
+      return;
+    }
 
-      html += '<div class="card card-accent card-accent--' + accent + '" data-resource-id="' + escapeAttr(item.id || "") + '">';
-      html += '<div class="card-body">';
-      html += '<div class="kpi-card__label">' + escapeHTML(item.name) + "</div>";
+    grid.innerHTML = equipment
+      .map(function (item) {
+        const total = Number(item.total_capacity || 0);
+        const allocated = Number(item.allocated_quantity || 0);
+        const utilization = total > 0 ? Math.round((allocated / total) * 100) : 0;
+        const accent = utilization >= 80 ? "success" : utilization >= 50 ? "secondary" : "warning";
 
-      if (item.fixedWarning) {
-        html += '<div class="kpi-card__value" style="font-size:1.5rem;color:var(--color-warning);">' + formatNumber(total) + "</div>";
-        html += '<div class="kpi-card__delta flat">Across all categories</div>';
-      } else {
-        html += '<div class="kpi-card__value" style="font-size:1.5rem;">';
-        html += formatNumber(allocated) + " / " + formatNumber(total);
-        html += "</div>";
-        html += '<div class="kpi-card__delta ' + (utilization >= 75 ? "up" : "flat") + '">';
-        html += utilization + "% utilization";
-        html += "</div>";
-      }
-
-      if (hasDbRecords && item.id) {
-        html += '<div class="resource-action-cell" style="margin-top:12px;justify-content:flex-start;">';
-        html += renderActionButtons(item.id);
-        html += "</div>";
-      }
-
-      html += "</div>";
-      html += "</div>";
-    });
-
-    mount.innerHTML = html;
+        return `
+          <div class="card card-accent card-accent--${accent}" data-resource-id="${escapeAttr(item.id)}">
+            <div class="card-body">
+              <div class="kpi-card__label">${escapeHTML(item.name)}</div>
+              <div class="kpi-card__value" style="font-size:1.5rem;">
+                ${formatNumber(allocated)} / ${formatNumber(total)}
+              </div>
+              <div class="kpi-card__delta ${utilization >= 75 ? "up" : "flat"}">
+                ${utilization}% utilization · ${escapeHTML(item.unit || "unit")}
+              </div>
+              <div class="resource-action-cell" style="margin-top:12px;justify-content:flex-start;">
+                <button type="button" title="Edit" data-resource-edit="${escapeAttr(item.id)}">
+                  <i class="fa-solid fa-pen"></i>
+                </button>
+                <button type="button" title="Delete" class="danger" data-resource-delete="${escapeAttr(item.id)}">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
   }
 
   function renderEquipmentDeploymentTable() {
-    const card = document.getElementById("equipmentDeploymentCard");
-    if (!card) return;
+    const section = document.getElementById("equipment");
+    if (!section) return;
 
-    let html = "";
-    html += '<div class="resource-report-heading">';
-    html += "<h3>Equipment Deployment (May 2026)</h3>";
-    html += "<p>Planned versus deployed equipment summary</p>";
-    html += "</div>";
-    html += '<div class="card-body table-scroll">';
-    html += '<table class="data-table resource-report-table">';
-    html += "<thead>";
-    html += "<tr>";
-    html += "<th>Category</th>";
-    html += '<th class="num">Planned</th>';
-    html += '<th class="num">Deployed</th>';
-    html += '<th class="num">Variance</th>';
-    html += "</tr>";
-    html += "</thead>";
-    html += "<tbody>";
+    let card = document.getElementById("equipmentDeploymentCard");
 
-    EQUIPMENT_DEPLOYMENT.forEach(function (item) {
-      html += '<tr class="' + (item.isTotal ? "resource-total-row" : "") + '">';
-      html += "<td>" + escapeHTML(item.category) + "</td>";
-      html += '<td class="num">' + formatNumber(item.planned) + "</td>";
-      html += '<td class="num">' + formatNumber(item.deployed) + "</td>";
-      html += '<td class="num">' + formatNumber(item.variance) + "</td>";
-      html += "</tr>";
-    });
+    if (!card) {
+      card = document.createElement("div");
+      card.id = "equipmentDeploymentCard";
+      card.className = "card resource-report-card";
+      section.appendChild(card);
+    }
 
-    html += "</tbody>";
-    html += "</table>";
-    html += "</div>";
+    card.innerHTML = `
+      <div class="resource-report-heading">
+        <h3>Equipment Deployment (May 2026)</h3>
+        <p>Planned versus deployed equipment summary</p>
+      </div>
 
-    card.innerHTML = html;
+      <div class="card-body table-scroll">
+        <table class="data-table resource-report-table">
+          <thead>
+            <tr>
+              <th scope="col">Category</th>
+              <th scope="col" class="num">Planned</th>
+              <th scope="col" class="num">Deployed</th>
+              <th scope="col" class="num">Variance</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${EQUIPMENT_DEPLOYMENT.map(function (item) {
+              return `
+                <tr class="${item.isTotal ? "resource-total-row" : ""}">
+                  <td>${escapeHTML(item.category)}</td>
+                  <td class="num">${formatNumber(item.planned)}</td>
+                  <td class="num">${formatNumber(item.deployed)}</td>
+                  <td class="num">${formatNumber(item.variance)}</td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
   }
 
   function renderManpowerProgressCards() {
-    const mount = document.getElementById("manpowerProgressCards");
-    if (!mount) return;
+    const section = document.getElementById("manpower");
+    if (!section) return;
 
-    let html = "";
+    let grid = document.getElementById("manpowerProgressCards");
 
-    MANPOWER_PROGRESS.forEach(function (item) {
-      html += '<div class="card kpi-card card-accent card-accent--' + item.accent + '">';
-      html += '<div class="kpi-card__top">';
-      html += '<div class="kpi-card__label">' + escapeHTML(item.label) + "</div>";
-      html += '<div class="kpi-card__icon ' + item.iconTone + '">';
-      html += '<i class="fa-solid ' + item.icon + '"></i>';
-      html += "</div>";
-      html += "</div>";
-      html += '<div class="kpi-card__value">' + escapeHTML(item.value) + "</div>";
-      html += '<div class="kpi-card__delta flat">' + escapeHTML(item.note) + "</div>";
-      html += "</div>";
-    });
+    if (!grid) {
+      grid = document.createElement("div");
+      grid.id = "manpowerProgressCards";
+      grid.className = "grid grid-4 resource-manpower-kpis";
 
-    mount.innerHTML = html;
+      const chartCard = section.querySelector(".manpower-chart-card") || section.querySelector(".card");
+      section.insertBefore(grid, chartCard);
+    }
+
+    grid.innerHTML = MANPOWER_PROGRESS.map(function (item) {
+      return `
+        <div class="card kpi-card card-accent card-accent--${item.accent}">
+          <div class="kpi-card__top">
+            <div class="kpi-card__label">${escapeHTML(item.label)}</div>
+            <div class="kpi-card__icon ${item.iconTone}">
+              <i class="fa-solid ${item.icon}"></i>
+            </div>
+          </div>
+          <div class="kpi-card__value">${escapeHTML(item.value)}</div>
+          <div class="kpi-card__delta flat">${escapeHTML(item.note)}</div>
+        </div>
+      `;
+    }).join("");
   }
 
   function renderManpowerChart() {
-    const canvas = document.getElementById("manpowerChart");
-    if (!canvas) return;
+    const el = document.getElementById("manpowerChart");
+    if (!el || !window.Chart) return;
 
-    const manpower = getDisplayManpower();
+    const manpower = byType("manpower");
 
     const labels = manpower.map(function (item) {
       return item.name;
@@ -829,22 +833,11 @@
       state.chart = null;
     }
 
-    if (typeof Chart === "undefined") {
-      const parent = canvas.parentElement;
-      if (parent) {
-        parent.innerHTML =
-          '<div class="resource-empty">' +
-          '<i class="fa-solid fa-chart-pie"></i>' +
-          '<p>Manpower chart could not load because Chart.js is unavailable.</p>' +
-          "</div>";
-      }
-      return;
-    }
+    const cssVar = function (name) {
+      return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    };
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    state.chart = new Chart(ctx, {
+    state.chart = new Chart(el, {
       type: "doughnut",
       data: {
         labels: labels.length ? labels : ["No manpower data"],
@@ -852,19 +845,19 @@
           {
             data: values.length ? values : [1],
             backgroundColor: [
-              cssVar("--color-primary", "#0a4595"),
-              "#07858c",
-              cssVar("--color-warning", "#c47a14"),
-              cssVar("--color-success", "#00875a"),
-              "#0ea5e9",
-              "#f97316"
+              cssVar("--color-primary") || "#2563EB",
+              cssVar("--color-secondary") || "#7C3AED",
+              cssVar("--color-warning") || "#D97706",
+              cssVar("--color-success") || "#059669",
+              "#0EA5E9",
+              "#F97316",
+              "#14B8A6"
             ],
             borderWidth: 0
           }
         ]
       },
       options: {
-        responsive: true,
         maintainAspectRatio: false,
         cutout: "65%",
         plugins: {
@@ -882,101 +875,187 @@
     });
   }
 
-  function renderManpowerTable() {
-    const card = document.getElementById("manpowerListCard");
-    if (!card) return;
+  function renderManpowerActions() {
+    const section = document.getElementById("manpower");
+    if (!section) return;
 
-    const manpower = getDisplayManpower();
-    const hasDbRecords = byType("manpower").length > 0;
+    let list = section.querySelector(".manpower-list-card");
 
-    let html = "";
-    html += '<div class="card-body table-scroll">';
-    html += '<table class="data-table">';
-    html += "<thead>";
-    html += "<tr>";
-    html += "<th>Category</th>";
-    html += "<th>Unit</th>";
-    html += '<th class="num">Total</th>';
-    html += '<th class="num">Allocated</th>';
-    html += '<th class="num">Remaining</th>';
-
-    if (hasDbRecords) {
-      html += '<th class="num">Actions</th>';
+    if (!list) {
+      list = document.createElement("div");
+      list.className = "card manpower-list-card";
+      list.style.marginTop = "16px";
+      section.appendChild(list);
     }
 
-    html += "</tr>";
-    html += "</thead>";
-    html += "<tbody>";
+    const manpower = byType("manpower");
 
-    manpower.forEach(function (item) {
-      const remaining = getRemaining(item);
-
-      html += '<tr data-resource-id="' + escapeAttr(item.id || "") + '">';
-      html += "<td>" + escapeHTML(item.name) + "</td>";
-      html += "<td>" + escapeHTML(item.unit || "") + "</td>";
-      html += '<td class="num">' + formatNumber(item.total_capacity) + "</td>";
-      html += '<td class="num">' + formatNumber(item.allocated_quantity || 0) + "</td>";
-      html += '<td class="num">' + formatNumber(remaining) + "</td>";
-
-      if (hasDbRecords) {
-        html += "<td>" + renderActionButtons(item.id) + "</td>";
-      }
-
-      html += "</tr>";
-    });
-
-    html += "</tbody>";
-    html += "</table>";
-    html += "</div>";
-
-    card.innerHTML = html;
+    list.innerHTML = `
+      <div class="card-body table-scroll">
+        ${
+          manpower.length
+            ? `
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    <th>Unit</th>
+                    <th class="num">Total</th>
+                    <th class="num">Allocated</th>
+                    <th class="num">Remaining</th>
+                    <th class="num">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${manpower
+                    .map(function (item) {
+                      return `
+                        <tr data-resource-id="${escapeAttr(item.id)}">
+                          <td>${escapeHTML(item.name)}</td>
+                          <td>${escapeHTML(item.unit || "")}</td>
+                          <td class="num">${formatNumber(item.total_capacity)}</td>
+                          <td class="num">${formatNumber(item.allocated_quantity || 0)}</td>
+                          <td class="num">${formatNumber(item.remaining_capacity ?? item.total_capacity)}</td>
+                          <td>
+                            <div class="resource-action-cell">
+                              <button type="button" title="Edit" data-resource-edit="${escapeAttr(item.id)}">
+                                <i class="fa-solid fa-pen"></i>
+                              </button>
+                              <button type="button" title="Delete" class="danger" data-resource-delete="${escapeAttr(item.id)}">
+                                <i class="fa-solid fa-trash"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      `;
+                    })
+                    .join("")}
+                </tbody>
+              </table>
+            `
+            : `
+              <div class="resource-empty">
+                <i class="fa-solid fa-people-group"></i>
+                <p>No manpower records found.</p>
+                ${buttonHTML("fa-plus", "Add Manpower", "btn-primary-lite", 'data-resource-add="manpower"')}
+              </div>
+            `
+        }
+      </div>
+    `;
   }
 
   function renderWorkforceByEmployerTable() {
-    const card = document.getElementById("workforceByEmployerCard");
-    if (!card) return;
+    const section = document.getElementById("manpower");
+    if (!section) return;
 
-    let html = "";
-    html += '<div class="resource-report-heading">';
-    html += "<h3>Workforce By Employer</h3>";
-    html += "<p>Employer, category and headcount breakdown</p>";
-    html += "</div>";
-    html += '<div class="card-body table-scroll">';
-    html += '<table class="data-table resource-report-table">';
-    html += "<thead>";
-    html += "<tr>";
-    html += "<th>Group</th>";
-    html += "<th>Category</th>";
-    html += '<th class="num">Headcount</th>';
-    html += "</tr>";
-    html += "</thead>";
-    html += "<tbody>";
+    let card = document.getElementById("workforceByEmployerCard");
 
-    WORKFORCE_BY_EMPLOYER.forEach(function (item) {
-      html += '<tr class="' + (item.isTotal ? "resource-total-row" : "") + '">';
-      html += "<td>" + escapeHTML(item.group) + "</td>";
-      html += "<td>" + escapeHTML(item.category) + "</td>";
-      html += '<td class="num">' + formatNumber(item.headcount) + "</td>";
-      html += "</tr>";
+    if (!card) {
+      card = document.createElement("div");
+      card.id = "workforceByEmployerCard";
+      card.className = "card resource-report-card";
+      section.appendChild(card);
+    }
+
+    card.innerHTML = `
+      <div class="resource-report-heading">
+        <h3>Workforce By Employer</h3>
+        <p>Employer, category and headcount breakdown</p>
+      </div>
+
+      <div class="card-body table-scroll">
+        <table class="data-table resource-report-table">
+          <thead>
+            <tr>
+              <th scope="col">Group</th>
+              <th scope="col">Category</th>
+              <th scope="col" class="num">Headcount</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${WORKFORCE_BY_EMPLOYER.map(function (item) {
+              return `
+                <tr class="${item.isTotal ? "resource-total-row" : ""}">
+                  <td>${escapeHTML(item.group)}</td>
+                  <td>${escapeHTML(item.category)}</td>
+                  <td class="num">${formatNumber(item.headcount)}</td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function injectSectionActions() {
+    [
+      { id: "materials", type: "material" },
+      { id: "equipment", type: "equipment" },
+      { id: "manpower", type: "manpower" }
+    ].forEach(function (item) {
+      const section = document.getElementById(item.id);
+      if (!section) return;
+
+      const heading = section.querySelector(".section-heading");
+      if (!heading || heading.closest(".resource-heading-row")) return;
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "resource-heading-row";
+
+      heading.parentNode.insertBefore(wrapper, heading);
+      wrapper.appendChild(heading);
+
+      const actions = document.createElement("div");
+      actions.className = "resource-actions";
+      actions.innerHTML = buttonHTML(
+        "fa-plus",
+        "Add " + RESOURCE_TYPES[item.type].label,
+        "btn-primary-lite",
+        'data-resource-add="' + item.type + '"'
+      );
+
+      wrapper.appendChild(actions);
     });
-
-    html += "</tbody>";
-    html += "</table>";
-    html += "</div>";
-
-    card.innerHTML = html;
   }
 
   function renderAll() {
     updateKPIs();
+
     renderMaterialsTable();
     renderHdpePipeStockTable();
+
     renderEquipmentCards();
     renderEquipmentDeploymentTable();
+
     renderManpowerProgressCards();
     renderManpowerChart();
-    renderManpowerTable();
+    renderManpowerActions();
     renderWorkforceByEmployerTable();
+  }
+
+  async function loadResources() {
+    if (!state.projectId) {
+      showNoProjectState();
+      return;
+    }
+
+    try {
+      const result = await api().request("GET", "/projects/" + state.projectId + "/resources?limit=200");
+      state.resources = Array.isArray(result && result.data) ? result.data : [];
+      renderAll();
+    } catch (err) {
+      showError(err, "Failed to load resource dashboard data");
+      showDashboardError(err.message || "Failed to load resource dashboard data");
+      renderAll();
+    }
+  }
+
+  function showNoProjectState() {
+    showDashboardError(
+      "No project is selected. Add a project in the database and store it in localStorage as current_project, or expose GET /projects so the dashboard can auto-select the first project."
+    );
   }
 
   function showDashboardError(message) {
@@ -993,38 +1072,19 @@
       main.insertBefore(box, main.firstChild);
     }
 
-    box.innerHTML =
-      '<div class="card-body">' +
-        '<div class="empty-state">' +
-          '<i class="fa-solid fa-triangle-exclamation"></i>' +
-          "<p>" + escapeHTML(message) + "</p>" +
-        "</div>" +
-      "</div>";
+    box.innerHTML = `
+      <div class="card-body">
+        <div class="empty-state">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <p>${escapeHTML(message)}</p>
+        </div>
+      </div>
+    `;
   }
 
   function clearDashboardError() {
     const box = document.getElementById("resourceDashboardError");
     if (box) box.remove();
-  }
-
-  async function loadResources() {
-    if (!state.projectId) {
-      showDashboardError("No project is selected. The dashboard is showing sample resource data until a project is selected.");
-      renderAll();
-      return;
-    }
-
-    try {
-      const result = await api().request("GET", "/projects/" + state.projectId + "/resources?limit=200");
-      state.resources = Array.isArray(result && result.data) ? result.data : [];
-      clearDashboardError();
-      renderAll();
-    } catch (err) {
-      state.resources = [];
-      showError(err, "Failed to load resource dashboard data");
-      showDashboardError(err.message || "Failed to load resource dashboard data. Showing sample resource data.");
-      renderAll();
-    }
   }
 
   function openResourceModal(type, resource) {
@@ -1037,67 +1097,59 @@
     backdrop.className = "resource-modal-backdrop";
     backdrop.id = "resourceModalBackdrop";
 
-    const resourceName = resource && resource.name ? resource.name : "";
-    const resourceUnit = resource && resource.unit ? resource.unit : config.defaultUnit;
-    const resourceCapacity = resource && resource.total_capacity ? resource.total_capacity : "";
-    const resourceNotes = resource && resource.notes ? resource.notes : "";
+    backdrop.innerHTML = `
+      <div class="resource-modal" role="dialog" aria-modal="true" aria-labelledby="resourceModalTitle">
+        <div class="resource-modal__header">
+          <h3 id="resourceModalTitle">${isEdit ? "Edit" : "Add"} ${config.label}</h3>
+          <button type="button" class="icon-btn" data-resource-modal-close aria-label="Close">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
 
-    let html = "";
-    html += '<div class="resource-modal" role="dialog" aria-modal="true">';
-    html += '<div class="resource-modal__header">';
-    html += "<h3>" + (isEdit ? "Edit " : "Add ") + config.label + "</h3>";
-    html += '<button type="button" class="icon-btn" data-resource-modal-close aria-label="Close">';
-    html += '<i class="fa-solid fa-xmark"></i>';
-    html += "</button>";
-    html += "</div>";
+        <form id="resourceForm">
+          <div class="resource-modal__body">
+            <div class="resource-form-grid">
+              <div class="resource-form-field full">
+                <label for="resourceName">Name</label>
+                <input id="resourceName" name="name" type="text" required maxlength="200" value="${escapeAttr(resource && resource.name ? resource.name : "")}" />
+              </div>
 
-    html += '<form id="resourceForm">';
-    html += '<div class="resource-modal__body">';
-    html += '<div class="resource-form-grid">';
+              <div class="resource-form-field">
+                <label for="resourceType">Type</label>
+                <select id="resourceType" name="type" required>
+                  <option value="material" ${type === "material" ? "selected" : ""}>Material</option>
+                  <option value="equipment" ${type === "equipment" ? "selected" : ""}>Equipment</option>
+                  <option value="manpower" ${type === "manpower" ? "selected" : ""}>Manpower</option>
+                </select>
+              </div>
 
-    html += '<div class="resource-form-field full">';
-    html += '<label for="resourceName">Name</label>';
-    html += '<input id="resourceName" name="name" type="text" required maxlength="200" value="' + escapeAttr(resourceName) + '" />';
-    html += "</div>";
+              <div class="resource-form-field">
+                <label for="resourceUnit">Unit</label>
+                <input id="resourceUnit" name="unit" type="text" required maxlength="20" value="${escapeAttr((resource && resource.unit) || config.defaultUnit)}" />
+              </div>
 
-    html += '<div class="resource-form-field">';
-    html += '<label for="resourceType">Type</label>';
-    html += '<select id="resourceType" name="type" required>';
-    html += '<option value="material" ' + (type === "material" ? "selected" : "") + ">Material</option>";
-    html += '<option value="equipment" ' + (type === "equipment" ? "selected" : "") + ">Equipment</option>";
-    html += '<option value="manpower" ' + (type === "manpower" ? "selected" : "") + ">Manpower</option>";
-    html += "</select>";
-    html += "</div>";
+              <div class="resource-form-field">
+                <label for="resourceCapacity">Total Capacity / Quantity</label>
+                <input id="resourceCapacity" name="total_capacity" type="number" step="0.01" min="0.01" required value="${escapeAttr(resource && resource.total_capacity ? resource.total_capacity : "")}" />
+              </div>
 
-    html += '<div class="resource-form-field">';
-    html += '<label for="resourceUnit">Unit</label>';
-    html += '<input id="resourceUnit" name="unit" type="text" required maxlength="20" value="' + escapeAttr(resourceUnit) + '" />';
-    html += "</div>";
+              <div class="resource-form-field full">
+                <label for="resourceNotes">Notes</label>
+                <textarea id="resourceNotes" name="notes" maxlength="1000">${escapeHTML(resource && resource.notes ? resource.notes : "")}</textarea>
+              </div>
+            </div>
+          </div>
 
-    html += '<div class="resource-form-field">';
-    html += '<label for="resourceCapacity">Total Capacity / Quantity</label>';
-    html += '<input id="resourceCapacity" name="total_capacity" type="number" step="0.01" min="0.01" required value="' + escapeAttr(resourceCapacity) + '" />';
-    html += "</div>";
+          <div class="resource-modal__footer">
+            <button type="button" class="btn-ghost" data-resource-modal-close>Cancel</button>
+            <button type="submit" class="btn-primary-lite">
+              <i class="fa-solid fa-floppy-disk"></i> ${isEdit ? "Update" : "Save"}
+            </button>
+          </div>
+        </form>
+      </div>
+    `;
 
-    html += '<div class="resource-form-field full">';
-    html += '<label for="resourceNotes">Notes</label>';
-    html += '<textarea id="resourceNotes" name="notes" maxlength="1000">' + escapeHTML(resourceNotes) + "</textarea>";
-    html += "</div>";
-
-    html += "</div>";
-    html += "</div>";
-
-    html += '<div class="resource-modal__footer">';
-    html += '<button type="button" class="btn-ghost" data-resource-modal-close>Cancel</button>';
-    html += '<button type="submit" class="btn-primary-lite">';
-    html += '<i class="fa-solid fa-floppy-disk"></i> ' + (isEdit ? "Update" : "Save");
-    html += "</button>";
-    html += "</div>";
-
-    html += "</form>";
-    html += "</div>";
-
-    backdrop.innerHTML = html;
     document.body.appendChild(backdrop);
 
     const form = backdrop.querySelector("#resourceForm");
@@ -1105,20 +1157,15 @@
     form.addEventListener("submit", async function (event) {
       event.preventDefault();
 
-      if (!state.projectId && !isEdit) {
-        toast("No project is selected. Please select or create a project first.", "fa-triangle-exclamation");
-        return;
-      }
-
       const submitBtn = form.querySelector('button[type="submit"]');
       submitBtn.disabled = true;
 
       const payload = {
-        name: form.elements.name.value.trim(),
-        type: form.elements.type.value,
-        unit: form.elements.unit.value.trim(),
-        total_capacity: Number(form.elements.total_capacity.value),
-        notes: form.elements.notes.value.trim() || undefined
+        name: form.name.value.trim(),
+        type: form.type.value,
+        unit: form.unit.value.trim(),
+        total_capacity: Number(form.total_capacity.value),
+        notes: form.notes.value.trim() || undefined
       };
 
       try {
@@ -1131,6 +1178,7 @@
         }
 
         closeResourceModal();
+        clearDashboardError();
         await loadResources();
       } catch (err) {
         showError(err, "Failed to " + (isEdit ? "update" : "create") + " resource");
@@ -1166,6 +1214,7 @@
     if (!resource) return;
 
     const confirmed = window.confirm('Delete resource "' + resource.name + '"? This is allowed only if it has no allocations.');
+
     if (!confirmed) return;
 
     try {
@@ -1195,10 +1244,7 @@
           return item.id === id;
         });
 
-        if (resource) {
-          openResourceModal(resource.type, resource);
-        }
-
+        if (resource) openResourceModal(resource.type, resource);
         return;
       }
 
@@ -1212,27 +1258,27 @@
   }
 
   function initExportButton() {
-    const exportBtn = document.getElementById("resourceExportBtn");
+    const exportBtn = Array.from(document.querySelectorAll(".filter-bar button")).find(function (btn) {
+      return /export/i.test(btn.textContent || "");
+    });
+
     if (!exportBtn) return;
 
     exportBtn.addEventListener("click", function () {
       const rows = [
-        ["Name", "Type", "Unit", "Total Capacity", "Allocated Quantity", "Remaining Capacity", "Notes"]
+        ["Name", "Type", "Unit", "Total Capacity", "Allocated Quantity", "Remaining Capacity", "Notes"],
+        ...state.resources.map(function (r) {
+          return [
+            r.name,
+            r.type,
+            r.unit,
+            r.total_capacity,
+            r.allocated_quantity || 0,
+            r.remaining_capacity ?? r.total_capacity,
+            r.notes || ""
+          ];
+        })
       ];
-
-      state.resources.forEach(function (resource) {
-        rows.push([
-          resource.name,
-          resource.type,
-          resource.unit,
-          resource.total_capacity,
-          resource.allocated_quantity || 0,
-          resource.remaining_capacity !== undefined && resource.remaining_capacity !== null
-            ? resource.remaining_capacity
-            : resource.total_capacity,
-          resource.notes || ""
-        ]);
-      });
 
       const csv = rows
         .map(function (row) {
@@ -1250,37 +1296,53 @@
 
       link.href = url;
       link.download = "resource-dashboard.csv";
-      document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
 
       URL.revokeObjectURL(url);
       toast("Resource data exported", "fa-download");
     });
   }
 
-  function setText(id, value) {
-    const el = document.getElementById(id);
-    if (el) el.textContent = value;
+  function escapeHTML(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function escapeAttr(value) {
+    return escapeHTML(value).replace(/"/g, "&quot;");
   }
 
   async function init() {
     if (state.initialized) return;
-
     state.initialized = true;
 
     ensureStyles();
+    injectSectionActions();
     initGlobalClicks();
     initExportButton();
 
-    renderAll();
-
     state.projectId = await resolveProjectId();
+
+    if (!state.projectId) {
+      showNoProjectState();
+      renderAll();
+      return;
+    }
 
     await loadResources();
   }
 
   document.addEventListener("wsdp:authready", function () {
     init();
+  });
+
+  document.addEventListener("DOMContentLoaded", function () {
+    setTimeout(function () {
+      if (!state.initialized && window.WSDP_API) {
+        init();
+      }
+    }, 300);
   });
 })();
