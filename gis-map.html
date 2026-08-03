@@ -87,7 +87,7 @@
     <main class="main-content">
 
       <div class="section-heading">
-        <h2>GIS Map — 7 Intervention Areas (Lubango)</h2>
+        <h2>GIS Map — Lubango Distribution Network Intervention Areas</h2>
         <span class="section-sub">Pipeline corridor, work fronts and intervention areas</span>
       </div>
 
@@ -128,38 +128,38 @@
               <h4>Intervention Areas</h4>
 
               <label class="filter-chip">
-                <input type="checkbox" class="gis-filter-area" data-area="Mapunda" checked>
-                Mapunda
+                <input type="checkbox" class="gis-filter-area" data-area="Casa Verde" checked>
+                Casa Verde
               </label>
 
               <label class="filter-chip">
-                <input type="checkbox" class="gis-filter-area" data-area="Nambambe" checked>
-                Nambambe
+                <input type="checkbox" class="gis-filter-area" data-area="Escola Portuguesa" checked>
+                Escola Portuguesa
               </label>
 
               <label class="filter-chip">
-                <input type="checkbox" class="gis-filter-area" data-area="Bula Matadi" checked>
-                Bula Matadi
+                <input type="checkbox" class="gis-filter-area" data-area="Cowboy I" checked>
+                Cowboy I
               </label>
 
               <label class="filter-chip">
-                <input type="checkbox" class="gis-filter-area" data-area="Lubango Central" checked>
-                Lubango Central
+                <input type="checkbox" class="gis-filter-area" data-area="Sofrio" checked>
+                Sofrio
               </label>
 
               <label class="filter-chip">
-                <input type="checkbox" class="gis-filter-area" data-area="Comandante" checked>
-                Comandante
+                <input type="checkbox" class="gis-filter-area" data-area="João de Almeida" checked>
+                João de Almeida
               </label>
 
               <label class="filter-chip">
-                <input type="checkbox" class="gis-filter-area" data-area="Ferrovia" checked>
-                Ferrovia
+                <input type="checkbox" class="gis-filter-area" data-area="Caixote ou Socombar" checked>
+                Caixote ou Socombar
               </label>
 
               <label class="filter-chip">
-                <input type="checkbox" class="gis-filter-area" data-area="Casa Verde / Escola Portuguesa" checked>
-                Casa Verde / Escola Portuguesa
+                <input type="checkbox" class="gis-filter-area" data-area="Arimba" checked>
+                Arimba
               </label>
             </div>
 
@@ -250,90 +250,101 @@
 
     var interventionAreas = [
       {
-        name: "Mapunda",
-        status: "notStarted",
-        statusLabel: "Not Started",
-        color: criticalColor,
-        coords: [-14.8968, 13.4558]
-      },
-      {
-        name: "Nambambe",
-        status: "notStarted",
-        statusLabel: "Not Started",
-        color: criticalColor,
-        coords: [-14.8725, 13.5356]
-      },
-      {
-        name: "Bula Matadi",
-        status: "notStarted",
-        statusLabel: "Not Started",
-        color: criticalColor,
-        coords: [-14.9055, 13.5127]
-      },
-      {
-        name: "Lubango Central",
-        status: "progress",
-        statusLabel: "In Progress",
-        color: warningColor,
-        coords: [-14.9177, 13.4925]
-      },
-      {
-        name: "Comandante",
-        status: "progress",
-        statusLabel: "In Progress",
-        color: warningColor,
-        coords: [-14.9349, 13.4789]
-      },
-      {
-        name: "Ferrovia",
-        status: "mobilising",
-        statusLabel: "Mobilising",
-        color: mobilisingColor,
-        coords: [-14.9484, 13.5098]
-      },
-      {
-        name: "Casa Verde / Escola Portuguesa",
+        name: "Casa Verde",
         status: "complete",
         statusLabel: "Complete",
         color: successColor,
         coords: [-14.9621, 13.4585]
+      },
+      {
+        name: "Escola Portuguesa",
+        status: "progress",
+        statusLabel: "In Progress",
+        color: warningColor,
+        coords: [-14.9550, 13.4680]
+      },
+      {
+        name: "Cowboy I",
+        status: "mobilising",
+        statusLabel: "Mobilising",
+        color: mobilisingColor,
+        coords: [-14.9450, 13.4950]
+      },
+      {
+        name: "Sofrio",
+        status: "progress",
+        statusLabel: "In Progress",
+        color: warningColor,
+        coords: [-14.9320, 13.5200]
+      },
+      {
+        name: "João de Almeida",
+        status: "notStarted",
+        statusLabel: "Not Started",
+        color: criticalColor,
+        coords: [-14.9200, 13.5350]
+      },
+      {
+        name: "Caixote ou Socombar",
+        status: "mobilising",
+        statusLabel: "Mobilising",
+        color: mobilisingColor,
+        coords: [-14.9000, 13.5200]
+      },
+      {
+        name: "Arimba",
+        status: "notStarted",
+        statusLabel: "Not Started",
+        color: criticalColor,
+        coords: [-14.8850, 13.4700]
       }
     ];
 
     var alignmentSegments = [
       {
-        name: "Northern alignment",
-        area: "Mapunda",
-        status: "notStarted",
-        statusLabel: "Not Started",
-        color: criticalColor,
-        coords: [
-          [-14.8968, 13.4558],
-          [-14.9055, 13.5127],
-          [-14.8725, 13.5356]
-        ]
-      },
-      {
-        name: "Central alignment",
-        area: "Lubango Central",
-        status: "progress",
-        statusLabel: "In Progress",
-        color: warningColor,
-        coords: [
-          [-14.9177, 13.4925],
-          [-14.9349, 13.4789],
-          [-14.9484, 13.5098]
-        ]
-      },
-      {
-        name: "South-west alignment",
-        area: "Casa Verde / Escola Portuguesa",
+        name: "Western Corridor",
+        area: "Casa Verde",
         status: "complete",
         statusLabel: "Complete",
         color: successColor,
         coords: [
-          [-14.9349, 13.4789],
-          [-14.9621, 13.4585]
+          [-14.9621, 13.4585],
+          [-14.9550, 13.4680]
+        ]
+      },
+      {
+        name: "Central Corridor",
+        area: "Cowboy I",
+        status: "mobilising",
+        statusLabel: "Mobilising",
+        color: mobilisingColor,
+        coords: [
+          [-14.9550, 13.4680],
+          [-14.9450, 13.4950],
+          [-14.9320, 13.5200]
+        ]
+      },
+      {
+        name: "Northern Corridor",
+        area: "João de Almeida",
+        status: "notStarted",
+        statusLabel: "Not Started",
+        color: criticalColor,
+        coords: [
+          [-14.9320, 13.5200],
+          [-14.9200, 13.5350],
+          [-14.9000, 13.5200]
+        ]
+      },
+      {
+        name: "Eastern Corridor",
+        area: "Arimba",
+        status: "notStarted",
+        statusLabel: "Not Started",
+        color: criticalColor,
+        coords: [
+          [-14.9000, 13.5200],
+          [-14.8850, 13.4700]
         ]
       }
     ];
