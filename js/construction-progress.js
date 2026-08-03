@@ -772,9 +772,12 @@
     }
   });
 
-  document.addEventListener("DOMContentLoaded", async function () {
+  document.addEventListener("wsdp:authready", async function () {
     const ready = await ensureSessionAndProject();
-    if (!ready) return;
+
+    if (!ready) {
+      return;
+    }
 
     await loadDashboard();
   });
