@@ -15,6 +15,101 @@
   })();
   let dashboardData = null;
 
+  const FALLBACK_AREA_PROGRESS = [
+    {
+      area: "Zone A",
+      planned: 23.2,
+      actual: 23.2,
+      variance: 0,
+      unit: "km",
+    },
+    {
+      area: "Zone B",
+      planned: 23.1,
+      actual: 20.5,
+      variance: -2.6,
+      unit: "km",
+    },
+    {
+      area: "Zone C",
+      planned: 23.2,
+      actual: 12.4,
+      variance: -10.8,
+      unit: "km",
+    },
+    {
+      area: "Zone D",
+      planned: 23.1,
+      actual: 3.0,
+      variance: -20.1,
+      unit: "km",
+    },
+  ];
+
+  const FALLBACK_PIPE_DIAMETER_MATRIX = [
+    {
+      diameter: "90 mm",
+      planned: 18.5,
+      installed: 13.8,
+      unit: "km",
+    },
+    {
+      diameter: "110 mm",
+      planned: 22.4,
+      installed: 16.9,
+      unit: "km",
+    },
+    {
+      diameter: "160 mm",
+      planned: 24.8,
+      installed: 17.2,
+      unit: "km",
+    },
+    {
+      diameter: "200 mm",
+      planned: 16.1,
+      installed: 8.6,
+      unit: "km",
+    },
+    {
+      diameter: "250 mm",
+      planned: 10.9,
+      installed: 2.6,
+      unit: "km",
+    },
+  ];
+
+  const FALLBACK_MONTHLY_PROGRESS = [
+    {
+      activity: "Pipe Laying",
+      previousMonth: 52.4,
+      currentMonth: 6.7,
+      cumulative: 59.1,
+      unit: "km",
+    },
+    {
+      activity: "Hydro Testing",
+      previousMonth: 41.2,
+      currentMonth: 6.4,
+      cumulative: 47.6,
+      unit: "km",
+    },
+    {
+      activity: "House Connections",
+      previousMonth: 2860,
+      currentMonth: 260,
+      cumulative: 3120,
+      unit: "nos",
+    },
+    {
+      activity: "Valve Chambers",
+      previousMonth: 42,
+      currentMonth: 6,
+      cumulative: 48,
+      unit: "nos",
+    },
+  ];
+
   function unwrap(result) {
     return result?.data?.data ?? result?.data ?? result;
   }
@@ -37,6 +132,19 @@
   function numberValue(value) {
     const n = Number(value);
     return Number.isFinite(n) ? n : 0;
+  }
+
+  function formatProgressValue(value, unit) {
+    const n = numberValue(value);
+    const formatted = Number.isInteger(n) ? n.toLocaleString() : n.toFixed(1);
+    return `${formatted}${unit ? ` ${escapeHtml(unit)}` : ""}`;
+  }
+
+  function formatSignedValue(value, unit) {
+    const n = numberValue(value);
+    const sign = n > 0 ? "+" : "";
+    const formatted = Number.isInteger(n) ? n.toLocaleString() : n.toFixed(1);
+    return `${sign}${formatted}${unit ? ` ${escapeHtml(unit)}` : ""}`;
   }
 
   function getStatusClass(status) {
@@ -124,6 +232,9 @@
 
   function renderAll() {
     renderPipelineKpis();
+    renderAreaProgressTable();
+    renderPipeDiameterMatrix();
+    renderMonthlyProgressTable();
     renderPipelineTable();
 
     renderHouseKpis();
@@ -143,9 +254,15 @@
   function renderPipelineKpis() {
     if (!dashboardData?.pipeline) return;
 
-    setCountValue("pipelineLaidKm", dashboardData.pipeline.laid, 1);
-    setCountValue("pipelineTestedKm", dashboardData.pipeline.tested, 1);
-    setCountValue("pipelineRemainingKm", dashboardData.pipeline.remaining, 1);
+    const pipeline = dashboardData.pipeline;
+
+    setCountValue("pipelineLaidKm", pipeline.laid, 1);
+    setCountValue(
+      "pipelineHydroTestedKm",
+      pipeline.tested ?? pipeline.hydroTested ?? pipeline.hydro_tested ?? 0,
+      1
+    );
+    setCountValue("pipelineRemainingKm", pipeline.remaining, 1);
   }
 
   function renderPipelineTable() {
@@ -183,6 +300,120 @@
                 Delete
               </button>
             </td>
+          </tr>
+        `
+      );
+    });
+  }
+
+  function renderAreaProgressTable() {
+    const tbody = document.querySelector("#areaProgressTableBody");
+    if (!tbody) return;
+
+    const rows =
+      dashboardData?.area_progress ||
+      dashboardData?.areaProgress ||
+      dashboardData?.area_wise_progress ||
+      FALLBACK_AREA_PROGRESS;
+
+    tbody.innerHTML = "";
+
+    if (!rows.length) {
+      tbody.innerHTML = emptyRow(4, "No area-wise progress data available.");
+      return;
+    }
+
+    rows.forEach((item) => {
+      const planned = numberValue(item.planned);
+      const actual = numberValue(item.actual);
+      const varianceValue =
+        item.variance !== undefined && item.variance !== null
+          ? numberValue(item.variance)
+          : actual - planned;
+
+      const unit = item.unit || "km";
+      const varianceClass =
+        varianceValue < 0 ? "down" : varianceValue > 0 ? "up" : "flat";
+
+      tbody.insertAdjacentHTML(
+        "beforeend",
+        `
+          <tr>
+            <td>${escapeHtml(item.area || item.zone || item.name || "-")}</td>
+            <td class="num">${formatProgressValue(planned, unit)}</td>
+            <td class="num">${formatProgressValue(actual, unit)}</td>
+            <td class="num">
+              <span class="kpi-card__delta ${varianceClass}" style="justify-content:flex-end;">
+                ${formatSignedValue(varianceValue, unit)}
+              </span>
+            </td>
+          </tr>
+        `
+      );
+    });
+  }
+
+  function renderPipeDiameterMatrix() {
+    const tbody = document.querySelector("#pipeDiameterTableBody");
+    if (!tbody) return;
+
+    const rows =
+      dashboardData?.pipe_diameter_matrix ||
+      dashboardData?.pipeDiameterMatrix ||
+      dashboardData?.diameter_matrix ||
+      FALLBACK_PIPE_DIAMETER_MATRIX;
+
+    tbody.innerHTML = "";
+
+    if (!rows.length) {
+      tbody.innerHTML = emptyRow(3, "No pipe diameter matrix data available.");
+      return;
+    }
+
+    rows.forEach((item) => {
+      const unit = item.unit || "km";
+
+      tbody.insertAdjacentHTML(
+        "beforeend",
+        `
+          <tr>
+            <td>${escapeHtml(item.diameter || item.pipeDiameter || "-")}</td>
+            <td class="num">${formatProgressValue(item.planned, unit)}</td>
+            <td class="num">${formatProgressValue(item.installed ?? item.actual, unit)}</td>
+          </tr>
+        `
+      );
+    });
+  }
+
+  function renderMonthlyProgressTable() {
+    const tbody = document.querySelector("#monthlyProgressTableBody");
+    if (!tbody) return;
+
+    const rows =
+      dashboardData?.monthly_progress ||
+      dashboardData?.monthlyProgress ||
+      dashboardData?.progress_monthly ||
+      FALLBACK_MONTHLY_PROGRESS;
+
+    tbody.innerHTML = "";
+
+    if (!rows.length) {
+      tbody.innerHTML = emptyRow(4, "No monthly progress data available.");
+      return;
+    }
+
+    rows.forEach((item) => {
+      const unit = item.unit || "";
+
+      tbody.insertAdjacentHTML(
+        "beforeend",
+        `
+          <tr>
+            <td>${escapeHtml(item.activity || item.activityName || "-")}</td>
+            <td class="num">${formatProgressValue(item.previousMonth ?? item.previous_month, unit)}</td>
+            <td class="num">${formatProgressValue(item.currentMonth ?? item.current_month, unit)}</td>
+            <td class="num">${formatProgressValue(item.cumulative, unit)}</td>
           </tr>
         `
       );
