@@ -794,21 +794,29 @@
       grid.id = "manpowerProgressCards";
       grid.className = "grid grid-4 resource-manpower-kpis";
 
-      const chartCard = section.querySelector(".manpower-chart-card") || section.querySelector(".card");
+      const chartCard =
+        section.querySelector(".manpower-chart-card") ||
+        section.querySelector(".card");
+
       section.insertBefore(grid, chartCard);
     }
 
-    grid.innerHTML = MANPOWER_PROGRESS.map(function (item) {
+    grid.innerHTML = MANPOWER_PROGRESS.map(function(item) {
       return `
         <div class="card kpi-card card-accent card-accent--${item.accent}">
           <div class="kpi-card__top">
             <div class="kpi-card__label">${escapeHTML(item.label)}</div>
+
             <div class="kpi-card__icon ${item.iconTone}">
               <i class="fa-solid ${item.icon}"></i>
             </div>
           </div>
+
           <div class="kpi-card__value">${escapeHTML(item.value)}</div>
-          <div class="kpi-card__delta flat">${escapeHTML(item.note)}</div>
+
+          <div class="kpi-card__delta flat">
+            ${escapeHTML(item.note)}
+          </div>
         </div>
       `;
     }).join("");
