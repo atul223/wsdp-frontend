@@ -19,6 +19,8 @@
   let methodStatements = [];
 
   let initialized = false;
+  let importInProgress = false;
+
 
   const els = {};
 
@@ -45,6 +47,9 @@
     els.saveBtn = document.getElementById("saveReportBtn");
     els.resetBtn = document.getElementById("resetReportFormBtn");
     els.customBtn = document.getElementById("customReportBtn");
+    els.importBtn = document.getElementById("importReportsBtn");
+    els.exportBtn = document.getElementById("exportReportsBtn");
+    els.importFile = document.getElementById("reportImportFile");
   }
 
   function toast(message, icon) {
@@ -529,6 +534,330 @@
     URL.revokeObjectURL(url);
   }
 
+  function createSafeFilename(value) {
+    return String(value || "reports")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "reports";
+  }
+
+  function downloadTextFile(filename, content, mimeType) {
+    const blob = new Blob([content], {
+      type: mimeType || "text/plain;charset=utf-8",
+    });
+
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    URL.revokeObjectURL(url);
+  }
+
+  function csvEscape(value) {
+    const stringValue = String(value ?? "");
+
+    if (
+      stringValue.includes(",") ||
+      stringValue.includes('"') ||
+      stringValue.includes("\n") ||
+      stringValue.includes("\r")
+    ) {
+      return `"${stringValue.replace(/"/g, '""')}"`;
+    }
+
+    return stringValue;
+  }
+
+  function exportReportsAsCsv() {
+    if (!reports.length) {
+      toast("No reports available to export.", "fa-triangle-exclamation");
+      return;
+    }
+
+    const headers = [
+      "Report Title",
+      "Period",
+      "Module",
+      "Date From",
+      "Date To",
+      "Generated Date",
+      "Status",
+      "Summary",
+    ];
+
+    const rows = reports.map((report) => {
+      return [
+        report.title || "",
+        report.period || "",
+        report.module || "overall",
+        report.date_from || report.dateFrom || "",
+        report.date_to || report.dateTo || "",
+        report.generated_date || report.generatedDate || "",
+        report.status || "draft",
+        report.summary || "",
+      ];
+    });
+
+    const csv = [headers, ...rows]
+      .map((row) => row.map(csvEscape).join(","))
+      .join("\n");
+
+    const projectName = projectInfo && projectInfo.name
+      ? projectInfo.name
+      : "wsdp";
+
+    const filename = `${createSafeFilename(projectName)}-reports-${todayIso()}.csv`;
+
+    downloadTextFile(filename, csv, "text/csv;charset=utf-8");
+    toast("Reports exported successfully.", "fa-file-export");
+  }
+
+  function parseCsvLine(line) {
+    const values = [];
+    let current = "";
+    let insideQuotes = false;
+
+    for (let i = 0; i < line.length; i += 1) {
+      const char = line[i];
+      const nextChar = line[i + 1];
+
+      if (char === '"' && insideQuotes && nextChar === '"') {
+        current += '"';
+        i += 1;
+        continue;
+      }
+
+      if (char === '"') {
+        insideQuotes = !insideQuotes;
+        continue;
+      }
+
+      if (char === "," && !insideQuotes) {
+        values.push(current);
+        current = "";
+        continue;
+      }
+
+      current += char;
+    }
+
+    values.push(current);
+    return values;
+  }
+
+  function parseCsv(text) {
+    const lines = String(text || "")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    if (lines.length < 2) {
+      return [];
+    }
+
+    const headers = parseCsvLine(lines[0]).map((header) =>
+      String(header || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "")
+    );
+
+    return lines.slice(1).map((line) => {
+      const values = parseCsvLine(line);
+      const row = {};
+
+      headers.forEach((header, index) => {
+        row[header] = values[index] ?? "";
+      });
+
+      return row;
+    });
+  }
+
+  function normalizeImportedReport(row) {
+    const title =
+      row.title ||
+      row.report_title ||
+      row.report ||
+      row.document ||
+      row.name ||
+      row.report_name ||
+      "";
+
+    const period =
+      row.period ||
+      row.month ||
+      row.reporting_period ||
+      "";
+
+    const moduleValue =
+      row.module ||
+      row.report_module ||
+      "overall";
+
+    const dateFrom =
+      row.date_from ||
+      row.from ||
+      row.start_date ||
+      "";
+
+    const dateTo =
+      row.date_to ||
+      row.to ||
+      row.end_date ||
+      "";
+
+    const generatedDate =
+      row.generated_date ||
+      row.generated ||
+      row.report_date ||
+      row.date ||
+      todayIso();
+
+    const status =
+      row.status ||
+      "draft";
+
+    const summary =
+      row.summary ||
+      row.description ||
+      row.remarks ||
+      null;
+
+    return {
+      title: String(title || "").trim(),
+      period: String(period || "").trim(),
+      module: String(moduleValue || "overall").trim() || "overall",
+      date_from: dateFrom || null,
+      date_to: dateTo || null,
+      generated_date: generatedDate || todayIso(),
+      status: String(status || "draft").trim() || "draft",
+      summary: summary ? String(summary).trim() : null,
+    };
+  }
+
+  function extractImportedReports(fileText, fileName) {
+    const lowerName = String(fileName || "").toLowerCase();
+
+    if (lowerName.endsWith(".json")) {
+      const parsed = JSON.parse(fileText);
+
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+
+      if (parsed && Array.isArray(parsed.reports)) {
+        return parsed.reports;
+      }
+
+      throw new Error("JSON file must contain an array of reports or a reports array property.");
+    }
+
+    if (lowerName.endsWith(".csv")) {
+      return parseCsv(fileText);
+    }
+
+    throw new Error("Unsupported import file type. Please select a .csv or .json file.");
+  }
+
+  function setImportLoading(isLoading) {
+    importInProgress = isLoading;
+
+    if (els.importBtn) {
+      els.importBtn.disabled = isLoading;
+      els.importBtn.innerHTML = isLoading
+        ? '<i class="fa-solid fa-spinner fa-spin"></i> Importing...'
+        : '<i class="fa-solid fa-file-import"></i> Import';
+    }
+
+    if (els.exportBtn) {
+      els.exportBtn.disabled = isLoading;
+    }
+  }
+
+  async function handleImportFileChange(e) {
+    const file = e.target.files && e.target.files[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (!projectId) {
+      toast("Project context is missing. Please load the project first.", "fa-triangle-exclamation");
+      e.target.value = "";
+      return;
+    }
+
+    if (importInProgress) {
+      e.target.value = "";
+      return;
+    }
+
+    setImportLoading(true);
+
+    try {
+      const fileText = await file.text();
+      const rawRows = extractImportedReports(fileText, file.name);
+
+      if (!rawRows.length) {
+        toast("The selected file does not contain any report records.", "fa-triangle-exclamation");
+        return;
+      }
+
+      const payloads = rawRows
+        .map(normalizeImportedReport)
+        .filter((payload) => payload.title && payload.period && payload.generated_date);
+
+      if (!payloads.length) {
+        toast("No valid report records were found in the selected file.", "fa-triangle-exclamation");
+        return;
+      }
+
+      let successCount = 0;
+      let failedCount = 0;
+
+      for (const payload of payloads) {
+        const validationError = validatePayload(payload);
+
+        if (validationError) {
+          failedCount += 1;
+          continue;
+        }
+
+        try {
+          await window.WSDP_API.request("POST", `/projects/${projectId}/reports`, payload);
+          successCount += 1;
+        } catch (err) {
+          console.error("Failed to import report record:", payload, err);
+          failedCount += 1;
+        }
+      }
+
+      await loadReports();
+
+      if (successCount && failedCount) {
+        toast(`${successCount} reports imported. ${failedCount} records failed.`, "fa-triangle-exclamation");
+      } else if (successCount) {
+        toast(`${successCount} reports imported successfully.`, "fa-file-import");
+      } else {
+        toast("Import failed. No records were saved.", "fa-triangle-exclamation");
+      }
+    } catch (err) {
+      console.error(err);
+      toast(err.message || "Failed to import reports.", "fa-triangle-exclamation");
+    } finally {
+      setImportLoading(false);
+      e.target.value = "";
+    }
+  }
+
   async function exportReport(id, format) {
     try {
       const result = await window.WSDP_API.request(
@@ -598,6 +927,14 @@
     els.resetBtn?.addEventListener("click", resetForm);
     els.customBtn?.addEventListener("click", generateCustomDraft);
     els.tableBody?.addEventListener("click", handleTableClick);
+
+    els.importBtn?.addEventListener("click", function () {
+      els.importFile?.click();
+    });
+
+    els.importFile?.addEventListener("change", handleImportFileChange);
+
+    els.exportBtn?.addEventListener("click", exportReportsAsCsv);
   }
 
   async function ensureAuthReady() {

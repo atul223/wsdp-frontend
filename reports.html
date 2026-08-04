@@ -28,6 +28,47 @@
     color: var(--text-primary);
   }
 
+  .reports-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .reports-action-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .reports-action-btn {
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: border-color var(--transition-base), color var(--transition-base), background var(--transition-base);
+  }
+
+  .reports-action-btn:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+  }
+
+  .reports-action-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .reports-import-input {
+    display: none;
+  }
+
   .reports-form-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -203,8 +244,27 @@
           </div>
         </div>
 
-        <div class="reports-project-label" id="reportsProjectLabel">
-          Project: <strong>Loading…</strong>
+        <div class="reports-toolbar-right">
+          <div class="reports-action-group">
+            <input
+              class="reports-import-input"
+              id="reportImportFile"
+              type="file"
+              accept=".csv,.json,text/csv,application/json"
+            >
+
+            <button class="reports-action-btn" type="button" id="importReportsBtn">
+              <i class="fa-solid fa-file-import"></i> Import
+            </button>
+
+            <button class="reports-action-btn" type="button" id="exportReportsBtn">
+              <i class="fa-solid fa-file-export"></i> Export
+            </button>
+          </div>
+
+          <div class="reports-project-label" id="reportsProjectLabel">
+            Project: <strong>Loading…</strong>
+          </div>
         </div>
       </div>
 
