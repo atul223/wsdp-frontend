@@ -18,6 +18,8 @@
   let amendments = [];
   let methodStatements = [];
 
+  let initialized = false;
+
   const els = {};
 
   function bindElements() {
@@ -49,7 +51,7 @@
     if (window.WSDP_TOAST) {
       window.WSDP_TOAST(message, { icon: icon || "fa-circle-check" });
     } else {
-      alert(message);
+      console.log(message);
     }
   }
 
@@ -58,21 +60,28 @@
   }
 
   function setLoading(isLoading) {
-    if (els.saveBtn) {
-      els.saveBtn.disabled = isLoading;
-      els.saveBtn.innerHTML = isLoading
-        ? '<i class="fa-solid fa-spinner fa-spin"></i> Saving...'
-        : '<i class="fa-solid fa-floppy-disk"></i> Save Report';
-    }
+    if (!els.saveBtn) return;
+
+    els.saveBtn.disabled = isLoading;
+    els.saveBtn.innerHTML = isLoading
+      ? '<i class="fa-solid fa-spinner fa-spin"></i> Saving...'
+      : '<i class="fa-solid fa-floppy-disk"></i> Save Report';
   }
 
   function formatDate(value) {
     if (!value) return "-";
 
-    const dt = new Date(value + "T00:00:00");
+    const stringValue = String(value);
+
+    let normalized = stringValue;
+    if (stringValue.includes("T")) {
+      normalized = stringValue.split("T")[0];
+    }
+
+    const dt = new Date(normalized + "T00:00:00");
 
     if (Number.isNaN(dt.getTime())) {
-      return value;
+      return stringValue;
     }
 
     return dt.toLocaleDateString("en-GB", {
@@ -122,7 +131,7 @@
       return;
     }
 
-    els.projectLabel.innerHTML = `Project: <strong>${escapeHtml(projectInfo.name)}</strong>`;
+    els.projectLabel.innerHTML = `Project: <strong>${escapeHtml(projectInfo.name || "Unnamed Project")}</strong>`;
   }
 
   function renderEmpty(message) {
@@ -159,41 +168,48 @@
     }
 
     els.tableBody.innerHTML = reports
-      .map(
-        (report) => `
-          <tr data-id="${escapeHtml(report.id)}">
+      .map((report) => {
+        const id = report.id;
+        const title = report.title || "-";
+        const period = report.period || "-";
+        const moduleName = prettyModule(report.module);
+        const generatedDate = report.generated_date || report.generatedDate || report.generatedDateAt;
+        const status = report.status || "draft";
+
+        return `
+          <tr data-id="${escapeHtml(id)}">
             <td>
-              <strong>${escapeHtml(report.title)}</strong>
+              <strong>${escapeHtml(title)}</strong>
               ${
                 report.summary
                   ? `<div style="font-size:12px;color:var(--text-muted);margin-top:3px;">${escapeHtml(report.summary)}</div>`
                   : ""
               }
             </td>
-            <td>${escapeHtml(report.period)}</td>
-            <td>${escapeHtml(prettyModule(report.module))}</td>
-            <td>${formatDate(report.generated_date)}</td>
-            <td>${renderStatusChip(report.status)}</td>
+            <td>${escapeHtml(period)}</td>
+            <td>${escapeHtml(moduleName)}</td>
+            <td>${formatDate(generatedDate)}</td>
+            <td>${renderStatusChip(status)}</td>
             <td style="text-align:right; white-space:nowrap;">
-              <button class="export-btn" type="button" data-action="export" data-format="pdf" data-id="${escapeHtml(report.id)}">
+              <button class="export-btn" type="button" data-action="export" data-format="pdf" data-id="${escapeHtml(id)}">
                 <i class="fa-solid fa-file-pdf"></i> PDF
               </button>
-              <button class="export-btn" type="button" data-action="export" data-format="excel" data-id="${escapeHtml(report.id)}">
+              <button class="export-btn" type="button" data-action="export" data-format="excel" data-id="${escapeHtml(id)}">
                 <i class="fa-solid fa-file-excel"></i> Excel
               </button>
-              <button class="export-btn" type="button" data-action="export" data-format="powerpoint" data-id="${escapeHtml(report.id)}">
+              <button class="export-btn" type="button" data-action="export" data-format="powerpoint" data-id="${escapeHtml(id)}">
                 <i class="fa-solid fa-file-powerpoint"></i> PPT
               </button>
-              <button class="table-action-btn" type="button" data-action="edit" data-id="${escapeHtml(report.id)}">
+              <button class="table-action-btn" type="button" data-action="edit" data-id="${escapeHtml(id)}">
                 <i class="fa-solid fa-pen"></i>
               </button>
-              <button class="table-action-btn danger" type="button" data-action="delete" data-id="${escapeHtml(report.id)}">
+              <button class="table-action-btn danger" type="button" data-action="delete" data-id="${escapeHtml(id)}">
                 <i class="fa-solid fa-trash"></i>
               </button>
             </td>
           </tr>
-        `
-      )
+        `;
+      })
       .join("");
   }
 
@@ -201,24 +217,20 @@
     if (!els.periodicReportsTableBody) return;
 
     if (!periodicReports.length) {
-      renderLibraryEmpty(
-        els.periodicReportsTableBody,
-        3,
-        "No periodic reports found."
-      );
+      renderLibraryEmpty(els.periodicReportsTableBody, 3, "No periodic reports found.");
       return;
     }
 
     els.periodicReportsTableBody.innerHTML = periodicReports
-      .map(
-        (item) => `
+      .map((item) => {
+        return `
           <tr>
-            <td>${escapeHtml(item.document)}</td>
-            <td>${escapeHtml(item.latest_issue || "-")}</td>
+            <td>${escapeHtml(item.document || item.title || "-")}</td>
+            <td>${escapeHtml(item.latest_issue || item.latestIssue || "-")}</td>
             <td>${renderStatusChip(item.status)}</td>
           </tr>
-        `
-      )
+        `;
+      })
       .join("");
   }
 
@@ -231,15 +243,15 @@
     }
 
     els.ipcsTableBody.innerHTML = ipcs
-      .map(
-        (item) => `
+      .map((item) => {
+        return `
           <tr>
-            <td>${escapeHtml(item.ipc)}</td>
-            <td>${formatDate(item.date)}</td>
+            <td>${escapeHtml(item.ipc || item.name || "-")}</td>
+            <td>${formatDate(item.date || item.ipc_date || item.ipcDate)}</td>
             <td>${renderStatusChip(item.status)}</td>
           </tr>
-        `
-      )
+        `;
+      })
       .join("");
   }
 
@@ -252,15 +264,15 @@
     }
 
     els.amendmentsTableBody.innerHTML = amendments
-      .map(
-        (item) => `
+      .map((item) => {
+        return `
           <tr>
-            <td>${escapeHtml(item.amendment)}</td>
-            <td>${escapeHtml(item.subject)}</td>
+            <td>${escapeHtml(item.amendment || item.name || "-")}</td>
+            <td>${escapeHtml(item.subject || "-")}</td>
             <td>${renderStatusChip(item.status)}</td>
           </tr>
-        `
-      )
+        `;
+      })
       .join("");
   }
 
@@ -268,24 +280,20 @@
     if (!els.methodStatementsTableBody) return;
 
     if (!methodStatements.length) {
-      renderLibraryEmpty(
-        els.methodStatementsTableBody,
-        3,
-        "No method statements found."
-      );
+      renderLibraryEmpty(els.methodStatementsTableBody, 3, "No method statements found.");
       return;
     }
 
     els.methodStatementsTableBody.innerHTML = methodStatements
-      .map(
-        (item) => `
+      .map((item) => {
+        return `
           <tr>
-            <td>${escapeHtml(item.method_statement)}</td>
-            <td>${formatDate(item.date)}</td>
+            <td>${escapeHtml(item.method_statement || item.methodStatement || item.title || "-")}</td>
+            <td>${formatDate(item.date || item.statement_date || item.statementDate)}</td>
             <td>${renderStatusChip(item.status)}</td>
           </tr>
-        `
-      )
+        `;
+      })
       .join("");
   }
 
@@ -324,25 +332,33 @@
   }
 
   function resetForm() {
+    if (!els.form) return;
+
     els.reportId.value = "";
     els.form.reset();
     els.generatedDate.value = todayIso();
     els.module.value = "overall";
     els.status.value = "draft";
-    els.saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Report';
+
+    if (els.saveBtn) {
+      els.saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Report';
+    }
   }
 
   function fillForm(report) {
-    els.reportId.value = report.id;
+    els.reportId.value = report.id || "";
     els.title.value = report.title || "";
     els.period.value = report.period || "";
     els.module.value = report.module || "overall";
-    els.dateFrom.value = report.date_from || "";
-    els.dateTo.value = report.date_to || "";
-    els.generatedDate.value = report.generated_date || todayIso();
+    els.dateFrom.value = report.date_from || report.dateFrom || "";
+    els.dateTo.value = report.date_to || report.dateTo || "";
+    els.generatedDate.value = report.generated_date || report.generatedDate || todayIso();
     els.status.value = report.status || "draft";
     els.summary.value = report.summary || "";
-    els.saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Update Report';
+
+    if (els.saveBtn) {
+      els.saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Update Report';
+    }
 
     window.scrollTo({
       top: 0,
@@ -357,8 +373,13 @@
     );
 
     projectInfo = result.data;
-    projectId = projectInfo.id;
+    projectId = projectInfo && projectInfo.id ? projectInfo.id : null;
+
     renderProjectLabel();
+
+    if (!projectId) {
+      throw new Error("Default project was not returned by the backend.");
+    }
   }
 
   async function loadReports() {
@@ -383,30 +404,41 @@
     renderLibraryEmpty(els.amendmentsTableBody, 3, "Loading amendments...");
     renderLibraryEmpty(els.methodStatementsTableBody, 3, "Loading method statements...");
 
-    const result = await window.WSDP_API.request(
-      "GET",
-      `/projects/${projectId}/reports/library`
-    );
+    try {
+      const result = await window.WSDP_API.request(
+        "GET",
+        `/projects/${projectId}/reports/library`
+      );
 
-    const data = result.data || {};
+      const data = result.data || {};
 
-    periodicReports = Array.isArray(data.periodic_reports)
-      ? data.periodic_reports
-      : [];
+      periodicReports = Array.isArray(data.periodic_reports)
+        ? data.periodic_reports
+        : [];
 
-    ipcs = Array.isArray(data.ipcs)
-      ? data.ipcs
-      : [];
+      ipcs = Array.isArray(data.ipcs)
+        ? data.ipcs
+        : [];
 
-    amendments = Array.isArray(data.amendments)
-      ? data.amendments
-      : [];
+      amendments = Array.isArray(data.amendments)
+        ? data.amendments
+        : [];
 
-    methodStatements = Array.isArray(data.method_statements)
-      ? data.method_statements
-      : [];
+      methodStatements = Array.isArray(data.method_statements)
+        ? data.method_statements
+        : [];
 
-    renderReportLibrary();
+      renderReportLibrary();
+    } catch (err) {
+      console.error("Failed to load report library:", err);
+
+      renderLibraryEmpty(els.periodicReportsTableBody, 3, "Failed to load periodic reports.");
+      renderLibraryEmpty(els.ipcsTableBody, 3, "Failed to load IPCs.");
+      renderLibraryEmpty(els.amendmentsTableBody, 3, "Failed to load amendments.");
+      renderLibraryEmpty(els.methodStatementsTableBody, 3, "Failed to load method statements.");
+
+      toast(err.message || "Failed to load reports library.", "fa-triangle-exclamation");
+    }
   }
 
   async function saveReport(e) {
@@ -468,20 +500,28 @@
     }
   }
 
-  function downloadBase64File({ filename, mime_type, content_base64 }) {
-    const binary = atob(content_base64);
+  function downloadBase64File(fileData) {
+    if (!fileData || !fileData.content_base64) {
+      toast("Export response is missing file content.", "fa-triangle-exclamation");
+      return;
+    }
+
+    const binary = atob(fileData.content_base64);
     const bytes = new Uint8Array(binary.length);
 
     for (let i = 0; i < binary.length; i += 1) {
       bytes[i] = binary.charCodeAt(i);
     }
 
-    const blob = new Blob([bytes], { type: mime_type || "application/octet-stream" });
+    const blob = new Blob([bytes], {
+      type: fileData.mime_type || "application/octet-stream",
+    });
+
     const url = URL.createObjectURL(blob);
 
     const a = document.createElement("a");
     a.href = url;
-    a.download = filename || "report";
+    a.download = fileData.filename || "report";
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -517,6 +557,8 @@
 
     const id = btn.getAttribute("data-id");
     const action = btn.getAttribute("data-action");
+
+    if (!id) return;
 
     if (action === "edit") {
       const report = reports.find((item) => item.id === id);
@@ -558,17 +600,48 @@
     els.tableBody?.addEventListener("click", handleTableClick);
   }
 
+  async function ensureAuthReady() {
+    if (!window.WSDP_API) {
+      throw new Error("WSDP_API is not available. Check that js/api.js is loaded before js/reports.js.");
+    }
+
+    if (typeof window.WSDP_API.restoreSession === "function") {
+      const user = await window.WSDP_API.restoreSession();
+
+      if (!user) {
+        window.location.href = "login.html";
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   async function init() {
+    if (initialized) return;
+    initialized = true;
+
     bindElements();
+
+    if (!els.form || !els.tableBody) {
+      console.error("Reports module DOM elements are missing.");
+      initialized = false;
+      return;
+    }
+
     bindEvents();
     resetForm();
 
     try {
+      const authOk = await ensureAuthReady();
+      if (!authOk) return;
+
       await loadDefaultProject();
       await loadReports();
       await loadReportLibrary();
     } catch (err) {
       console.error(err);
+
       renderProjectLabel();
       renderEmpty(err.message || "Failed to load reports.");
 
@@ -581,5 +654,15 @@
     }
   }
 
-  document.addEventListener("wsdp:authready", init);
+  function initWhenReady() {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", init, { once: true });
+    } else {
+      init();
+    }
+  }
+
+  document.addEventListener("wsdp:authready", init, { once: true });
+
+  initWhenReady();
 })();
