@@ -676,6 +676,8 @@
     renderReferenceCards();
   }
 
+
+
   function destroyChart(canvas) {
     if (!canvas || !window.Chart) return;
 
@@ -938,6 +940,67 @@
     });
   }
 
+  function renderPaymentTracking() {
+    const table = document.getElementById("paymentTrackingTable");
+    if (!table) return;
+
+    let tbody = document.getElementById("paymentTrackingTableBody");
+
+    if (!tbody) {
+        tbody = table.querySelector("tbody");
+
+        if (!tbody) {
+            tbody = document.createElement("tbody");
+            tbody.id = "paymentTrackingTableBody";
+            table.appendChild(tbody);
+        }
+    }
+
+    const rows =
+        state.summary &&
+        Array.isArray(state.summary.payment_tracking) &&
+        state.summary.payment_tracking.length
+            ? state.summary.payment_tracking
+            : FALLBACK_PAYMENT_TRACKING;
+
+    tbody.innerHTML = rows
+        .map(function (row) {
+            const description =
+                row.description ||
+                row.label ||
+                row.name ||
+                "—";
+
+            const rawAmount =
+                row.amount !== undefined && row.amount !== null
+                    ? row.amount
+                    : row.aoa_amount !== undefined && row.aoa_amount !== null
+                        ? row.aoa_amount
+                        : row.value;
+
+            const amountText =
+                row.amount_display ||
+                row.display_amount ||
+                (
+                    rawAmount !== undefined && rawAmount !== null && rawAmount !== ""
+                        ? formatAmount(rawAmount, 2) + " AOA"
+                        : "—"
+                );
+
+            const isImportant =
+                String(description).toLowerCase() === "contract value" ||
+                String(description).toLowerCase() === "outstanding";
+
+            return `
+                <tr>
+                    <td>${isImportant ? "<strong>" + escapeHtml(description) + "</strong>" : escapeHtml(description)}</td>
+                    <td class="num">${isImportant ? "<strong>" + escapeHtml(amountText) + "</strong>" : escapeHtml(amountText)}</td>
+                </tr>
+            `;
+        })
+        .join("");
+  }
+
   function renderBankGuarantees() {
     const table = document.getElementById("bankGuaranteesTable");
     if (!table) return;
@@ -1041,6 +1104,7 @@
     renderSummary();
     renderCharts();
     renderIpcTracker();
+    renderPaymentTracking();
     renderBankGuarantees();
     renderAmendments();
   }
@@ -1377,6 +1441,7 @@
     renderReferenceCards();
     renderCharts();
     renderIpcTracker();
+    renderPaymentTracking();
     renderBankGuarantees();
     renderAmendments();
   }

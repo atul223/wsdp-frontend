@@ -164,6 +164,42 @@
       </div>
 
       <div class="section-heading">
+        <h2>Payment Tracking</h2>
+        <span class="section-sub">Contract value, invoicing, paid and outstanding amounts</span>
+      </div>
+
+      <div class="card" id="paymentTrackingCard">
+        <div class="card-body table-scroll">
+          <table class="data-table" id="paymentTrackingTable">
+            <thead>
+              <tr>
+                <th scope="col">Description</th>
+                <th scope="col" class="num">Amount</th>
+              </tr>
+            </thead>
+            <tbody id="paymentTrackingTableBody">
+              <tr>
+                <td>Contract Value</td>
+                <td class="num">3,625,580,000.00 AOA</td>
+              </tr>
+              <tr>
+                <td>Amount Invoiced</td>
+                <td class="num">650,999,524.39 AOA</td>
+              </tr>
+              <tr>
+                <td>Amount Paid</td>
+                <td class="num">404,659,374.56 AOA</td>
+              </tr>
+              <tr>
+                <td>Outstanding</td>
+                <td class="num">246,340,149.83 AOA</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="section-heading">
         <h2>IPC Tracker</h2>
         <span class="section-sub">Interim payment certificates</span>
       </div>
@@ -425,6 +461,9 @@
   });
 </script>
 
-js/financial-dashboard.jsscript>
+<script src="js/api.js"></script>
+<script src="js/shell.js"></script>
+<script src="js/main.js"></script>
+<script src="js/financial-dashboard.js"></script>
 </body>
 </html>

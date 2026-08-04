@@ -134,6 +134,13 @@
     { group: "Grand Total", category: "", headcount: 115, isTotal: true }
   ];
 
+  const FALLBACK_PAYMENT_TRACKING = [
+    { description: "Contract Value", amount: 3625580000 },
+    { description: "Amount Invoiced", amount: 650999524.39 },
+    { description: "Amount Paid", amount: 404659374.56 },
+    { description: "Outstanding", amount: 246340149.83 }
+  ];
+
   let state = {
     projectId: null,
     resources: [],
