@@ -92,66 +92,81 @@
           <div class="card-body">
             <div style="height:260px;"><canvas id="pipelineByZoneChart"></canvas></div>
           </div>
-          <!-- ============ PROGRESS SUMMARY TABLES ============ -->
-          <div id="progress-summaries" class="grid grid-12" style="margin-top:20px;">
+          <!-- ==========================================
+              PROGRESS SUMMARY TABLES
+          ========================================== -->
 
-            <div class="card col-span-4">
+          <section id="progress-summaries">
+
+            <!-- AREA WISE PROGRESS -->
+            <div class="card" style="margin-top:20px;">
               <div class="card-header">
                 <h3>Area-wise Progress</h3>
               </div>
+
               <div class="card-body table-scroll">
                 <table class="data-table">
                   <thead>
                     <tr>
-                      <th scope="col">Area</th>
-                      <th scope="col" class="num">Planned</th>
-                      <th scope="col" class="num">Actual</th>
-                      <th scope="col" class="num">Variance</th>
+                      <th>Area</th>
+                      <th class="num">Planned (km)</th>
+                      <th class="num">Actual (km)</th>
+                      <th class="num">Variance (km)</th>
                     </tr>
                   </thead>
+
                   <tbody id="areaProgressTableBody"></tbody>
+
                 </table>
               </div>
             </div>
 
-            <div class="card col-span-4">
+            <!-- PIPE DIAMETER MATRIX -->
+            <div class="card" style="margin-top:20px;">
               <div class="card-header">
-                <h3>Pipe Diameter Matrix</h3>
+                <h3>Pipe Diameter Progress Matrix</h3>
               </div>
+
               <div class="card-body table-scroll">
                 <table class="data-table">
                   <thead>
                     <tr>
-                      <th scope="col">Diameter</th>
-                      <th scope="col" class="num">Planned</th>
-                      <th scope="col" class="num">Installed</th>
+                      <th>Diameter</th>
+                      <th class="num">Planned (km)</th>
+                      <th class="num">Installed (km)</th>
                     </tr>
                   </thead>
+
                   <tbody id="pipeDiameterTableBody"></tbody>
+
                 </table>
               </div>
             </div>
 
-            <div class="card col-span-4">
+            <!-- MONTHLY PROGRESS -->
+            <div class="card" style="margin-top:20px;">
               <div class="card-header">
-                <h3>Monthly Progress</h3>
+                <h3>Monthly Progress Summary</h3>
               </div>
+
               <div class="card-body table-scroll">
                 <table class="data-table">
                   <thead>
                     <tr>
-                      <th scope="col">Activity</th>
-                      <th scope="col" class="num">Previous Month</th>
-                      <th scope="col" class="num">Current Month</th>
-                      <th scope="col" class="num">Cumulative</th>
+                      <th>Activity</th>
+                      <th class="num">Previous Month</th>
+                      <th class="num">Current Month</th>
+                      <th class="num">Cumulative</th>
                     </tr>
                   </thead>
+
                   <tbody id="monthlyProgressTableBody"></tbody>
+
                 </table>
               </div>
             </div>
 
-          </div>
+          </section>
         </div>
 
         <div class="card" style="margin-top:20px;">
