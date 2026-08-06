@@ -1,6 +1,15 @@
 /* ============================================================
    charts.js — Home dashboard charts, EHS charts and mini GIS map
    Existing website theme/colors are reused through CSS variables.
+
+   Updated for Home Dashboard values based on latest available
+   Monthly Progress Report data:
+   - May 2026 planning table actual: 8,922.5 m
+   - June 2026 planned: 9,836 m
+   - June 2026 actual: 5,904 m
+   - June 2026 cumulative pipe laying: 29,532.50 m
+   - June 2026 overall physical execution: 19%
+   - Cumulative billing: 263.03 M AOA
    ============================================================ */
 
 (function () {
@@ -18,6 +27,7 @@
   }
 
   function formatNumber(value) {
+    if (value === null || typeof value === "undefined") return "";
     return Number(value).toLocaleString("en-US");
   }
 
@@ -85,14 +95,14 @@
         datasets: [
           {
             label: "Planned (m)",
-            data: [1100, 2050, 2900, 8050, 10250, 9800],
+            data: [1100, 2050, 2900, 8050, 10280.5, 9836],
             backgroundColor: plannedColor,
             borderColor: plannedColor,
             borderWidth: 1
           },
           {
             label: "Actual (m)",
-            data: [520, 1250, 4550, 8900, 8200, 0],
+            data: [520, 1250, 4550, 8900, 8922.5, 5904],
             backgroundColor: actualColor,
             borderColor: actualColor,
             borderWidth: 1
@@ -190,7 +200,7 @@
           },
           {
             label: "Actual %",
-            data: [0, 0.5, 1.2, 2.4, 3.8, 5.3, 6.8, 8.6, 11.1, 14.1, 17.0, null, null, null],
+            data: [0, 0.5, 1.2, 2.4, 3.8, 5.3, 6.8, 8.6, 11.1, 14.1, 17.0, 19.0, null, null],
             borderColor: actualColor,
             backgroundColor: "rgba(10, 69, 149, 0.14)",
             borderWidth: 3,
@@ -246,6 +256,7 @@
           tooltip: {
             callbacks: {
               label: function (context) {
+                if (context.parsed.y === null) return "";
                 return " " + context.dataset.label + ": " + context.parsed.y + "%";
               }
             }
@@ -265,21 +276,22 @@
     new Chart(canvas, {
       type: "line",
       data: {
-        labels: ["Jul-25", "Sep-25", "Nov-25", "Jan-26", "Feb-26", "Apr-26", "Jun-26 (Plan)"],
+        labels: ["Jul-25", "Sep-25", "Nov-25", "Jan-26", "Mar-26", "May-26", "Jun-26"],
         datasets: [
           {
             label: "Planned (M AOA)",
-            data: [0, 180, 540, 900, 1100, 1450, 1750],
+            data: [null, null, null, null, null, null, null],
             borderColor: plannedColor,
             backgroundColor: "transparent",
             borderDash: [6, 5],
             borderWidth: 2.5,
             tension: 0.28,
-            pointRadius: 3
+            pointRadius: 3,
+            spanGaps: false
           },
           {
             label: "Invoiced (M AOA)",
-            data: [0, 0, 0, 0, 410, 650.99, null],
+            data: [0, 0, 0, 0, 0, 263.03, 263.03],
             borderColor: actualColor,
             backgroundColor: "rgba(10, 69, 149, 0.14)",
             borderWidth: 3,
@@ -306,12 +318,12 @@
           },
           y: {
             beginAtZero: true,
-            max: 1800,
+            max: 400,
             grid: {
               color: "rgba(0,0,0,0.06)"
             },
             ticks: {
-              stepSize: 200,
+              stepSize: 50,
               callback: function (value) {
                 return formatNumber(value);
               },
@@ -329,13 +341,23 @@
               boxHeight: 12,
               font: {
                 size: 11
+              },
+              filter: function (legendItem, chartData) {
+                var dataset = chartData.datasets[legendItem.datasetIndex];
+                return dataset.data.some(function (item) {
+                  return item !== null && typeof item !== "undefined";
+                });
               }
             }
           },
           tooltip: {
             callbacks: {
               label: function (context) {
+                if (context.parsed.y === null) return "";
                 return " " + context.dataset.label + ": " + formatNumber(context.parsed.y) + " M AOA";
+              },
+              afterBody: function () {
+                return "Planned financial curve pending CTCE recovery/financial plan.";
               }
             }
           }
@@ -351,6 +373,13 @@
     var targetColor = cssVar("--color-success", "#1E8449");
     var actualColor = cssVar("--color-primary", "#0A4595");
 
+    /*
+      Latest available ESHS report found for May 2026 describes performance
+      as moderate to satisfactory, but it does not provide a formal numeric
+      compliance score. Therefore, the earlier scoring framework is retained
+      as a dashboard-level indicator and not recalculated from unsupported data.
+    */
+
     new Chart(canvas, {
       type: "bar",
       data: {
@@ -364,7 +393,7 @@
             borderWidth: 1
           },
           {
-            label: "Actual %",
+            label: "Dashboard Score %",
             data: [78, 84, 80, 82, 77],
             backgroundColor: actualColor,
             borderColor: actualColor,
@@ -418,6 +447,9 @@
             callbacks: {
               label: function (context) {
                 return " " + context.dataset.label + ": " + context.parsed.y + "%";
+              },
+              afterBody: function () {
+                return "Latest ESHS report gives qualitative status, not a formal numeric score.";
               }
             }
           }
@@ -581,51 +613,54 @@
 
     var areas = [
       {
-        name: "Mapunda",
-        status: "Not Started",
-        color: criticalColor,
-        coords: [-14.8968, 13.4558]
-      },
-      {
-        name: "Nambambe",
-        status: "Not Started",
-        color: criticalColor,
-        coords: [-14.8725, 13.5356]
-      },
-      {
-        name: "Bula Matadi",
-        status: "Not Started",
-        color: criticalColor,
-        coords: [-14.9055, 13.5127]
-      },
-      {
-        name: "Lubango Central",
+        name: "Casa Verde",
         status: "In Progress",
         color: warningColor,
-        coords: [-14.9177, 13.4925]
+        coords: [-14.9621, 13.4585]
       },
       {
-        name: "Comandante",
+        name: "Escola Portuguesa",
+        status: "In Progress",
+        color: warningColor,
+        coords: [-14.9558, 13.4662]
+      },
+      {
+        name: "Sofrio",
+        status: "In Progress",
+        color: warningColor,
+        coords: [-14.9484, 13.5098]
+      },
+      {
+        name: "Caixote / Socombar",
         status: "In Progress",
         color: warningColor,
         coords: [-14.9349, 13.4789]
       },
       {
-        name: "Ferrovia",
+        name: "Cowboy I",
         status: "Mobilising",
         color: mobilisingColor,
-        coords: [-14.9484, 13.5098]
+        coords: [-14.9177, 13.4925]
       },
       {
-        name: "Casa Verde / Escola Portuguesa",
-        status: "Complete",
-        color: successColor,
-        coords: [-14.9621, 13.4585]
+        name: "Joao de Almeida",
+        status: "Not Started",
+        color: criticalColor,
+        coords: [-14.9055, 13.5127]
+      },
+      {
+        name: "Arimba",
+        status: "Not Started",
+        color: criticalColor,
+        coords: [-14.8725, 13.5356]
       }
     ];
 
     var route = [
-      [-14.8968, 13.4558],
+      [-14.9621, 13.4585],
+      [-14.9558, 13.4662],
+      [-14.9349, 13.4789],
+      [-14.9484, 13.5098],
       [-14.9177, 13.4925],
       [-14.9055, 13.5127],
       [-14.8725, 13.5356]
