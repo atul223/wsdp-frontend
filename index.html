@@ -175,9 +175,9 @@
 <script>
   window.WSDP_PAGE = {
     title: "Landing Dashboard",
-    breadcrumb: "PDISA-2 Lubango <span class=\"separator\">/</span> Contract 44W3/LUBANGO/DNA/18",
-    statusClass: "status-pill--warning",
-    statusText: "Notional Delay: 6.5 months"
+    breadcrumb: "PDISA-2 Lubango <span class=\"separator\">/</span> Contract 44W3/LUBANGO/DNA18",
+    statusClass: "status-pill--info",
+    statusText: "IST"
   };
 </script>
 
@@ -196,7 +196,7 @@
         <div>
           <h1 class="home-project-title">PDISA-2 LUBANGO</h1>
           <div class="home-project-subtitle">
-            Construction Progress Dashboard &nbsp;|&nbsp; Contract 44W3/LUBANGO/DNA/18
+            Construction Progress Dashboard &nbsp;|&nbsp; Contract 44W3/LUBANGO/DNA18
           </div>
         </div>
 
@@ -219,6 +219,11 @@
 
         <span class="headline-pill info">
           <i class="fa-solid fa-file-contract"></i>
+          Original Contract: 70,000 m / 5,000 HSC
+        </span>
+
+        <span class="headline-pill info">
+          <i class="fa-solid fa-file-contract"></i>
           Contract: 3,625.58 M AOA (USD 5.6 M)
         </span>
 
@@ -227,14 +232,9 @@
           IPC-01 Approved &amp; IPC-02 Submitted (17.96%)
         </span>
 
-        <span class="headline-pill warning">
-          <i class="fa-solid fa-calendar-days"></i>
-          Notional Delay: 6.5 months
-        </span>
-
         <span class="headline-pill critical">
           <i class="fa-solid fa-triangle-exclamation"></i>
-          EOT &amp; Recovery Plan: Pending CTCE
+          EOT &amp; Recovery Plan: Processing for Approval
         </span>
       </div>
 
@@ -449,7 +449,7 @@
     </main>
 
     <footer style="text-align:center;padding:24px;color:var(--text-muted);font-size:12px;">
-      PDISA-2 Lubango — Construction Progress Dashboard · Contract 44W3/LUBANGO/DNA/18
+      PDISA-2 Lubango — Construction Progress Dashboard · Contract 44W3/LUBANGO/DNA18
     </footer>
 
   </div>
@@ -490,7 +490,7 @@
           '<div style="font-weight:800;font-size:15px;line-height:1.1;color:#ffffff;">PDISA-2 LUBANGO</div>' +
           '<div style="font-size:12px;line-height:1.35;color:rgba(255,255,255,.76);margin-top:4px;">' +
             'Construction Progress Dashboard<br>' +
-            'Contract 44W3/LUBANGO/DNA/18' +
+            'Contract 44W3/LUBANGO/DNA18' +
           '</div>' +
         '</div>';
 
@@ -502,6 +502,32 @@
     replaceSidebarBrand();
     setTimeout(replaceSidebarBrand, 150);
   });
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+  function updateClock() {
+
+    const time = new Intl.DateTimeFormat("en-IN", {
+      timeZone: "Asia/Kolkata",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false
+    }).format(new Date());
+
+    const statusPill = document.querySelector(".status-pill");
+
+    if (statusPill) {
+      statusPill.innerHTML =
+        '<span class="dot"></span> IST ' + time;
+    }
+  }
+
+  updateClock();
+  setInterval(updateClock, 1000);
+});
 </script>
 
 </body>

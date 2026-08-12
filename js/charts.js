@@ -193,7 +193,6 @@
             data: [0, 2, 5, 9, 14, 20, 28, 36, 44, 52, 60, 68, 76, 100],
             borderColor: plannedColor,
             backgroundColor: "transparent",
-            borderDash: [6, 5],
             borderWidth: 2.5,
             tension: 0.28,
             pointRadius: 3

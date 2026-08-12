@@ -153,7 +153,7 @@
 
       <div class="search-box">
         <i class="fa-solid fa-magnifying-glass"></i>
-        <input type="text" id="globalSearch" placeholder="Search villages, IPCs, reports…" aria-label="Global search" />
+        <input type="text" id="globalSearch" placeholder="Search IPCs, Reports" aria-label="Global search" />
         <kbd>⌘K</kbd>
       </div>
 
@@ -165,7 +165,7 @@
         <button class="icon-btn" id="themeToggleBtn" aria-label="Toggle dark mode">
           <i class="fa-solid fa-moon" id="themeToggleIcon"></i>
         </button>
-        <button class="icon-btn" aria-label="Notifications" data-tooltip="3 unread alerts">
+        <button class="icon-btn" id="notificationsBtn" aria-label="Notifications" data-tooltip="3 unread alerts">
           <i class="fa-regular fa-bell"></i>
           <span class="notif-dot"></span>
         </button>
@@ -300,6 +300,69 @@
       backdrop.className = "sidebar-backdrop";
       document.body.appendChild(backdrop);
     }
+
+    setTimeout(() => {
+      const notificationBtn =
+        document.getElementById("notificationsBtn");
+
+      if (!notificationBtn) return;
+
+      let existing =
+        document.getElementById("notificationsPopup");
+
+      if (!existing) {
+        const popup = document.createElement("div");
+
+        popup.id = "notificationsPopup";
+
+        popup.style.cssText = `
+          position:absolute;
+          top:70px;
+          right:90px;
+          width:320px;
+          background:#fff;
+          border:1px solid #e5e7eb;
+          border-radius:12px;
+          box-shadow:0 10px 25px rgba(0,0,0,.12);
+          z-index:9999;
+          display:none;
+          padding:12px;
+        `;
+
+        popup.innerHTML = `
+          <div style="font-weight:700;margin-bottom:10px;">
+            3 Unread Alerts
+          </div>
+
+          <div style="padding:8px 0;border-bottom:1px solid #eee;">
+            IPC‑02 Submitted for Review
+          </div>
+
+          <div style="padding:8px 0;border-bottom:1px solid #eee;">
+            EOT & Recovery Plan Processing for Approval
+          </div>
+
+          <div style="padding:8px 0;">
+            ESHS Compliance below target (78%)
+          </div>
+        `;
+
+        document.body.appendChild(popup);
+
+        notificationBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+
+          popup.style.display =
+            popup.style.display === "block"
+              ? "none"
+              : "block";
+        });
+
+        document.addEventListener("click", () => {
+          popup.style.display = "none";
+        });
+      }
+    }, 200);
 
     // Restore collapsed state before paint-affecting layout to avoid flash
     const shell = document.querySelector(".app-shell");
