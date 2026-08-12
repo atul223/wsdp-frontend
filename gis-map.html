@@ -769,15 +769,24 @@
     }
 
     function getToGeoJsonParser() {
-      if (window.toGeoJSON && typeof window.toGeoJSON.kml === "function") {
+      if (
+        typeof toGeoJSON !== "undefined" &&
+        typeof toGeoJSON.kml === "function"
+      ) {
+        return toGeoJSON;
+      }
+
+      if (
+        window.toGeoJSON &&
+        typeof window.toGeoJSON.kml === "function"
+      ) {
         return window.toGeoJSON;
       }
 
-      if (window.togeojson && typeof window.togeojson.kml === "function") {
-        return window.togeojson;
-      }
-
-      if (window.tj && typeof window.tj.kml === "function") {
+      if (
+        window.tj &&
+        typeof window.tj.kml === "function"
+      ) {
         return window.tj;
       }
 
