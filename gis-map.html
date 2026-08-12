@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>GIS Map — PDISA-2 Lubango</title>
+<title>GIS Map - PDISA-2 Lubango</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -14,14 +14,28 @@
 <style>
   .gis-layout {
     display: grid;
-    grid-template-columns: 300px 1fr;
+    grid-template-columns: 280px minmax(0, 1fr) 270px;
     gap: var(--sp-5);
     align-items: start;
+  }
+
+  @media (max-width: 1400px) {
+    .gis-layout {
+      grid-template-columns: 280px minmax(0, 1fr);
+    }
+
+    .gis-right-panel {
+      grid-column: 1 / -1;
+    }
   }
 
   @media (max-width: 992px) {
     .gis-layout {
       grid-template-columns: 1fr;
+    }
+
+    .gis-right-panel {
+      grid-column: auto;
     }
   }
 
@@ -29,7 +43,8 @@
     margin-bottom: var(--sp-5);
   }
 
-  .filter-group h4 {
+  .filter-group h4,
+  .gis-panel-section h4 {
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: .05em;
@@ -47,18 +62,8 @@
     cursor: pointer;
   }
 
-  #gisMap {
-    height: 720px;
-    border-radius: var(--radius-md);
-    z-index: 1;
-    overflow: hidden;
-    background: #f8f8f8;
-    border: 1px solid var(--border-color);
-  }
-
-  .gis-popup strong {
-    display: block;
-    margin-bottom: 3px;
+  .filter-chip input {
+    margin: 0;
   }
 
   .legend-square {
@@ -66,199 +71,101 @@
     width: 13px;
     height: 13px;
     border-radius: 3px;
+    flex: 0 0 auto;
+  }
+
+  .gis-file-status {
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    border-radius: 10px;
+    padding: 10px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.45;
+  }
+
+  .gis-file-status strong {
+    color: var(--text-primary);
+  }
+
+  .gis-file-status.success {
+    border-color: rgba(46, 125, 50, .35);
+    background: rgba(46, 125, 50, .08);
+    color: #2e7d32;
+  }
+
+  .gis-file-status.error {
+    border-color: rgba(211, 47, 47, .35);
+    background: rgba(211, 47, 47, .08);
+    color: #c62828;
   }
 
   .gis-map-card .card-body {
     padding: 0;
-    position: relative;
   }
 
-  .gis-drawing-frame {
+  .gis-map-shell {
     position: relative;
     border-radius: var(--radius-md);
     overflow: hidden;
-    background: #fff;
+    background: #f8f8f8;
+    border: 1px solid var(--border-color);
   }
 
-  .gis-drawing-header {
-    position: absolute;
-    top: 12px;
-    left: 12px;
-    right: 250px;
-    z-index: 650;
-    display: grid;
-    grid-template-columns: minmax(220px, 34%) 1fr;
-    gap: 10px;
-    pointer-events: none;
-  }
-
-  .gis-key-plan,
-  .gis-progress-table {
-    background: rgba(255, 255, 255, 0.94);
-    border: 2px solid #111;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-    pointer-events: auto;
-  }
-
-  .gis-key-plan {
-    min-height: 118px;
-    padding: 8px;
-  }
-
-  .gis-key-title {
-    font-size: 12px;
-    font-weight: 800;
-    color: #111;
-    margin-bottom: 6px;
-    text-align: center;
-  }
-
-  .gis-key-map {
-    position: relative;
-    height: 76px;
-    border: 1px solid #bbb;
-    background:
-      linear-gradient(135deg, transparent 0 35%, rgba(0, 80, 255, 0.12) 35% 38%, transparent 38%),
-      linear-gradient(45deg, rgba(0, 180, 255, 0.08), rgba(255, 255, 255, 0.8));
-    overflow: hidden;
-  }
-
-  .gis-key-region {
-    position: absolute;
-    border: 1px solid #1f48ff;
-    background: rgba(220, 220, 220, 0.72);
-    clip-path: polygon(8% 10%, 82% 4%, 96% 28%, 72% 96%, 20% 82%, 0 44%);
-  }
-
-  .gis-key-region.region-1 {
-    left: 10px;
-    top: 12px;
-    width: 58px;
-    height: 42px;
-  }
-
-  .gis-key-region.region-2 {
-    left: 95px;
-    top: 8px;
-    width: 60px;
-    height: 48px;
-  }
-
-  .gis-key-region.region-3 {
-    left: 185px;
-    top: 28px;
-    width: 88px;
-    height: 36px;
-  }
-
-  .gis-key-dot {
-    position: absolute;
-    width: 18px;
-    height: 18px;
-    background: rgba(0, 60, 255, 0.9);
-    border-radius: 50%;
-    box-shadow: 0 0 0 3px rgba(0, 60, 255, 0.16);
-  }
-
-  .gis-key-dot.dot-1 {
-    left: 28px;
-    top: 26px;
-  }
-
-  .gis-key-dot.dot-2 {
-    left: 112px;
-    top: 20px;
-  }
-
-  .gis-key-dot.dot-3 {
-    left: 220px;
-    top: 36px;
-  }
-
-  .gis-key-label {
-    position: absolute;
-    background: #fff600;
-    color: #0029cc;
-    font-size: 10px;
-    line-height: 1;
-    padding: 2px 4px;
-    border: 1px solid #d9d000;
-    white-space: nowrap;
-  }
-
-  .gis-key-label.label-1 {
-    left: 4px;
-    top: 4px;
-  }
-
-  .gis-key-label.label-2 {
-    left: 76px;
-    top: 4px;
-  }
-
-  .gis-key-label.label-3 {
-    right: 6px;
-    bottom: 5px;
-  }
-
-  .gis-progress-table {
-    padding: 0;
-    align-self: start;
-  }
-
-  .gis-progress-table table {
+  #gisMap {
     width: 100%;
-    border-collapse: collapse;
-    font-size: 11px;
-    color: #111;
-    background: #fff;
+    height: 760px;
+    z-index: 1;
+    background: #f8f8f8;
   }
 
-  .gis-progress-table th,
-  .gis-progress-table td {
-    border: 1px solid #111;
-    padding: 6px 7px;
-    text-align: center;
-    vertical-align: middle;
+  @media (max-width: 1200px) {
+    #gisMap {
+      height: 680px;
+    }
   }
 
-  .gis-progress-table th {
-    font-weight: 800;
-    background: #fbfbfb;
-  }
-
-  .gis-progress-table .group-head {
+  .gis-popup {
+    max-width: 340px;
     font-size: 12px;
+    line-height: 1.45;
   }
 
-  .gis-engineering-panel {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    bottom: 12px;
-    width: 220px;
-    z-index: 660;
-    background: rgba(255, 255, 255, 0.96);
-    border: 2px solid #111;
-    display: flex;
-    flex-direction: column;
-    pointer-events: auto;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  .gis-popup strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 13px;
+    color: #102a43;
   }
 
-  .gis-north {
-    padding: 10px 10px 6px;
+  .gis-popup-description {
+    max-height: 220px;
+    overflow: auto;
+  }
+
+  .gis-panel-section {
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+  }
+
+  .gis-panel-section:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+    margin-bottom: 0;
+  }
+
+  .gis-north-box {
     display: grid;
     grid-template-columns: 72px 1fr;
-    gap: 8px;
+    gap: 10px;
     align-items: center;
-    border-bottom: 1px solid #111;
   }
 
   .north-symbol {
     width: 58px;
     height: 58px;
-    border: 1px solid #111;
+    border: 1px solid var(--text-primary);
     border-radius: 50%;
     margin: 0 auto;
     position: relative;
@@ -274,7 +181,7 @@
     height: 0;
     border-left: 10px solid transparent;
     border-right: 10px solid transparent;
-    border-bottom: 42px solid #111;
+    border-bottom: 42px solid var(--text-primary);
   }
 
   .north-symbol::after {
@@ -284,90 +191,35 @@
     left: 50%;
     transform: translateX(-50%);
     font-size: 14px;
-    color: #111;
+    color: var(--text-primary);
+    font-weight: 700;
   }
 
   .north-scale {
-    font-size: 10px;
-    color: #111;
     text-align: center;
+    font-size: 10px;
+    color: var(--text-secondary);
     margin-top: 4px;
   }
 
-  .gis-agency {
-    font-size: 9px;
-    line-height: 1.22;
-    color: #111;
-    text-align: center;
-    font-weight: 800;
-    text-transform: uppercase;
+  .gis-project-copy {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.45;
   }
 
-  .gis-ctce {
-    padding: 8px 10px;
-    border-bottom: 1px solid #111;
-    text-align: center;
-  }
-
-  .ctce-mark {
-    width: 80px;
-    height: 42px;
-    border-radius: 50%;
-    background: #0a65d8;
-    margin: 0 auto 4px;
-    position: relative;
-  }
-
-  .ctce-mark::before,
-  .ctce-mark::after {
-    content: "";
-    position: absolute;
-    background: #fff;
-    opacity: .95;
-  }
-
-  .ctce-mark::before {
-    left: 15px;
-    right: 15px;
-    top: 18px;
-    height: 5px;
-  }
-
-  .ctce-mark::after {
-    top: 7px;
-    bottom: 7px;
-    left: 37px;
-    width: 5px;
-  }
-
-  .ctce-text {
-    font-size: 16px;
-    font-family: Georgia, serif;
-    color: #111;
-  }
-
-  .gis-engineering-legend {
-    flex: 1;
-    padding: 10px 12px;
-    overflow: auto;
-    border-bottom: 1px solid #111;
-  }
-
-  .gis-engineering-legend h4 {
-    margin: 0 0 12px;
-    font-size: 15px;
-    color: #111;
-    font-weight: 700;
+  .gis-project-copy strong {
+    color: var(--text-primary);
   }
 
   .legend-row {
     display: grid;
-    grid-template-columns: 78px 1fr;
-    gap: 8px;
+    grid-template-columns: 70px 1fr;
+    gap: 10px;
     align-items: center;
-    margin-bottom: 13px;
-    font-size: 11px;
-    color: #111;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: var(--text-secondary);
   }
 
   .legend-line {
@@ -380,148 +232,35 @@
     border-top-style: dashed;
   }
 
-  .legend-point {
-    width: 17px;
-    height: 17px;
-    border-radius: 50%;
-    background: #fff600;
-    border: 1px solid #f2db00;
-    margin-left: 28px;
-  }
-
-  .legend-neighborhood {
-    border-top: 4px dashed #cfcfcf;
-  }
-
-  .legend-valve {
-    width: 20px;
+  .legend-dot {
+    width: 14px;
     height: 14px;
-    border: 2px solid #002eff;
+    border-radius: 999px;
     margin-left: 28px;
-    position: relative;
+    border: 1px solid rgba(0, 0, 0, .2);
   }
 
-  .legend-valve::before,
-  .legend-valve::after {
-    content: "";
-    position: absolute;
-    top: 50%;
-    width: 8px;
-    height: 2px;
-    background: #002eff;
+  .gis-kmz-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
   }
 
-  .legend-valve::before {
-    left: -10px;
-  }
-
-  .legend-valve::after {
-    right: -10px;
-  }
-
-  .gis-title-block {
-    font-size: 9px;
-    color: #111;
-    background: #fff;
-  }
-
-  .title-block-row {
-    border-bottom: 1px solid #111;
-    padding: 5px 7px;
-  }
-
-  .title-block-label {
-    font-size: 8px;
-    text-transform: uppercase;
-    color: #333;
-  }
-
-  .title-block-value {
-    font-weight: 800;
-    text-align: center;
-    line-height: 1.18;
-    margin-top: 3px;
-    font-size: 10px;
-  }
-
-  .title-block-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .title-block-grid > div {
-    border-right: 1px solid #111;
-    border-bottom: 1px solid #111;
-    padding: 4px;
-    text-align: center;
-  }
-
-  .title-block-grid > div:nth-child(2n) {
-    border-right: 0;
-  }
-
-  .gis-note-box {
-    position: absolute;
-    left: 18px;
-    bottom: 18px;
-    width: min(570px, calc(100% - 275px));
-    z-index: 650;
-    background: rgba(255, 255, 255, 0.94);
-    border: 1px solid #111;
-    padding: 12px 14px;
-    pointer-events: auto;
-    color: #111;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  }
-
-  .gis-note-box h4 {
-    margin: 0 0 8px;
-    font-size: 15px;
-    font-weight: 700;
-  }
-
-  .note-row {
-    display: grid;
-    grid-template-columns: 130px 1fr;
-    gap: 10px;
-    align-items: start;
-    margin: 8px 0;
+  .gis-secondary-btn {
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    border-radius: 8px;
+    padding: 8px 10px;
     font-size: 12px;
-    line-height: 1.35;
+    font-weight: 700;
+    cursor: pointer;
+    transition: border-color var(--transition-base), color var(--transition-base);
   }
 
-  .hatch-sample {
-    height: 24px;
-    border: 1px solid #111;
-  }
-
-  .hatch-sample.completed {
-    background:
-      repeating-linear-gradient(0deg, rgba(0, 226, 38, .95) 0 2px, transparent 2px 8px),
-      repeating-linear-gradient(90deg, rgba(0, 226, 38, .95) 0 2px, transparent 2px 8px),
-      rgba(0, 226, 38, .08);
-  }
-
-  .hatch-sample.planned {
-    background:
-      repeating-linear-gradient(0deg, rgba(255, 0, 0, .95) 0 2px, transparent 2px 8px),
-      repeating-linear-gradient(90deg, rgba(255, 0, 0, .95) 0 2px, transparent 2px 8px),
-      rgba(255, 0, 0, .08);
-  }
-
-  .gis-floating-chip {
-    position: absolute;
-    z-index: 640;
-    background: #fff600;
-    color: #0024cc;
-    border: 1px solid #d6cc00;
-    font-size: 11px;
-    line-height: 1;
-    padding: 4px 6px;
-    font-weight: 800;
-    white-space: nowrap;
-    pointer-events: none;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, .12);
+  .gis-secondary-btn:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
   }
 
   .leaflet-container {
@@ -532,115 +271,21 @@
     font-size: 9px;
   }
 
-  .leaflet-tooltip.gis-label-tooltip {
-    background: #fff600;
-    color: #0024cc;
-    border: 1px solid #d6cc00;
-    border-radius: 0;
-    box-shadow: none;
-    font-size: 10px;
-    font-weight: 800;
-    padding: 3px 5px;
+  .leaflet-control-layers {
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .16);
+    border: 1px solid rgba(0, 0, 0, .12);
   }
 
-  .leaflet-tooltip.gis-pipe-tooltip {
-    background: transparent;
-    color: #002eff;
-    border: 0;
-    box-shadow: none;
-    font-size: 10px;
-    font-weight: 800;
-    text-shadow:
-      -1px -1px 0 #fff,
-      1px -1px 0 #fff,
-      -1px 1px 0 #fff,
-      1px 1px 0 #fff;
-  }
-
-  .leaflet-tooltip.gis-callout-tooltip {
-    background: rgba(255, 255, 255, .92);
-    color: #111;
-    border: 0;
-    box-shadow: none;
-    font-size: 13px;
+  .leaflet-tooltip.gis-kmz-tooltip {
+    background: rgba(255, 255, 255, .94);
+    border: 1px solid rgba(10, 69, 149, .25);
+    color: #0a4595;
+    border-radius: 6px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, .12);
+    font-size: 11px;
     font-weight: 700;
-    padding: 2px 4px;
-    white-space: nowrap;
-  }
-
-  .gis-valve-icon {
-    width: 18px;
-    height: 18px;
-    position: relative;
-  }
-
-  .gis-valve-icon::before {
-    content: "";
-    position: absolute;
-    left: 3px;
-    top: 4px;
-    width: 12px;
-    height: 10px;
-    border: 2px solid #002eff;
-    background: rgba(255, 255, 255, .8);
-  }
-
-  .gis-valve-icon::after {
-    content: "";
-    position: absolute;
-    left: -1px;
-    right: -1px;
-    top: 8px;
-    height: 2px;
-    background: #002eff;
-  }
-
-  .gis-connection-icon {
-    width: 19px;
-    height: 19px;
-    border-radius: 50%;
-    background: #fff600;
-    border: 1px solid #f2db00;
-    box-shadow: 0 0 0 3px rgba(255, 246, 0, .24);
-  }
-
-  .gis-area-label {
-    color: #002aff;
-    font-size: 9px;
-    font-weight: 800;
-    text-shadow:
-      -1px -1px 0 #fff,
-      1px -1px 0 #fff,
-      -1px 1px 0 #fff,
-      1px 1px 0 #fff;
-  }
-
-  @media (max-width: 1200px) {
-    .gis-drawing-header {
-      right: 12px;
-      grid-template-columns: 1fr;
-    }
-
-    .gis-engineering-panel {
-      position: relative;
-      width: auto;
-      top: auto;
-      right: auto;
-      bottom: auto;
-      margin: 12px;
-      z-index: 1;
-      max-height: none;
-    }
-
-    #gisMap {
-      height: 680px;
-    }
-
-    .gis-note-box {
-      width: calc(100% - 36px);
-      left: 18px;
-      right: 18px;
-    }
+    padding: 4px 7px;
   }
 </style>
 </head>
@@ -656,9 +301,6 @@
   };
 </script>
 
-// Ensure correct KMZ asset path
-fetch("assets/lubango_Project.kmz")
-
 <div class="app-shell">
   <aside class="sidebar" id="sidebarMount"></aside>
 
@@ -668,8 +310,8 @@ fetch("assets/lubango_Project.kmz")
     <main class="main-content">
 
       <div class="section-heading">
-        <h2>GIS Map — Lubango Distribution Network Intervention Areas</h2>
-        <span class="section-sub">Engineering-style construction areas, pipeline corridors and intervention zones</span>
+        <h2>GIS Map - Lubango Distribution Network Intervention Areas</h2>
+        <span class="section-sub">KMZ-driven project GIS viewer with satellite, street and topographic map layers</span>
       </div>
 
       <div class="gis-layout">
@@ -678,17 +320,25 @@ fetch("assets/lubango_Project.kmz")
           <div class="card-body">
 
             <div class="filter-group">
+              <h4>GIS Source</h4>
+              <div class="gis-file-status" id="kmzStatus">
+                <strong>Loading KMZ...</strong><br>
+                Checking configured GIS asset paths.
+              </div>
+            </div>
+
+            <div class="filter-group">
               <h4>Construction Stage</h4>
 
               <label class="filter-chip">
                 <input type="checkbox" class="gis-filter-status" data-status="complete" checked>
-                <span class="legend-square" style="background:#00e226;"></span>
+                <span class="legend-square" style="background:#00a651;"></span>
                 Completed Area
               </label>
 
               <label class="filter-chip">
                 <input type="checkbox" class="gis-filter-status" data-status="planned" checked>
-                <span class="legend-square" style="background:#ff0000;"></span>
+                <span class="legend-square" style="background:#e53935;"></span>
                 Planned Area
               </label>
 
@@ -750,236 +400,94 @@ fetch("assets/lubango_Project.kmz")
               </label>
             </div>
 
-            <div class="filter-group">
-              <h4>Legend</h4>
+            <div class="gis-kmz-actions">
+              <button class="btn-primary" id="resetFiltersBtn" style="justify-content:center;">
+                <i class="fa-solid fa-rotate-left"></i>
+                Reset Filters
+              </button>
 
-              <div class="map-legend" style="flex-direction:column;align-items:flex-start;gap:8px;">
-                <div class="item">
-                  <span class="dot" style="background:#00e226;"></span>
-                  Completed in June 2026
-                </div>
-
-                <div class="item">
-                  <span class="dot" style="background:#ff0000;"></span>
-                  Planned for July 2026
-                </div>
-
-                <div class="item">
-                  <span class="dot" style="background:#002eff;"></span>
-                  Water distribution pipeline
-                </div>
-
-                <div class="item">
-                  <span class="dot" style="background:#fff600;border:1px solid #d9c900;"></span>
-                  Sector connection point
-                </div>
-              </div>
+              <button class="gis-secondary-btn" id="fitKmzBtn" type="button">
+                <i class="fa-solid fa-location-crosshairs"></i>
+                Fit Map
+              </button>
             </div>
-
-            <button class="btn-primary" id="resetFiltersBtn" style="width:100%;justify-content:center;">
-              <i class="fa-solid fa-rotate-left"></i>
-              Reset Filters
-            </button>
 
           </div>
         </div>
 
         <div class="card gis-map-card">
           <div class="card-body">
-            <div class="gis-drawing-frame">
+            <div class="gis-map-shell">
               <div id="gisMap"></div>
+            </div>
+          </div>
+        </div>
 
-              <div class="gis-drawing-header">
-                <div class="gis-key-plan">
-                  <div class="gis-key-title">Key Plan of This DMA</div>
-                  <div class="gis-key-map">
-                    <div class="gis-key-region region-1"></div>
-                    <div class="gis-key-region region-2"></div>
-                    <div class="gis-key-region region-3"></div>
-                    <div class="gis-key-dot dot-1"></div>
-                    <div class="gis-key-dot dot-2"></div>
-                    <div class="gis-key-dot dot-3"></div>
-                    <div class="gis-key-label label-1">DMA Casa Verde</div>
-                    <div class="gis-key-label label-2">DMA Escola Portuguesa</div>
-                    <div class="gis-key-label label-3">DMA Sofrio</div>
-                  </div>
+        <div class="card gis-right-panel">
+          <div class="card-body">
+
+            <div class="gis-panel-section">
+              <h4>Map Orientation</h4>
+              <div class="gis-north-box">
+                <div>
+                  <div class="north-symbol"></div>
+                  <div class="north-scale">Dynamic scale</div>
                 </div>
-
-                <div class="gis-progress-table">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th class="group-head" colspan="3">Domestic Connection Pipeline (m)</th>
-                        <th class="group-head" colspan="7">Water Distribution Pipeline (m)</th>
-                        <th class="group-head">Domestic Connections</th>
-                      </tr>
-                      <tr>
-                        <th>De20</th>
-                        <th>De25</th>
-                        <th>Total</th>
-                        <th>De63</th>
-                        <th>De75</th>
-                        <th>De90</th>
-                        <th>De110</th>
-                        <th>De160</th>
-                        <th>De200</th>
-                        <th>Total</th>
-                        <th>pcs</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td>9,961</td>
-                        <td>12,174</td>
-                        <td>22,135</td>
-                        <td>9,262</td>
-                        <td>0</td>
-                        <td>3,815</td>
-                        <td>1,113</td>
-                        <td>696</td>
-                        <td>437</td>
-                        <td>17,117</td>
-                        <td>1,210</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div class="gis-engineering-panel">
-                <div class="gis-north">
-                  <div>
-                    <div class="north-symbol"></div>
-                    <div class="north-scale">1:5000</div>
-                  </div>
-
-                  <div class="gis-agency">
-                    Republic of Angola<br>
-                    Ministry of Energy and Water<br>
-                    Second Water Sector Institutional Development Project
-                  </div>
-                </div>
-
-                <div class="gis-ctce">
-                  <div class="ctce-mark"></div>
-                  <div class="ctce-text">CTCE</div>
-                </div>
-
-                <div class="gis-engineering-legend">
-                  <h4>Legend:</h4>
-
-                  <div class="legend-row">
-                    <div class="legend-neighborhood"></div>
-                    <div>Neighborhoods / bairros</div>
-                  </div>
-
-                  <div class="legend-row">
-                    <div class="legend-point"></div>
-                    <div>Sector connection point</div>
-                  </div>
-
-                  <div class="legend-row">
-                    <div class="legend-line" style="border-top-color:#ff0000;"></div>
-                    <div>Water distribution pipeline /63mm HDPE</div>
-                  </div>
-
-                  <div class="legend-row">
-                    <div class="legend-line" style="border-top-color:#111;"></div>
-                    <div>Water distribution pipeline /75mm HDPE</div>
-                  </div>
-
-                  <div class="legend-row">
-                    <div class="legend-line" style="border-top-color:#ff00ea;"></div>
-                    <div>Water distribution pipeline /90mm HDPE</div>
-                  </div>
-
-                  <div class="legend-row">
-                    <div class="legend-line" style="border-top-color:#002eff;"></div>
-                    <div>Water distribution pipeline /110mm HDPE</div>
-                  </div>
-
-                  <div class="legend-row">
-                    <div class="legend-line" style="border-top-color:#00d9d9;"></div>
-                    <div>Water distribution pipeline /160mm HDPE</div>
-                  </div>
-
-                  <div class="legend-row">
-                    <div class="legend-line" style="border-top-color:#00e226;"></div>
-                    <div>Water distribution pipeline /200mm HDPE</div>
-                  </div>
-
-                  <div class="legend-row">
-                    <div class="legend-line" style="border-top-color:#fff000;"></div>
-                    <div>Water distribution pipeline /250mm HDPE</div>
-                  </div>
-
-                  <div class="legend-row">
-                    <div class="legend-line dashed" style="border-top-color:#ff0000;"></div>
-                    <div>Water distribution pipeline /315mm HDPE</div>
-                  </div>
-
-                  <div class="legend-row">
-                    <div class="legend-valve"></div>
-                    <div>Gate valve / air valve / flowmeter</div>
-                  </div>
-                </div>
-
-                <div class="gis-title-block">
-                  <div class="title-block-row">
-                    <div class="title-block-label">Project</div>
-                    <div class="title-block-value">
-                      Design and Construction of Network and Home Connections for Peri-Urban Areas in the City of Lubango
-                    </div>
-                  </div>
-
-                  <div class="title-block-row">
-                    <div class="title-block-label">Name of Drawing</div>
-                    <div class="title-block-value">
-                      General Layout of Water Distribution Pipeline
-                    </div>
-                  </div>
-
-                  <div class="title-block-grid">
-                    <div>
-                      <div class="title-block-label">Scale</div>
-                      <strong>1:5000</strong>
-                    </div>
-                    <div>
-                      <div class="title-block-label">Version</div>
-                      <strong>R07</strong>
-                    </div>
-                    <div>
-                      <div class="title-block-label">Job Number</div>
-                      <strong>44W3/LUBANGO/DNA/18</strong>
-                    </div>
-                    <div>
-                      <div class="title-block-label">Date</div>
-                      <strong>2025.05</strong>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="gis-note-box">
-                <h4>Note:</h4>
-
-                <div class="note-row">
-                  <div class="hatch-sample completed"></div>
-                  <div>
-                    <strong>Construction Areas Completed in June 2026</strong><br>
-                    Planned completion for June was 600 m. Actual completed work reached 408 m. Cumulative completed length: 16,413.5 m.
-                  </div>
-                </div>
-
-                <div class="note-row">
-                  <div class="hatch-sample planned"></div>
-                  <div>
-                    <strong>Construction Areas Planned for July 2026</strong><br>
-                    Planned to complete 180 m in July. Construction of the primary pipeline network will continue in the selected DMA areas.
-                  </div>
+                <div class="gis-project-copy">
+                  <strong>GIS Mode</strong><br>
+                  Satellite, street and topographic base layers are available from the layer switcher.
                 </div>
               </div>
             </div>
+
+            <div class="gis-panel-section">
+              <h4>Engineering Legend</h4>
+
+              <div class="legend-row">
+                <div class="legend-line" style="border-top-color:#e53935;"></div>
+                <div>Pipeline or red KML layer</div>
+              </div>
+
+              <div class="legend-row">
+                <div class="legend-line" style="border-top-color:#111;"></div>
+                <div>Pipeline or black KML layer</div>
+              </div>
+
+              <div class="legend-row">
+                <div class="legend-line" style="border-top-color:#ff00ea;"></div>
+                <div>Pipeline or magenta KML layer</div>
+              </div>
+
+              <div class="legend-row">
+                <div class="legend-line" style="border-top-color:#0057ff;"></div>
+                <div>Default KMZ line layer</div>
+              </div>
+
+              <div class="legend-row">
+                <div class="legend-line" style="border-top-color:#00bcd4;"></div>
+                <div>Cyan KML layer</div>
+              </div>
+
+              <div class="legend-row">
+                <div class="legend-line" style="border-top-color:#00a651;"></div>
+                <div>Completed or green KML polygon</div>
+              </div>
+
+              <div class="legend-row">
+                <div class="legend-dot" style="background:#fff600;"></div>
+                <div>Point or sector connection</div>
+              </div>
+            </div>
+
+            <div class="gis-panel-section">
+              <h4>Project Information</h4>
+              <div class="gis-project-copy">
+                <strong>Project:</strong> Design and Construction of Network and Home Connections for Peri-Urban Areas in the City of Lubango<br><br>
+                <strong>Contract:</strong> 44W3/LUBANGO/DNA/18<br><br>
+                <strong>GIS Asset:</strong> lubango_Project.kmz
+              </div>
+            </div>
+
           </div>
         </div>
 
@@ -988,765 +496,438 @@ fetch("assets/lubango_Project.kmz")
     </main>
 
     <footer style="text-align:center;padding:24px;color:var(--text-muted);font-size:12px;">
-      PDISA-2 Lubango — Construction Progress Dashboard · Contract 44W3/LUBANGO/DNA/18
+      PDISA-2 Lubango - Construction Progress Dashboard · Contract 44W3/LUBANGO/DNA/18
     </footer>
   </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-js/api.jsscript>
-js/shell.jsscript>
-js/main.jsscript>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://unpkg.com/togeojson@0.16.0/dist/togeojson.umd.js"></script>
+<script src="js/api.js"></script>
+<script src="js/shell.js"></script>
+<script src="js/main.js"></script>
 
 <script>
   document.addEventListener("DOMContentLoaded", function () {
     var mapElement = document.getElementById("gisMap");
+    var kmzStatus = document.getElementById("kmzStatus");
+    var fitKmzBtn = document.getElementById("fitKmzBtn");
+    var resetFiltersBtn = document.getElementById("resetFiltersBtn");
 
-    if (!mapElement || typeof L === "undefined") return;
-
-    function cssVar(name, fallback) {
-      var value = getComputedStyle(document.documentElement)
-        .getPropertyValue(name)
-        .trim();
-
-      return value || fallback;
+    if (!mapElement || typeof L === "undefined") {
+      return;
     }
 
-    var successColor = "#00e226";
-    var plannedColor = "#ff0000";
-    var warningColor = cssVar("--color-warning", "#B9770E");
-    var primaryColor = "#002eff";
-    var criticalColor = cssVar("--color-critical", "#C0392B");
-    var mobilisingColor = "#F58232";
+    var KMZ_ASSET_PATHS = [
+      "/assets/gis/lubango_Project.kmz",
+      "/assets/lubango_Project.kmz",
+      "assets/gis/lubango_Project.kmz",
+      "assets/lubango_Project.kmz"
+    ];
 
-    var pipeColors = {
-      de63: "#ff0000",
-      de75: "#111111",
-      de90: "#ff00ea",
-      de110: "#002eff",
-      de160: "#00d9d9",
-      de200: "#00e226",
-      de250: "#fff000",
-      de315: "#ff0000"
-    };
+    var AREA_NAMES = [
+      "Casa Verde",
+      "Escola Portuguesa",
+      "Cowboy I",
+      "Sofrio",
+      "João de Almeida",
+      "Caixote ou Socombar",
+      "Arimba"
+    ];
+
+    var STATUS_KEYWORDS = [
+      {
+        status: "complete",
+        keywords: ["complete", "completed", "concluido", "concluído", "executed", "done", "june"]
+      },
+      {
+        status: "planned",
+        keywords: ["planned", "plan", "july", "programmed", "programado"]
+      },
+      {
+        status: "progress",
+        keywords: ["progress", "in progress", "ongoing", "under construction"]
+      },
+      {
+        status: "mobilising",
+        keywords: ["mobilising", "mobilizing", "mobilisation", "mobilization"]
+      },
+      {
+        status: "notStarted",
+        keywords: ["not started", "not-started", "pending", "to start"]
+      }
+    ];
 
     var map = L.map(mapElement, {
       zoomControl: true,
-      attributionControl: true,
-      renderer: L.svg({
-        padding: 0.5
-      })
+      attributionControl: true
     }).setView([-14.9177, 13.4925], 13);
 
-    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
-      maxZoom: 19,
-      attribution: "Tiles &copy; Esri"
-    }).addTo(map);
+    var satelliteLayer = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      {
+        maxZoom: 19,
+        attribution: "Tiles &copy; Esri"
+      }
+    );
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      opacity: 0.18,
-      attribution: "&copy; OpenStreetMap"
-    }).addTo(map);
+    var streetLayer = L.tileLayer(
+      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap"
+      }
+    );
 
-    function addSvgPatterns() {
-      var svg = map.getPane("overlayPane").querySelector("svg");
+    var topoLayer = L.tileLayer(
+      "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+      {
+        maxZoom: 17,
+        attribution: "&copy; OpenTopoMap"
+      }
+    );
 
-      if (!svg || svg.querySelector("#completedHatch")) {
-        return;
+    satelliteLayer.addTo(map);
+
+    var overlayControl = L.control.layers(
+      {
+        "Satellite": satelliteLayer,
+        "Street": streetLayer,
+        "Topographic": topoLayer
+      },
+      {},
+      {
+        collapsed: false
+      }
+    ).addTo(map);
+
+    var kmzLayer = null;
+    var kmzFeatureLayers = [];
+    var loadedKmzUrl = "";
+
+    function setKmzStatus(message, type) {
+      if (!kmzStatus) return;
+
+      kmzStatus.classList.remove("success", "error");
+
+      if (type) {
+        kmzStatus.classList.add(type);
       }
 
-      var defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
-
-      var completedPattern = document.createElementNS("http://www.w3.org/2000/svg", "pattern");
-      completedPattern.setAttribute("id", "completedHatch");
-      completedPattern.setAttribute("patternUnits", "userSpaceOnUse");
-      completedPattern.setAttribute("width", "10");
-      completedPattern.setAttribute("height", "10");
-
-      var completedPath1 = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      completedPath1.setAttribute("d", "M0 0H10M0 5H10M0 10H10");
-      completedPath1.setAttribute("stroke", successColor);
-      completedPath1.setAttribute("stroke-width", "1.2");
-
-      var completedPath2 = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      completedPath2.setAttribute("d", "M0 0V10M5 0V10M10 0V10");
-      completedPath2.setAttribute("stroke", successColor);
-      completedPath2.setAttribute("stroke-width", "1.2");
-
-      completedPattern.appendChild(completedPath1);
-      completedPattern.appendChild(completedPath2);
-
-      var plannedPattern = document.createElementNS("http://www.w3.org/2000/svg", "pattern");
-      plannedPattern.setAttribute("id", "plannedHatch");
-      plannedPattern.setAttribute("patternUnits", "userSpaceOnUse");
-      plannedPattern.setAttribute("width", "10");
-      plannedPattern.setAttribute("height", "10");
-
-      var plannedPath1 = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      plannedPath1.setAttribute("d", "M0 0H10M0 5H10M0 10H10");
-      plannedPath1.setAttribute("stroke", plannedColor);
-      plannedPath1.setAttribute("stroke-width", "1.2");
-
-      var plannedPath2 = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      plannedPath2.setAttribute("d", "M0 0V10M5 0V10M10 0V10");
-      plannedPath2.setAttribute("stroke", plannedColor);
-      plannedPath2.setAttribute("stroke-width", "1.2");
-
-      plannedPattern.appendChild(plannedPath1);
-      plannedPattern.appendChild(plannedPath2);
-
-      defs.appendChild(completedPattern);
-      defs.appendChild(plannedPattern);
-
-      svg.insertBefore(defs, svg.firstChild);
+      kmzStatus.innerHTML = message;
     }
 
-    map.whenReady(addSvgPatterns);
-    map.on("zoomend moveend layeradd", addSvgPatterns);
-
-    var constructionAreas = [
-      {
-        name: "DMA Casa Verde",
-        area: "Casa Verde",
-        status: "complete",
-        statusLabel: "Completed in June 2026",
-        pattern: "completedHatch",
-        borderColor: successColor,
-        coords: [
-          [-14.9540, 13.4560],
-          [-14.9460, 13.4710],
-          [-14.9510, 13.4930],
-          [-14.9660, 13.4940],
-          [-14.9740, 13.4740],
-          [-14.9660, 13.4560]
-        ],
-        label: [-14.9610, 13.4725]
-      },
-      {
-        name: "DMA Escola Portuguesa",
-        area: "Escola Portuguesa",
-        status: "complete",
-        statusLabel: "Completed in June 2026",
-        pattern: "completedHatch",
-        borderColor: successColor,
-        coords: [
-          [-14.9400, 13.4780],
-          [-14.9290, 13.4980],
-          [-14.9365, 13.5260],
-          [-14.9550, 13.5260],
-          [-14.9625, 13.5030],
-          [-14.9540, 13.4820]
-        ],
-        label: [-14.9460, 13.5040]
-      },
-      {
-        name: "DMA Sofrio",
-        area: "Sofrio",
-        status: "complete",
-        statusLabel: "Completed in June 2026",
-        pattern: "completedHatch",
-        borderColor: successColor,
-        coords: [
-          [-14.9150, 13.4980],
-          [-14.9020, 13.5170],
-          [-14.9090, 13.5440],
-          [-14.9280, 13.5410],
-          [-14.9350, 13.5180],
-          [-14.9290, 13.5010]
-        ],
-        label: [-14.9190, 13.5200]
-      },
-      {
-        name: "DMA João de Almeida",
-        area: "João de Almeida",
-        status: "planned",
-        statusLabel: "Planned for July 2026",
-        pattern: "plannedHatch",
-        borderColor: plannedColor,
-        coords: [
-          [-14.8980, 13.5030],
-          [-14.8845, 13.5200],
-          [-14.8940, 13.5450],
-          [-14.9100, 13.5410],
-          [-14.9140, 13.5200]
-        ],
-        label: [-14.9005, 13.5240]
-      },
-      {
-        name: "DMA Cowboy I",
-        area: "Cowboy I",
-        status: "planned",
-        statusLabel: "Planned for July 2026",
-        pattern: "plannedHatch",
-        borderColor: plannedColor,
-        coords: [
-          [-14.9660, 13.4950],
-          [-14.9540, 13.5260],
-          [-14.9640, 13.5490],
-          [-14.9820, 13.5390],
-          [-14.9850, 13.5120]
-        ],
-        label: [-14.9700, 13.5250]
-      },
-      {
-        name: "DMA Caixote ou Socombar",
-        area: "Caixote ou Socombar",
-        status: "complete",
-        statusLabel: "Completed in June 2026",
-        pattern: "completedHatch",
-        borderColor: successColor,
-        coords: [
-          [-14.8860, 13.4560],
-          [-14.8750, 13.4770],
-          [-14.8830, 13.5000],
-          [-14.9020, 13.5000],
-          [-14.9100, 13.4770],
-          [-14.9010, 13.4570]
-        ],
-        label: [-14.8930, 13.4770]
-      },
-      {
-        name: "DMA Arimba",
-        area: "Arimba",
-        status: "planned",
-        statusLabel: "Planned for July 2026",
-        pattern: "plannedHatch",
-        borderColor: plannedColor,
-        coords: [
-          [-14.8800, 13.4540],
-          [-14.8660, 13.4720],
-          [-14.8730, 13.4960],
-          [-14.8900, 13.4930],
-          [-14.8960, 13.4700]
-        ],
-        label: [-14.8810, 13.4740]
-      }
-    ];
-
-    var pipeLines = [
-      {
-        name: "De110 - L=150m",
-        area: "Casa Verde",
-        status: "complete",
-        diameter: "de110",
-        coords: [
-          [-14.9650, 13.4590],
-          [-14.9580, 13.4700],
-          [-14.9520, 13.4900]
-        ]
-      },
-      {
-        name: "De160 - L=95m",
-        area: "Casa Verde",
-        status: "complete",
-        diameter: "de160",
-        coords: [
-          [-14.9710, 13.4720],
-          [-14.9620, 13.4800],
-          [-14.9530, 13.4880]
-        ]
-      },
-      {
-        name: "De90 - L=82m",
-        area: "Casa Verde",
-        status: "complete",
-        diameter: "de90",
-        coords: [
-          [-14.9640, 13.4630],
-          [-14.9680, 13.4820],
-          [-14.9580, 13.4920]
-        ]
-      },
-      {
-        name: "De63 - L=74m",
-        area: "Casa Verde",
-        status: "complete",
-        diameter: "de63",
-        coords: [
-          [-14.9560, 13.4600],
-          [-14.9620, 13.4720],
-          [-14.9660, 13.4890]
-        ]
-      },
-      {
-        name: "De200 - L=120m",
-        area: "Escola Portuguesa",
-        status: "complete",
-        diameter: "de200",
-        coords: [
-          [-14.9580, 13.4860],
-          [-14.9490, 13.5020],
-          [-14.9400, 13.5190]
-        ]
-      },
-      {
-        name: "De110 - L=135m",
-        area: "Escola Portuguesa",
-        status: "complete",
-        diameter: "de110",
-        coords: [
-          [-14.9520, 13.4840],
-          [-14.9470, 13.4990],
-          [-14.9450, 13.5210]
-        ]
-      },
-      {
-        name: "De160 - L=108m",
-        area: "Escola Portuguesa",
-        status: "complete",
-        diameter: "de160",
-        coords: [
-          [-14.9360, 13.4860],
-          [-14.9430, 13.5050],
-          [-14.9380, 13.5250]
-        ]
-      },
-      {
-        name: "De63 - L=91m",
-        area: "Escola Portuguesa",
-        status: "complete",
-        diameter: "de63",
-        coords: [
-          [-14.9550, 13.5150],
-          [-14.9440, 13.5110],
-          [-14.9340, 13.5060]
-        ]
-      },
-      {
-        name: "De160 - L=77m",
-        area: "Sofrio",
-        status: "complete",
-        diameter: "de160",
-        coords: [
-          [-14.9320, 13.5050],
-          [-14.9220, 13.5200],
-          [-14.9100, 13.5380]
-        ]
-      },
-      {
-        name: "De110 - L=130m",
-        area: "Sofrio",
-        status: "complete",
-        diameter: "de110",
-        coords: [
-          [-14.9260, 13.5020],
-          [-14.9160, 13.5220],
-          [-14.9130, 13.5410]
-        ]
-      },
-      {
-        name: "De63 - L=61m",
-        area: "Sofrio",
-        status: "complete",
-        diameter: "de63",
-        coords: [
-          [-14.9190, 13.5050],
-          [-14.9210, 13.5230],
-          [-14.9280, 13.5400]
-        ]
-      },
-      {
-        name: "De315 - L=180m",
-        area: "João de Almeida",
-        status: "planned",
-        diameter: "de315",
-        dashed: true,
-        coords: [
-          [-14.9130, 13.5180],
-          [-14.9020, 13.5300],
-          [-14.8910, 13.5420]
-        ]
-      },
-      {
-        name: "De110 - L=84m",
-        area: "João de Almeida",
-        status: "planned",
-        diameter: "de110",
-        coords: [
-          [-14.9060, 13.5090],
-          [-14.9000, 13.5250],
-          [-14.9010, 13.5430]
-        ]
-      },
-      {
-        name: "De63 - L=72m",
-        area: "João de Almeida",
-        status: "planned",
-        diameter: "de63",
-        coords: [
-          [-14.8940, 13.5080],
-          [-14.9040, 13.5230],
-          [-14.9090, 13.5380]
-        ]
-      },
-      {
-        name: "De250 - L=155m",
-        area: "Cowboy I",
-        status: "planned",
-        diameter: "de250",
-        coords: [
-          [-14.9820, 13.5100],
-          [-14.9710, 13.5230],
-          [-14.9600, 13.5450]
-        ]
-      },
-      {
-        name: "De110 - L=124m",
-        area: "Cowboy I",
-        status: "planned",
-        diameter: "de110",
-        coords: [
-          [-14.9780, 13.5040],
-          [-14.9690, 13.5190],
-          [-14.9660, 13.5400]
-        ]
-      },
-      {
-        name: "De90 - L=76m",
-        area: "Cowboy I",
-        status: "planned",
-        diameter: "de90",
-        coords: [
-          [-14.9690, 13.5000],
-          [-14.9740, 13.5200],
-          [-14.9800, 13.5370]
-        ]
-      },
-      {
-        name: "De200 - L=100m",
-        area: "Caixote ou Socombar",
-        status: "complete",
-        diameter: "de200",
-        coords: [
-          [-14.9050, 13.4590],
-          [-14.8950, 13.4790],
-          [-14.8860, 13.4970]
-        ]
-      },
-      {
-        name: "De160 - L=88m",
-        area: "Caixote ou Socombar",
-        status: "complete",
-        diameter: "de160",
-        coords: [
-          [-14.8980, 13.4570],
-          [-14.9000, 13.4770],
-          [-14.8940, 13.4980]
-        ]
-      },
-      {
-        name: "De63 - L=64m",
-        area: "Arimba",
-        status: "planned",
-        diameter: "de63",
-        coords: [
-          [-14.8940, 13.4650],
-          [-14.8810, 13.4740],
-          [-14.8720, 13.4920]
-        ]
-      },
-      {
-        name: "De110 - L=92m",
-        area: "Arimba",
-        status: "planned",
-        diameter: "de110",
-        coords: [
-          [-14.8890, 13.4560],
-          [-14.8820, 13.4740],
-          [-14.8850, 13.4930]
-        ]
-      }
-    ];
-
-    var callouts = [
-      {
-        text: "Areas Completed in June 2026",
-        area: "Casa Verde",
-        status: "complete",
-        from: [-14.9555, 13.4670],
-        to: [-14.9420, 13.4300]
-      },
-      {
-        text: "Construction Areas Planned for July 2026",
-        area: "Cowboy I",
-        status: "planned",
-        from: [-14.9700, 13.5270],
-        to: [-14.9920, 13.4400]
-      },
-      {
-        text: "Areas Completed in June 2026",
-        area: "Sofrio",
-        status: "complete",
-        from: [-14.9210, 13.5230],
-        to: [-14.9010, 13.5660]
-      },
-      {
-        text: "Sector Connection Point 1",
-        area: "Escola Portuguesa",
-        status: "complete",
-        from: [-14.9445, 13.5050],
-        to: [-14.9320, 13.4820]
-      },
-      {
-        text: "Connection from De315 pipeline",
-        area: "João de Almeida",
-        status: "planned",
-        from: [-14.9010, 13.5300],
-        to: [-14.8820, 13.5550]
-      }
-    ];
-
-    var connectionPoints = [
-      {
-        name: "Sector Connection Point 1",
-        area: "Escola Portuguesa",
-        status: "complete",
-        coords: [-14.9445, 13.5050]
-      },
-      {
-        name: "Sector Connection Point 2",
-        area: "João de Almeida",
-        status: "planned",
-        coords: [-14.9010, 13.5300]
-      },
-      {
-        name: "Sector Connection Point 3",
-        area: "Casa Verde",
-        status: "complete",
-        coords: [-14.9620, 13.4790]
-      }
-    ];
-
-    var valves = [
-      {
-        name: "Gate Valve",
-        area: "Casa Verde",
-        status: "complete",
-        coords: [-14.9580, 13.4700]
-      },
-      {
-        name: "Air Valve",
-        area: "Escola Portuguesa",
-        status: "complete",
-        coords: [-14.9470, 13.4990]
-      },
-      {
-        name: "Pressure Reducing Valve",
-        area: "Sofrio",
-        status: "complete",
-        coords: [-14.9220, 13.5200]
-      },
-      {
-        name: "Flowmeter",
-        area: "João de Almeida",
-        status: "planned",
-        coords: [-14.9020, 13.5300]
-      },
-      {
-        name: "Gate Valve",
-        area: "Cowboy I",
-        status: "planned",
-        coords: [-14.9710, 13.5230]
-      }
-    ];
-
-    function setLayerMeta(layer, status, area) {
-      layer._status = status;
-      layer._area = area;
-      return layer;
+    function normalizeText(value) {
+      return String(value || "")
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+        .trim();
     }
 
-    function bindAreaPopup(layer, item) {
-      return layer.bindPopup(
-        '<div class="gis-popup">' +
-          '<strong>' + item.name + '</strong>' +
-          'Area: ' + item.area + '<br>' +
-          'Status: ' + item.statusLabel +
-        '</div>'
-      );
+    function stripHtml(value) {
+      var div = document.createElement("div");
+      div.innerHTML = String(value || "");
+      return div.textContent || div.innerText || "";
     }
 
-    function applyPatternFill(layer, patternId, fallbackColor) {
-      layer.on("add", function () {
-        setTimeout(function () {
-          addSvgPatterns();
+    function escapeHtml(value) {
+      return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
 
-          if (layer._path) {
-            layer._path.setAttribute("fill", "url(#" + patternId + ")");
-            layer._path.setAttribute("fill-opacity", "0.82");
-            layer._path.setAttribute("stroke", fallbackColor);
-            layer._path.setAttribute("stroke-width", "2");
+    function detectArea(searchText) {
+      var normalized = normalizeText(searchText);
+
+      for (var i = 0; i < AREA_NAMES.length; i += 1) {
+        if (normalized.indexOf(normalizeText(AREA_NAMES[i])) !== -1) {
+          return AREA_NAMES[i];
+        }
+      }
+
+      return "";
+    }
+
+    function detectStatus(searchText) {
+      var normalized = normalizeText(searchText);
+
+      for (var i = 0; i < STATUS_KEYWORDS.length; i += 1) {
+        var group = STATUS_KEYWORDS[i];
+
+        for (var j = 0; j < group.keywords.length; j += 1) {
+          if (normalized.indexOf(group.keywords[j]) !== -1) {
+            return group.status;
           }
-        }, 0);
-      });
+        }
+      }
 
-      return layer;
+      return "";
     }
 
-    var areaLayers = constructionAreas.map(function (item) {
-      var layer = L.polygon(item.coords, {
-        color: item.borderColor,
+    function getFeatureSearchText(feature) {
+      var properties = feature && feature.properties ? feature.properties : {};
+      return [
+        properties.name,
+        stripHtml(properties.description),
+        properties.folder,
+        properties.styleUrl
+      ].filter(Boolean).join(" ");
+    }
+
+    function getGeometryType(feature) {
+      return feature && feature.geometry ? feature.geometry.type : "";
+    }
+
+    function getDefaultStyle(feature) {
+      var properties = feature && feature.properties ? feature.properties : {};
+      var geometryType = getGeometryType(feature);
+
+      var style = {
+        color: properties.stroke || "#0057ff",
+        weight: Number(properties["stroke-width"] || properties.strokeWidth || 3),
+        opacity: Number(properties["stroke-opacity"] || properties.strokeOpacity || 0.95),
+        fillColor: properties.fill || "#00a651",
+        fillOpacity: Number(properties["fill-opacity"] || properties.fillOpacity || 0.22)
+      };
+
+      var searchText = normalizeText(getFeatureSearchText(feature));
+
+      if (searchText.indexOf("de63") !== -1 || searchText.indexOf("63mm") !== -1) {
+        style.color = "#e53935";
+      } else if (searchText.indexOf("de75") !== -1 || searchText.indexOf("75mm") !== -1) {
+        style.color = "#111111";
+      } else if (searchText.indexOf("de90") !== -1 || searchText.indexOf("90mm") !== -1) {
+        style.color = "#ff00ea";
+      } else if (searchText.indexOf("de110") !== -1 || searchText.indexOf("110mm") !== -1) {
+        style.color = "#0057ff";
+      } else if (searchText.indexOf("de160") !== -1 || searchText.indexOf("160mm") !== -1) {
+        style.color = "#00bcd4";
+      } else if (searchText.indexOf("de200") !== -1 || searchText.indexOf("200mm") !== -1) {
+        style.color = "#00a651";
+      } else if (searchText.indexOf("de250") !== -1 || searchText.indexOf("250mm") !== -1) {
+        style.color = "#f5e400";
+      } else if (searchText.indexOf("de315") !== -1 || searchText.indexOf("315mm") !== -1) {
+        style.color = "#e53935";
+        style.dashArray = "8 6";
+      }
+
+      if (geometryType.indexOf("Polygon") !== -1) {
+        if (searchText.indexOf("planned") !== -1 || searchText.indexOf("july") !== -1) {
+          style.color = "#e53935";
+          style.fillColor = "#e53935";
+          style.fillOpacity = 0.20;
+        } else if (searchText.indexOf("complete") !== -1 || searchText.indexOf("june") !== -1) {
+          style.color = "#00a651";
+          style.fillColor = "#00a651";
+          style.fillOpacity = 0.22;
+        }
+      }
+
+      return style;
+    }
+
+    function buildPopupHtml(feature) {
+      var properties = feature && feature.properties ? feature.properties : {};
+      var name = properties.name || "GIS Feature";
+      var description = properties.description || "";
+
+      var html = '<div class="gis-popup">';
+      html += "<strong>" + escapeHtml(name) + "</strong>";
+
+      if (description) {
+        html += '<div class="gis-popup-description">' + description + "</div>";
+      }
+
+      html += "</div>";
+
+      return html;
+    }
+
+    function pointToLayer(feature, latlng) {
+      var searchText = normalizeText(getFeatureSearchText(feature));
+      var fillColor = "#fff600";
+      var color = "#b8a900";
+      var radius = 7;
+
+      if (searchText.indexOf("valve") !== -1 || searchText.indexOf("válvula") !== -1) {
+        fillColor = "#ffffff";
+        color = "#0057ff";
+        radius = 6;
+      }
+
+      return L.circleMarker(latlng, {
+        radius: radius,
+        color: color,
         weight: 2,
-        opacity: 0.95,
-        fillColor: item.status === "complete" ? successColor : plannedColor,
-        fillOpacity: 0.20
+        fillColor: fillColor,
+        fillOpacity: 0.9
+      });
+    }
+
+    function getToGeoJsonParser() {
+      if (window.toGeoJSON && typeof window.toGeoJSON.kml === "function") {
+        return window.toGeoJSON;
+      }
+
+      if (window.togeojson && typeof window.togeojson.kml === "function") {
+        return window.togeojson;
+      }
+
+      if (window.tj && typeof window.tj.kml === "function") {
+        return window.tj;
+      }
+
+      return null;
+    }
+
+    async function fetchFirstAvailableKmz() {
+      var errors = [];
+
+      for (var i = 0; i < KMZ_ASSET_PATHS.length; i += 1) {
+        var url = KMZ_ASSET_PATHS[i];
+
+        try {
+          var response = await fetch(url, {
+            cache: "no-cache"
+          });
+
+          if (!response.ok) {
+            errors.push(url + " returned " + response.status);
+            continue;
+          }
+
+          loadedKmzUrl = url;
+
+          return {
+            url: url,
+            arrayBuffer: await response.arrayBuffer()
+          };
+        } catch (error) {
+          errors.push(url + " failed");
+        }
+      }
+
+      throw new Error("KMZ file was not found. Checked: " + errors.join("; "));
+    }
+
+    async function readKmlTextFromKmz(arrayBuffer) {
+      if (!window.JSZip) {
+        throw new Error("JSZip library is not loaded.");
+      }
+
+      var zip = await JSZip.loadAsync(arrayBuffer);
+      var fileNames = Object.keys(zip.files);
+
+      var kmlFileName = fileNames.find(function (name) {
+        return name.toLowerCase() === "doc.kml";
       });
 
-      applyPatternFill(layer, item.pattern, item.borderColor);
-      bindAreaPopup(layer, item);
+      if (!kmlFileName) {
+        kmlFileName = fileNames.find(function (name) {
+          return name.toLowerCase().endsWith(".kml") && !zip.files[name].dir;
+        });
+      }
 
-      layer.bindTooltip(item.name, {
-        permanent: true,
-        direction: "center",
-        className: "gis-label-tooltip"
-      });
+      if (!kmlFileName) {
+        throw new Error("No KML file was found inside the KMZ package.");
+      }
 
-      setLayerMeta(layer, item.status, item.area);
-      return layer.addTo(map);
-    });
+      return zip.file(kmlFileName).async("text");
+    }
 
-    var pipeLayers = pipeLines.map(function (item) {
-      var layer = L.polyline(item.coords, {
-        color: pipeColors[item.diameter] || primaryColor,
-        weight: item.diameter === "de315" ? 4 : 3,
-        opacity: 0.98,
-        dashArray: item.dashed ? "8 6" : null
-      });
+    async function loadKmzFromServer() {
+      try {
+        setKmzStatus(
+          "<strong>Loading KMZ...</strong><br>Trying configured asset paths.",
+          ""
+        );
 
-      layer.bindPopup(
-        '<div class="gis-popup">' +
-          '<strong>' + item.name + '</strong>' +
-          'Area: ' + item.area + '<br>' +
-          'Status: ' + (item.status === "planned" ? "Planned for July 2026" : "Completed in June 2026") +
-        '</div>'
-      );
+        var parser = getToGeoJsonParser();
 
-      layer.bindTooltip(item.name, {
-        permanent: false,
-        direction: "center",
-        className: "gis-pipe-tooltip"
-      });
+        if (!parser) {
+          throw new Error("toGeoJSON library is not loaded.");
+        }
 
-      setLayerMeta(layer, item.status, item.area);
-      return layer.addTo(map);
-    });
+        var fetched = await fetchFirstAvailableKmz();
+        var kmlText = await readKmlTextFromKmz(fetched.arrayBuffer);
 
-    var calloutLayers = callouts.map(function (item) {
-      var leader = L.polyline([item.from, item.to], {
-        color: "#111",
-        weight: 1.5,
-        opacity: 0.95
-      });
+        var xml = new DOMParser().parseFromString(kmlText, "text/xml");
 
-      leader.bindTooltip(item.text, {
-        permanent: true,
-        direction: "center",
-        className: "gis-callout-tooltip"
-      });
+        var parseError = xml.querySelector("parsererror");
 
-      setLayerMeta(leader, item.status, item.area);
-      return leader.addTo(map);
-    });
+        if (parseError) {
+          throw new Error("The KML inside the KMZ could not be parsed.");
+        }
 
-    var connectionIcon = L.divIcon({
-      className: "",
-      html: '<div class="gis-connection-icon"></div>',
-      iconSize: [19, 19],
-      iconAnchor: [9, 9]
-    });
+        var geojson = parser.kml(xml);
 
-    var connectionLayers = connectionPoints.map(function (item) {
-      var marker = L.marker(item.coords, {
-        icon: connectionIcon
-      }).bindPopup(
-        '<div class="gis-popup">' +
-          '<strong>' + item.name + '</strong>' +
-          'Sector connection point<br>' +
-          'Area: ' + item.area +
-        '</div>'
-      );
+        if (!geojson || !geojson.features || !geojson.features.length) {
+          throw new Error("The KMZ loaded, but no map features were found in the KML.");
+        }
 
-      setLayerMeta(marker, item.status, item.area);
-      return marker.addTo(map);
-    });
+        if (kmzLayer && map.hasLayer(kmzLayer)) {
+          map.removeLayer(kmzLayer);
+        }
 
-    var valveIcon = L.divIcon({
-      className: "",
-      html: '<div class="gis-valve-icon"></div>',
-      iconSize: [18, 18],
-      iconAnchor: [9, 9]
-    });
+        kmzFeatureLayers = [];
 
-    var valveLayers = valves.map(function (item) {
-      var marker = L.marker(item.coords, {
-        icon: valveIcon
-      }).bindPopup(
-        '<div class="gis-popup">' +
-          '<strong>' + item.name + '</strong>' +
-          'Pipeline appurtenance<br>' +
-          'Area: ' + item.area +
-        '</div>'
-      );
+        kmzLayer = L.geoJSON(geojson, {
+          style: getDefaultStyle,
+          pointToLayer: pointToLayer,
+          onEachFeature: function (feature, layer) {
+            var searchText = getFeatureSearchText(feature);
+            var area = detectArea(searchText);
+            var status = detectStatus(searchText);
 
-      setLayerMeta(marker, item.status, item.area);
-      return marker.addTo(map);
-    });
+            layer._gisSearchText = normalizeText(searchText);
+            layer._area = area;
+            layer._status = status;
 
-    var neighborhoodLines = [
-      [
-        [-14.9840, 13.4550],
-        [-14.9700, 13.4680],
-        [-14.9560, 13.4920],
-        [-14.9350, 13.5260],
-        [-14.9040, 13.5450],
-        [-14.8780, 13.5350]
-      ],
-      [
-        [-14.9440, 13.4380],
-        [-14.9410, 13.4660],
-        [-14.9300, 13.4930],
-        [-14.9110, 13.5150],
-        [-14.8860, 13.5320]
-      ],
-      [
-        [-14.9860, 13.5050],
-        [-14.9600, 13.5080],
-        [-14.9340, 13.5120],
-        [-14.9050, 13.5060],
-        [-14.8740, 13.4950]
-      ]
-    ];
+            if (feature.properties && feature.properties.name) {
+              layer.bindTooltip(feature.properties.name, {
+                permanent: false,
+                sticky: true,
+                className: "gis-kmz-tooltip"
+              });
+            }
 
-    var neighborhoodLayers = neighborhoodLines.map(function (coords) {
-      var layer = L.polyline(coords, {
-        color: "#f1f1f1",
-        weight: 4,
-        opacity: 0.95,
-        dashArray: "7 7"
-      });
+            layer.bindPopup(buildPopupHtml(feature));
+            kmzFeatureLayers.push(layer);
+          }
+        });
 
-      layer._status = "complete";
-      layer._area = "Casa Verde";
-      return layer.addTo(map);
-    });
+        kmzLayer.addTo(map);
+        overlayControl.addOverlay(kmzLayer, "Lubango KMZ");
 
-    var allFilterableLayers = []
-      .concat(areaLayers)
-      .concat(pipeLayers)
-      .concat(calloutLayers)
-      .concat(connectionLayers)
-      .concat(valveLayers);
+        if (kmzLayer.getBounds && kmzLayer.getBounds().isValid()) {
+          map.fitBounds(kmzLayer.getBounds(), {
+            padding: [30, 30]
+          });
+        }
 
-    var bounds = L.latLngBounds([]);
+        setKmzStatus(
+          "<strong>KMZ loaded successfully.</strong><br>" +
+          "Source: " + escapeHtml(loadedKmzUrl) + "<br>" +
+          "Features: " + geojson.features.length,
+          "success"
+        );
 
-    constructionAreas.forEach(function (area) {
-      area.coords.forEach(function (coord) {
-        bounds.extend(coord);
-      });
-    });
+        applyFilters();
+      } catch (error) {
+        console.error("KMZ Load Error:", error);
 
-    map.fitBounds(bounds.pad(0.25));
+        setKmzStatus(
+          "<strong>KMZ could not be loaded.</strong><br>" +
+          escapeHtml(error.message || "Unknown error") + "<br><br>" +
+          "Check that the file exists at assets/gis/lubango_Project.kmz or assets/lubango_Project.kmz.",
+          "error"
+        );
+      }
+    }
 
     function getCheckedValues(selector, dataKey) {
       return Array.from(document.querySelectorAll(selector + ":checked")).map(function (checkbox) {
@@ -1755,15 +936,30 @@ js/main.jsscript>
     }
 
     function applyFilters() {
+      if (!kmzFeatureLayers.length) {
+        return;
+      }
+
       var activeStatuses = getCheckedValues(".gis-filter-status", "status");
       var activeAreas = getCheckedValues(".gis-filter-area", "area");
+      var allAreasSelected = activeAreas.length === document.querySelectorAll(".gis-filter-area").length;
+      var allStatusesSelected = activeStatuses.length === document.querySelectorAll(".gis-filter-status").length;
 
-      allFilterableLayers.forEach(function (layer) {
-        var visible =
-          activeStatuses.indexOf(layer._status) !== -1 &&
-          activeAreas.indexOf(layer._area) !== -1;
+      kmzFeatureLayers.forEach(function (layer) {
+        var statusMatches = true;
+        var areaMatches = true;
 
-        if (visible && !map.hasLayer(layer)) {
+        if (layer._status && !allStatusesSelected) {
+          statusMatches = activeStatuses.indexOf(layer._status) !== -1;
+        }
+
+        if (layer._area && !allAreasSelected) {
+          areaMatches = activeAreas.indexOf(layer._area) !== -1;
+        }
+
+        var visible = statusMatches && areaMatches;
+
+        if (visible && kmzLayer && !map.hasLayer(layer)) {
           layer.addTo(map);
         }
 
@@ -1771,29 +967,42 @@ js/main.jsscript>
           map.removeLayer(layer);
         }
       });
-
-      addSvgPatterns();
     }
 
     document.querySelectorAll(".gis-filter-status, .gis-filter-area").forEach(function (checkbox) {
       checkbox.addEventListener("change", applyFilters);
     });
 
-    var resetBtn = document.getElementById("resetFiltersBtn");
-
-    if (resetBtn) {
-      resetBtn.addEventListener("click", function () {
+    if (resetFiltersBtn) {
+      resetFiltersBtn.addEventListener("click", function () {
         document.querySelectorAll(".gis-filter-status, .gis-filter-area").forEach(function (checkbox) {
           checkbox.checked = true;
         });
 
         applyFilters();
+
+        if (kmzLayer && kmzLayer.getBounds && kmzLayer.getBounds().isValid()) {
+          map.fitBounds(kmzLayer.getBounds(), {
+            padding: [30, 30]
+          });
+        }
       });
     }
 
+    if (fitKmzBtn) {
+      fitKmzBtn.addEventListener("click", function () {
+        if (kmzLayer && kmzLayer.getBounds && kmzLayer.getBounds().isValid()) {
+          map.fitBounds(kmzLayer.getBounds(), {
+            padding: [30, 30]
+          });
+        }
+      });
+    }
+
+    loadKmzFromServer();
+
     setTimeout(function () {
       map.invalidateSize();
-      addSvgPatterns();
     }, 300);
   });
 </script>
