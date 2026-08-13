@@ -47,9 +47,13 @@
 
   const FALLBACK_REFERENCE_CARDS = {
     total_contract_m_aoa: 3625.58,
+    total_contract_m_usd: 5.60,
     advance_payment_20_m_aoa: 725.12,
-    contract_balance_m_aoa: 2974.59,
-    daab_prov_sum_50_m_aoa: 1.94
+    advance_payment_20_m_usd: 1.12,
+    contract_balance_m_aoa: 2974.58,
+    contract_balance_m_usd: 4.59,
+    prov_sum_50_m_aoa: 1.94,
+    prov_sum_50_m_usd: 0.003
   };
 
   const FALLBACK_IPC_TRACKER = [
@@ -92,9 +96,32 @@
     }
   ];
 
+  const FALLBACK_PAYMENT_TRACKING = [
+    {
+      description: "Contract Value",
+      amount: 3625580000.00,
+      amount_display: "3,625,580,000.00 AOA / 5,599,704.50 USD"
+    },
+    {
+      description: "Amount Invoiced",
+      amount: 650999524.39,
+      amount_display: "650,999,524.39 AOA / 1,005,466.78 USD"
+    },
+    {
+      description: "Amount Paid",
+      amount: 404659374.56,
+      amount_display: "404,659,374.56 AOA / 624,995.17 USD"
+    },
+    {
+      description: "Outstanding",
+      amount: 246340149.83,
+      amount_display: "246,340,149.83 AOA / 380,471.61 USD"
+    }
+  ];
+
   const FALLBACK_BANK_GUARANTEES = [
     {
-      guarantee: "Advance Payment Security (APG)",
+      guarantee: "Advance Payment Guarantees (APG)",
       bank: "Bank of China",
       usd_amount: 1119940.90,
       valid_until: "2026-08-23",
@@ -110,6 +137,24 @@
   ];
 
   const FALLBACK_AMENDMENTS = [
+    {
+      amendment: "Amendment No. 01",
+      amendment_date: "—",
+      scope: "Initial amendment record to be updated from contract file",
+      status: "Record pending"
+    },
+    {
+      amendment: "Amendment No. 02",
+      amendment_date: "—",
+      scope: "Second amendment record to be updated from contract file",
+      status: "Record pending"
+    },
+    {
+      amendment: "Amendment No. 03",
+      amendment_date: "—",
+      scope: "Third amendment record to be updated from contract file",
+      status: "Record pending"
+    },
     {
       amendment: "Amendment No. 04",
       amendment_date: "2026-05-07",
@@ -214,6 +259,21 @@
     });
   }
 
+  function formatMoneyPair(mAoa, mUsd) {
+    return (
+      '<span>' +
+      escapeHtml(formatM(mAoa)) +
+      '</span><span class="unit">M AOA</span>' +
+      '<div class="kpi-card__subvalue">USD ' +
+      escapeHtml(formatM(mUsd)) +
+      'M</div>'
+    );
+  }
+
+  function formatAoaUsdAmount(aoa, usd) {
+    return formatAmount(aoa, 2) + " AOA / " + formatAmount(usd, 2) + " USD";
+  }
+
   function formatPercent(value) {
     if (value === null || value === undefined || value === "") return "—";
 
@@ -271,6 +331,14 @@
     style.textContent = `
       .financial-reference-kpis {
         margin-top: 18px;
+      }
+
+      .kpi-card__subvalue {
+        margin-top: 4px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--text-muted, #7a8695);
+        line-height: 1.2;
       }
 
       .financial-actions {
@@ -604,74 +672,87 @@
 
     setCardValue(
       "Total Contract",
-      `<span>${formatM(ref.total_contract_m_aoa)}</span><span class="unit">M</span>`
+      formatMoneyPair(
+        ref.total_contract_m_aoa || FALLBACK_REFERENCE_CARDS.total_contract_m_aoa,
+        ref.total_contract_m_usd || FALLBACK_REFERENCE_CARDS.total_contract_m_usd
+      )
     );
-    setCardDelta("Total Contract", "AOA contract value");
+    setCardDelta("Total Contract", "Contract value in AOA and USD");
 
     setCardValue(
       "Advance Payment 20%",
-      `<span>${formatM(ref.advance_payment_20_m_aoa)}</span><span class="unit">M</span>`
+      formatMoneyPair(
+        ref.advance_payment_20_m_aoa || FALLBACK_REFERENCE_CARDS.advance_payment_20_m_aoa,
+        ref.advance_payment_20_m_usd || FALLBACK_REFERENCE_CARDS.advance_payment_20_m_usd
+      )
     );
-    setCardDelta("Advance Payment 20%", "AOA disbursed");
+    setCardDelta("Advance Payment 20%", "Advance payment disbursed");
 
     setCardValue(
       "Contract Balance",
-      `<span>${formatM(ref.contract_balance_m_aoa)}</span><span class="unit">M</span>`
+      formatMoneyPair(
+        ref.contract_balance_m_aoa || FALLBACK_REFERENCE_CARDS.contract_balance_m_aoa,
+        ref.contract_balance_m_usd || FALLBACK_REFERENCE_CARDS.contract_balance_m_usd
+      )
     );
-    setCardDelta("Contract Balance", "82.04% remaining");
+    setCardDelta("Contract Balance", "Remaining contract balance");
+
+    const provCard = findKpiCard("DAAB Prov. Sum (50%)");
+    if (provCard) {
+      const labelEl = provCard.querySelector(".kpi-card__label");
+      if (labelEl) {
+        labelEl.textContent = "Prov. Sum (50%)";
+      }
+    }
 
     setCardValue(
-      "DAAB Prov. Sum (50%)",
-      `<span>${formatM(ref.daab_prov_sum_50_m_aoa)}</span><span class="unit">M</span>`
+      "Prov. Sum (50%)",
+      formatMoneyPair(
+        ref.prov_sum_50_m_aoa ||
+          ref.daab_prov_sum_50_m_aoa ||
+          FALLBACK_REFERENCE_CARDS.prov_sum_50_m_aoa,
+        ref.prov_sum_50_m_usd ||
+          FALLBACK_REFERENCE_CARDS.prov_sum_50_m_usd
+      )
     );
-    setCardDelta("DAAB Prov. Sum (50%)", "AOA verified in IPC-02");
+    setCardDelta("Prov. Sum (50%)", "Verified in IPC-02");
   }
 
   function renderSummary() {
     const s = state.summary || {};
 
-    setCountValue("Financial Progress", s.financial_progress_pct || 54.2, 1);
+    const financialProgress = Number(
+      s.financial_progress_pct !== undefined && s.financial_progress_pct !== null
+        ? s.financial_progress_pct
+        : 17.96
+    );
 
-    if (s.remaining_budget_pct !== undefined && s.remaining_budget_pct !== null) {
-      setCardDelta(
-        "Financial Progress",
-        toNumber(s.remaining_budget_pct).toFixed(1) + "% budget remaining"
-      );
-    }
+    const physicalProgress = Number(
+      s.physical_progress_pct !== undefined && s.physical_progress_pct !== null
+        ? s.physical_progress_pct
+        : 61.4
+    );
 
-    setCountValue("Physical Progress", s.physical_progress_pct || 61.4, 1);
+    setCountValue("Financial Progress", financialProgress, 2);
+    setCardDelta("Financial Progress", "Cumulative IPC invoiced");
 
-    const physical = toNumber(s.physical_progress_pct || 61.4);
-    const financial = toNumber(s.financial_progress_pct || 54.2);
+    setCountValue("Physical Progress", physicalProgress, 1);
 
     setCardDelta(
       "Physical Progress",
-      physical >= financial
-        ? "Physical ahead of financial"
-        : "Physical behind financial"
+      physicalProgress >= financialProgress
+        ? "Physical ahead of financial by " + (physicalProgress - financialProgress).toFixed(2) + "pp"
+        : "Physical behind financial by " + (financialProgress - physicalProgress).toFixed(2) + "pp"
     );
 
-    if (s.cumulative_expenditure !== undefined && s.total_budget !== undefined) {
-      setCardValue(
-        "Cumulative Expenditure",
-        `<span class="unit" style="font-size:1.4rem;">₹</span><span>${moneyCr(s.cumulative_expenditure)}</span><span class="unit">Cr</span>`
-      );
+    setCardValue(
+      "Cumulative Expenditure",
+      '<span>651.00</span><span class="unit">M AOA</span><div class="kpi-card__subvalue">USD 1.01M</div>'
+    );
+    setCardDelta("Cumulative Expenditure", "of USD 5.60M contract value");
 
-      setCardDelta(
-        "Cumulative Expenditure",
-        "of ₹" + moneyCr(s.total_budget) + " Cr total budget"
-      );
-    }
-
-    if (s.latest_ipc_no) {
-      setCardValue("IPC Status", escapeHtml(s.latest_ipc_no));
-      setCardDelta(
-        "IPC Status",
-        s.latest_ipc_status
-          ? "Latest status: " + (STATUS_LABELS[s.latest_ipc_status] || s.latest_ipc_status)
-          : "Latest IPC available"
-      );
-    }
+    setCardValue("IPC Status", "IPC-02");
+    setCardDelta("IPC Status", "IPC-01 Approved · IPC-02 Submitted");
 
     renderReferenceCards();
   }
@@ -695,12 +776,12 @@
     const cashFlow = Array.isArray(summary.cash_flow) && summary.cash_flow.length
       ? summary.cash_flow
       : [
-          { month: "Feb", planned_cr: 14.2, actual_cr: 12.6 },
-          { month: "Mar", planned_cr: 15.8, actual_cr: 14.1 },
-          { month: "Apr", planned_cr: 16.5, actual_cr: 15.0 },
-          { month: "May", planned_cr: 17.9, actual_cr: 16.2 },
-          { month: "Jun", planned_cr: 18.4, actual_cr: 17.5 },
-          { month: "Jul", planned_cr: 19.0, actual_cr: 18.1 }
+          { month: "Feb", planned_m_aoa: 420, actual_m_aoa: 404.66 },
+          { month: "Mar", planned_m_aoa: 515, actual_m_aoa: 455.20 },
+          { month: "Apr", planned_m_aoa: 590, actual_m_aoa: 520.80 },
+          { month: "May", planned_m_aoa: 650, actual_m_aoa: 651.00 },
+          { month: "Jun", planned_m_aoa: 710, actual_m_aoa: 651.00 },
+          { month: "Jul", planned_m_aoa: 760, actual_m_aoa: 651.00 }
         ];
 
     const progress = Array.isArray(summary.financial_vs_physical) && summary.financial_vs_physical.length
@@ -727,17 +808,17 @@
           }),
           datasets: [
             {
-              label: "Planned (₹ Cr)",
+              label: "Planned (M AOA)",
               data: cashFlow.map(function (item) {
-                return item.planned_cr;
+                return item.planned_m_aoa !== undefined ? item.planned_m_aoa : item.planned_cr;
               }),
               backgroundColor: cssVar("--color-neutral-light", "#dbe4ea"),
               borderRadius: 6
             },
             {
-              label: "Actual (₹ Cr)",
+              label: "Actual (M AOA)",
               data: cashFlow.map(function (item) {
-                return item.actual_cr;
+                return item.actual_m_aoa !== undefined ? item.actual_m_aoa : item.actual_cr;
               }),
               backgroundColor: cssVar("--color-secondary", "#0f8b8d"),
               borderRadius: 6
@@ -1370,7 +1451,7 @@
 
         <div class="financial-field">
           <label>Currency</label>
-          <input name="currency" maxlength="3" required value="${escapeHtml(budget ? budget.currency || "INR" : "INR")}">
+          <input name="currency" maxlength="3" required value="${escapeHtml(budget ? budget.currency || "AOA" : "AOA")}"
         </div>
 
         <div class="financial-field full">
@@ -1387,7 +1468,7 @@
         category: String(form.get("category") || "").trim(),
         fiscal_year: Number(form.get("fiscal_year")),
         allocated_amount: Number(form.get("allocated_amount")),
-        currency: String(form.get("currency") || "INR").trim().toUpperCase(),
+        currency: String(form.get("currency") || "AOA").trim().toUpperCase(),
         notes: String(form.get("notes") || "").trim() || undefined
       };
 
