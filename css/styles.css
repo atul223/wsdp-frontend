@@ -970,3 +970,112 @@ a:focus-visible, button:focus-visible, .nav-link:focus-visible, [tabindex]:focus
    ordinary bordered row. */
 .table-empty-row td { border-bottom: none; padding: 0; }
 .table-empty-row .empty-state { padding: var(--sp-8) var(--sp-6); }
+
+/* ============================================================
+   CONSTRUCTION PROGRESS DATE RANGE PICKER
+   ============================================================ */
+.date-range-picker {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.date-range-trigger {
+  min-width: 230px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.date-range-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 60;
+  width: 330px;
+  padding: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-lg);
+}
+
+.date-range-panel__top,
+.date-range-panel__actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.date-range-panel__top {
+  margin-bottom: 12px;
+}
+
+.calendar-weekdays,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.calendar-weekdays {
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.calendar-day {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 13px;
+  min-height: 36px;
+  transition: background var(--transition-base), color var(--transition-base), border-color var(--transition-base);
+}
+
+.calendar-day:hover {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.calendar-day.is-muted {
+  color: var(--text-muted);
+  cursor: default;
+  opacity: 0.35;
+}
+
+.calendar-day.is-selected {
+  background: var(--color-primary);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.calendar-day.is-in-range {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.date-range-panel__actions {
+  margin-top: 12px;
+}
+
+@media (max-width: 640px) {
+  .date-range-panel {
+    left: auto;
+    right: 0;
+    width: min(330px, calc(100vw - 32px));
+  }
+
+  .date-range-trigger {
+    min-width: 100%;
+  }
+}

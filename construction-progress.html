@@ -30,21 +30,55 @@
     <main class="main-content">
 
       <div class="filter-bar">
-        <span class="filter-bar__label"><i class="fa-solid fa-sliders"></i> Scope</span>
-        <select class="filter-select" aria-label="Filter by zone">
-          <option>All Zones</option>
-          <option>Zone A</option>
-          <option>Zone B</option>
-          <option>Zone C</option>
-          <option>Zone D</option>
+        <span class="filter-bar__label">
+          <i class="fa-solid fa-sliders"></i> Scope
+        </span>
+
+        <select class="filter-select" aria-label="Filter by area" id="areaScopeFilter">
+          <option value="all">All Areas</option>
+          <option value="Casa Verde">Casa Verde</option>
+          <option value="Escola Portuguesa">Escola Portuguesa</option>
+          <option value="Cowboy I">Cowboy I</option>
+          <option value="Sofrio">Sofrio</option>
+          <option value="João de Almeida">João de Almeida</option>
+          <option value="Caixote ou Socombar">Caixote ou Socombar</option>
+          <option value="Arimba">Arimba</option>
         </select>
-        <select class="filter-select" aria-label="Filter by date range">
-          <option>Last 30 days</option>
-          <option>Last 90 days</option>
-          <option>This quarter</option>
-          <option>Year to date</option>
-        </select>
-        <button class="btn-ghost"><i class="fa-solid fa-download"></i> Export</button>
+
+        <div class="date-range-picker" id="constructionDateRangePicker">
+          <button class="filter-select date-range-trigger" type="button" id="constructionDateRangeButton">
+            <i class="fa-regular fa-calendar-days"></i>
+            <span id="constructionDateRangeLabel">Select date range</span>
+          </button>
+
+          <div class="date-range-panel" id="constructionDateRangePanel" hidden>
+            <div class="date-range-panel__top">
+              <select id="constructionCalendarMonth" class="filter-select" aria-label="Select month"></select>
+              <select id="constructionCalendarYear" class="filter-select" aria-label="Select year"></select>
+            </div>
+
+            <div class="calendar-weekdays" aria-hidden="true">
+              <span>Sun</span>
+              <span>Mon</span>
+              <span>Tue</span>
+              <span>Wed</span>
+              <span>Thu</span>
+              <span>Fri</span>
+              <span>Sat</span>
+            </div>
+
+            <div class="calendar-grid" id="constructionCalendarGrid"></div>
+
+            <div class="date-range-panel__actions">
+              <button class="btn-ghost" type="button" id="clearConstructionDateRange">Clear</button>
+              <button class="btn-primary" type="button" id="applyConstructionDateRange">Apply</button>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn-ghost">
+          <i class="fa-solid fa-download"></i> Export
+        </button>
       </div>
 
       <div class="subnav">
@@ -88,7 +122,7 @@
         </div>
 
         <div class="card" style="margin-top:20px;">
-                    <div class="card-header"><h3>Pipeline Progress by Zone</h3></div>
+                    <div class="card-header"><h3>Pipeline Progress by Area</h3></div>
           <div class="card-body">
             <div style="height:260px;"><canvas id="pipelineByZoneChart"></canvas></div>
           </div>
@@ -197,11 +231,6 @@
               Village cluster-wise connection progress
             </span>
           </div>
-
-          <button id="addHouseClusterBtn" class="btn-ghost" type="button">
-            <i class="fa-solid fa-plus"></i>
-            Add Cluster
-          </button>
         </div>
         <div class="grid grid-12">
           <div class="card card-accent card-accent--success col-span-4">
@@ -226,37 +255,6 @@
             </div>
           </div>
         </div>
-        <div class="card" style="margin-top:20px;">
-          <div class="card-header">
-            <h3>House Connections — Village Cluster Breakdown</h3>
-          </div>
-          <div class="card-body">
-            <div style="height:260px;">
-              <canvas id="connectionsClusterChart"></canvas>
-            </div>
-
-            <div class="card" style="margin-top:20px;">
-              <div class="card-header">
-                <h3>House Connection Clusters</h3>
-              </div>
-              <div class="card-body table-scroll">
-                <table class="data-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Cluster</th>
-                      <th scope="col" class="num">Planned</th>
-                      <th scope="col" class="num">Completed</th>
-                      <th scope="col" class="num">In Progress</th>
-                      <th scope="col" class="num">Remaining</th>
-                      <th scope="col" class="actions-col">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody id="houseClusterTableBody"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
       </section>
 
       <!-- ============ TESTING & COMMISSIONING ============ -->
@@ -267,7 +265,7 @@
             Add Activity
           </button>
 
-          <h2>Testing & Commissioning</h2>
+          <h2>Hydro-testing </h2>
           <span class="section-sub">
             Hydro-testing, disinfection & handover readiness
           </span>
@@ -426,44 +424,68 @@
 <script src="js/construction-progress.js"></script>
 <script>
   document.addEventListener("DOMContentLoaded", function () {
-    function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
-
-    var zoneCtx = document.getElementById("pipelineByZoneChart");
-    if (zoneCtx && window.Chart) {
-      new Chart(zoneCtx, {
-        type: "bar",
-        data: {
-          labels: ["Zone A (0-23km)", "Zone B (23-46km)", "Zone C (46-69km)", "Zone D (69-92.7km)"],
-          datasets: [
-            { label: "Planned (km)", data: [23.2, 23.1, 23.2, 23.1], backgroundColor: cssVar("--color-neutral-light"), borderRadius: 6 },
-            { label: "Actual (km)", data: [23.2, 20.5, 12.4, 3.0], backgroundColor: cssVar("--color-primary"), borderRadius: 6 },
-          ],
-        },
-        options: {
-          maintainAspectRatio: false,
-          plugins: { legend: { position: "top", align: "end", labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true, pointStyle: "circle" } } },
-          scales: { y: { title: { display: true, text: "km" } }, x: { grid: { display: false } } },
-        },
-      });
+    function cssVar(name) {
+      return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
     }
 
-    var clusterCtx = document.getElementById("connectionsClusterChart");
-    if (clusterCtx && window.Chart) {
-      new Chart(clusterCtx, {
+    var areaCtx = document.getElementById("pipelineByZoneChart");
+
+    if (areaCtx && window.Chart) {
+      window.WSDP_PIPELINE_AREA_CHART = new Chart(areaCtx, {
         type: "bar",
         data: {
-          labels: ["Cluster 1-4", "Cluster 5-8", "Cluster 9-12", "Cluster 13-16", "Cluster 17-20"],
-          datasets: [
-            { label: "Completed", data: [780, 720, 690, 610, 320], backgroundColor: cssVar("--color-success"), stack: "s", borderRadius: 4 },
-            { label: "In Progress", data: [120, 140, 130, 150, 100], backgroundColor: cssVar("--color-warning"), stack: "s", borderRadius: 4 },
-            { label: "Remaining", data: [100, 140, 180, 240, 883], backgroundColor: cssVar("--color-neutral-light"), stack: "s", borderRadius: 4 },
+          labels: [
+            "Casa Verde",
+            "Escola Portuguesa",
+            "Cowboy I",
+            "Sofrio",
+            "João de Almeida",
+            "Caixote ou Socombar",
+            "Arimba"
           ],
+          datasets: [
+            {
+              label: "Planned (km)",
+              data: [0, 0, 0, 0, 0, 0, 0],
+              backgroundColor: cssVar("--color-neutral-light"),
+              borderRadius: 6
+            },
+            {
+              label: "Actual (km)",
+              data: [0, 0, 0, 0, 0, 0, 0],
+              backgroundColor: cssVar("--color-primary"),
+              borderRadius: 6
+            }
+          ]
         },
         options: {
           maintainAspectRatio: false,
-          plugins: { legend: { position: "top", align: "end", labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true, pointStyle: "circle" } } },
-          scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true } },
-        },
+          plugins: {
+            legend: {
+              position: "top",
+              align: "end",
+              labels: {
+                boxWidth: 10,
+                boxHeight: 10,
+                usePointStyle: true,
+                pointStyle: "circle"
+              }
+            }
+          },
+          scales: {
+            y: {
+              title: {
+                display: true,
+                text: "km"
+              }
+            },
+            x: {
+              grid: {
+                display: false
+              }
+            }
+          }
+        }
       });
     }
   });

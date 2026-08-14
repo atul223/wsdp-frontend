@@ -169,6 +169,63 @@
     return Number.isFinite(n) ? n : 0;
   }
 
+    function hasNumericValue(value) {
+    return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
+  }
+
+  function formatMaybeValue(value, unit) {
+    if (!hasNumericValue(value)) {
+      return escapeHtml(value || "Not quantified in report");
+    }
+
+    return formatProgressValue(value, unit);
+  }
+
+  function normalizeAreaName(value) {
+    const raw = String(value || "").trim();
+    const normalized = raw
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
+    const map = {
+      "zone a": "Casa Verde",
+      "zone b": "Escola Portuguesa",
+      "zone c": "Cowboy I",
+      "zone d": "Sofrio",
+      "casa verde": "Casa Verde",
+      "escola portuguesa": "Escola Portuguesa",
+      "comandante cowboy": "Cowboy I",
+      "cowboy i": "Cowboy I",
+      "sofrio": "Sofrio",
+      "so frio": "Sofrio",
+      "joao de almeida": "João de Almeida",
+      "joão de almeida": "João de Almeida",
+      "caixote / socombar": "Caixote ou Socombar",
+      "caixote o socumber": "Caixote ou Socombar",
+      "caixote o socombar": "Caixote ou Socombar",
+      "caixote ou socombar": "Caixote ou Socombar",
+      "arimba": "Arimba"
+    };
+
+    return map[normalized] || raw || "-";
+  }
+
+  function getSelectedArea() {
+    const select = document.getElementById("areaScopeFilter");
+    return select ? select.value : "all";
+  }
+
+  function areaMatchesSelection(areaName) {
+    const selected = getSelectedArea();
+
+    if (!selected || selected === "all") {
+      return true;
+    }
+
+    return normalizeAreaName(areaName) === selected;
+  }
+
   function formatProgressValue(value, unit) {
     const n = numberValue(value);
     const formatted = Number.isInteger(n) ? n.toLocaleString() : n.toFixed(1);
@@ -271,11 +328,11 @@
     renderPipeDiameterMatrix();
     renderMonthlyProgressTable();
     renderPipelineTable();
-
+    updatePipelineAreaChart();
     renderHouseKpis();
-    renderHouseClustersTable();
-
+    
     renderTestingTable();
+    renderBridgeCrossingsTable();
 
     renderValveSummary();
 
@@ -287,14 +344,19 @@
   ========================= */
 
   function renderPipelineKpis() {
-    if (!dashboardData?.pipeline) return;
+    const pipeline = dashboardData?.pipeline;
 
-    const pipeline = dashboardData.pipeline;
+    if (!pipeline) {
+      setCountValue("pipelineLaidKm", null, 1);
+      setCountValue("pipelineHydroTestedKm", null, 1);
+      setCountValue("pipelineRemainingKm", null, 1);
+      return;
+    }
 
     setCountValue("pipelineLaidKm", pipeline.laid, 1);
     setCountValue(
       "pipelineHydroTestedKm",
-      pipeline.tested ?? pipeline.hydroTested ?? pipeline.hydro_tested ?? 0,
+      pipeline.tested ?? pipeline.hydroTested ?? pipeline.hydro_tested ?? null,
       1
     );
     setCountValue("pipelineRemainingKm", pipeline.remaining, 1);
@@ -305,26 +367,38 @@
     if (!tbody) return;
 
     const rows = dashboardData?.pipeline_sections || [];
+    const selectedArea = getSelectedArea();
+
+    const filteredRows = selectedArea === "all"
+      ? rows
+      : rows.filter((section) => areaMatchesSelection(section.zone || section.area));
+
     tbody.innerHTML = "";
 
-    if (!rows.length) {
-      tbody.innerHTML = emptyRow(7, "No pipeline sections added yet.");
+    if (!filteredRows.length) {
+      tbody.innerHTML = emptyRow(5, "No pipeline sections added yet.");
       return;
     }
 
-    rows.forEach((section) => {
+    filteredRows.forEach((section) => {
+      const areaName = normalizeAreaName(section.zone || section.area);
+      const chainage = `${section.chainageFrom || "-"} - ${section.chainageTo || "-"}`;
+      const planned = section.plannedValue ?? section.lengthKm ?? section.planned ?? null;
+      const actual = section.actualValue ?? section.installed ?? section.laid ?? null;
+
       tbody.insertAdjacentHTML(
         "beforeend",
         `
-          <tr data-zone="${escapeHtml(section.zone)}">
-            <td>${escapeHtml(section.chainageFrom)} - ${escapeHtml(section.chainageTo)}</td>
-            <td>${escapeHtml(section.diameter)}</td>
-            <td class="num">${numberValue(section.lengthKm).toFixed(2)}</td>
-            <td class="num">${numberValue(section.layingPct).toFixed(2)}%</td>
-            <td class="num">${numberValue(section.testingPct).toFixed(2)}%</td>
+          <tr data-area="${escapeHtml(areaName)}">
+            <td>
+              <strong>${escapeHtml(areaName)}</strong><br>
+              <span style="color:var(--text-muted);font-size:12px;">${escapeHtml(chainage)}</span>
+            </td>
+            <td class="num">${formatMaybeValue(planned, "km")}</td>
+            <td class="num">${formatMaybeValue(actual, "km")}</td>
             <td>
               <span class="status-chip ${getStatusClass(section.status)}">
-                ${escapeHtml(section.status)}
+                ${escapeHtml(section.status || "In Progress")}
               </span>
             </td>
             <td class="actions-col">
@@ -373,16 +447,16 @@
       tbody.insertAdjacentHTML(
         "beforeend",
         `
-          <tr>
-            <td>${escapeHtml(item.area || item.zone || item.name || "-")}</td>
-            <td class="num">${formatProgressValue(planned, unit)}</td>
-            <td class="num">${formatProgressValue(actual, unit)}</td>
-            <td class="num">
-              <span class="kpi-card__delta ${varianceClass}" style="justify-content:flex-end;">
-                ${formatSignedValue(varianceValue, unit)}
-              </span>
-            </td>
-          </tr>
+        <tr>
+          <td>${escapeHtml(item.area || item.zone || item.name || "-")}</td>
+          <td class="num">${formatProgressValue(planned, unit)}</td>
+          <td class="num">${formatProgressValue(actual, unit)}</td>
+          <td class="num">
+            <span class="kpi-card__delta ${varianceClass}" style="justify-content:flex-end;">
+              ${formatSignedValue(varianceValue, unit)}
+            </span>
+          </td>
+        </tr>
         `
       );
     });
@@ -446,15 +520,56 @@
         `
           <tr>
             <td>${escapeHtml(item.activity || item.activityName || "-")}</td>
-            <td class="num">${formatProgressValue(item.previousMonth ?? item.previous_month, unit)}</td>
-            <td class="num">${formatProgressValue(item.currentMonth ?? item.current_month, unit)}</td>
-            <td class="num">${formatProgressValue(item.cumulative, unit)}</td>
+            <td class="num">${formatMaybeValue(item.previousMonth ?? item.previous_month, unit)}</td>
+            <td class="num">${formatMaybeValue(item.currentMonth ?? item.current_month, unit)}</td>
+            <td class="num">${formatMaybeValue(item.cumulative, unit)}</td>
           </tr>
         `
       );
     });
   }
 
+  function updatePipelineAreaChart() {
+    const chart = window.WSDP_PIPELINE_AREA_CHART;
+
+    if (!chart) {
+      return;
+    }
+
+    const sourceRows =
+      dashboardData?.area_progress ||
+      dashboardData?.areaProgress ||
+      dashboardData?.area_wise_progress ||
+      FALLBACK_AREA_PROGRESS;
+
+    const areaOrder = [
+      "Casa Verde",
+      "Escola Portuguesa",
+      "Cowboy I",
+      "Sofrio",
+      "João de Almeida",
+      "Caixote ou Socombar",
+      "Arimba"
+    ];
+
+    const planned = [];
+    const actual = [];
+
+    areaOrder.forEach((areaName) => {
+      const match = sourceRows.find((item) => {
+        return normalizeAreaName(item.area || item.zone || item.name) === areaName;
+      });
+
+      planned.push(hasNumericValue(match?.planned) ? numberValue(match.planned) : 0);
+      actual.push(hasNumericValue(match?.actual) ? numberValue(match.actual) : 0);
+    });
+
+    chart.data.labels = areaOrder;
+    chart.data.datasets[0].data = planned;
+    chart.data.datasets[1].data = actual;
+    chart.update();
+  }
+  
   function openPipelineModal(id) {
     const existing = id
       ? dashboardData.pipeline_sections.find((x) => x.id === id)
@@ -529,95 +644,6 @@
     setCountValue("houseRemainingCount", totals.remaining, 0);
   }
 
-  function renderHouseClustersTable() {
-    const tbody = document.querySelector("#houseClusterTableBody");
-    if (!tbody) return;
-
-    const rows = dashboardData?.house_clusters || [];
-    tbody.innerHTML = "";
-
-    if (!rows.length) {
-      tbody.innerHTML = emptyRow(6, "No house connection clusters added yet.");
-      return;
-    }
-
-    rows.forEach((cluster) => {
-      tbody.insertAdjacentHTML(
-        "beforeend",
-        `
-          <tr>
-            <td>${escapeHtml(cluster.clusterName)}</td>
-            <td class="num">${cluster.planned}</td>
-            <td class="num">${cluster.completed}</td>
-            <td class="num">${cluster.inProgress}</td>
-            <td class="num">${cluster.remaining}</td>
-            <td class="actions-col">
-              <button class="btn-ghost edit-house" type="button" data-id="${cluster.id}">
-                Edit
-              </button>
-              <button class="btn-ghost delete-house" type="button" data-id="${cluster.id}">
-                Delete
-              </button>
-            </td>
-          </tr>
-        `
-      );
-    });
-  }
-
-  function openHouseModal(id) {
-    const existing = id
-      ? dashboardData.house_clusters.find((x) => x.id === id)
-      : null;
-
-    openCrudModal({
-      title: existing ? "Edit House Connection Cluster" : "Add House Connection Cluster",
-      fields: [
-        inputField("Cluster Name", "clusterName", existing?.clusterName, "text", true),
-        inputField("Planned", "planned", existing?.planned ?? 0, "number", true),
-        inputField("Completed", "completed", existing?.completed ?? 0, "number", true),
-        inputField("In Progress", "inProgress", existing?.inProgress ?? 0, "number", true),
-        inputField("Remaining", "remaining", existing?.remaining ?? 0, "number", true),
-      ],
-      onSubmit: async (payload) => {
-        payload.projectId = PROJECT_ID;
-        payload.planned = parseInt(payload.planned || 0, 10);
-        payload.completed = parseInt(payload.completed || 0, 10);
-        payload.inProgress = parseInt(payload.inProgress || 0, 10);
-        payload.remaining = parseInt(payload.remaining || 0, 10);
-
-        if (id) {
-          await WSDP_API.request(
-            "PUT",
-            `/construction-progress/house-cluster/${id}`,
-            payload
-          );
-        } else {
-          await WSDP_API.request(
-            "POST",
-            "/construction-progress/house-cluster",
-            payload
-          );
-        }
-
-        toast("House connection cluster saved successfully");
-        await loadDashboard();
-      },
-    });
-  }
-
-  async function deleteHouseCluster(id) {
-    if (!confirm("Delete this house connection cluster?")) return;
-
-    await WSDP_API.request(
-      "DELETE",
-      `/construction-progress/house-cluster/${id}`
-    );
-
-    toast("House connection cluster deleted");
-    await loadDashboard();
-  }
-
   /* =========================
      TESTING
   ========================= */
@@ -626,7 +652,11 @@
     const tbody = document.querySelector("#testingActivityTableBody");
     if (!tbody) return;
 
-    const rows = dashboardData?.testing || [];
+    const rows =
+      dashboardData?.testing && dashboardData.testing.length
+        ? dashboardData.testing
+        : FALLBACK_TESTING_ACTIVITIES;
+
     tbody.innerHTML = "";
 
     if (!rows.length) {
@@ -639,21 +669,27 @@
         "beforeend",
         `
           <tr>
-            <td>${escapeHtml(activity.activityName)}</td>
-            <td class="num">${numberValue(activity.plannedValue).toFixed(2)} ${escapeHtml(activity.unit)}</td>
-            <td class="num">${numberValue(activity.actualValue).toFixed(2)} ${escapeHtml(activity.unit)}</td>
+            <td>${escapeHtml(activity.activityName || activity.name || "-")}</td>
+            <td class="num">${formatMaybeValue(activity.plannedValue ?? activity.planned, activity.unit || "")}</td>
+            <td class="num">${formatMaybeValue(activity.actualValue ?? activity.actual, activity.unit || "")}</td>
             <td>
               <span class="status-chip ${getStatusClass(activity.status)}">
-                ${escapeHtml(activity.status)}
+                ${escapeHtml(activity.status || "In Progress")}
               </span>
             </td>
             <td class="actions-col">
-              <button class="btn-ghost edit-testing" type="button" data-id="${activity.id}">
-                Edit
-              </button>
-              <button class="btn-ghost delete-testing" type="button" data-id="${activity.id}">
-                Delete
-              </button>
+              ${
+                String(activity.id || "").startsWith("report-")
+                  ? `<span style="color:var(--text-muted);font-size:12px;">Report fallback</span>`
+                  : `
+                    <button class="btn-ghost edit-testing" type="button" data-id="${activity.id}">
+                      Edit
+                    </button>
+                    <button class="btn-ghost delete-testing" type="button" data-id="${activity.id}">
+                      Delete
+                    </button>
+                  `
+              }
             </td>
           </tr>
         `
@@ -963,9 +999,198 @@
     const el = document.getElementById(id);
     if (!el) return;
 
+    if (!hasNumericValue(value)) {
+      el.dataset.count = "0";
+      el.textContent = "N/A";
+      return;
+    }
+
     const n = numberValue(value);
     el.dataset.count = String(n);
     el.textContent = decimals > 0 ? n.toFixed(decimals) : Math.round(n).toLocaleString();
+  }
+
+  function initConstructionDateRangePicker() {
+    const picker = document.getElementById("constructionDateRangePicker");
+    const button = document.getElementById("constructionDateRangeButton");
+    const panel = document.getElementById("constructionDateRangePanel");
+    const label = document.getElementById("constructionDateRangeLabel");
+    const monthSelect = document.getElementById("constructionCalendarMonth");
+    const yearSelect = document.getElementById("constructionCalendarYear");
+    const grid = document.getElementById("constructionCalendarGrid");
+    const clearBtn = document.getElementById("clearConstructionDateRange");
+    const applyBtn = document.getElementById("applyConstructionDateRange");
+
+    if (!picker || !button || !panel || !label || !monthSelect || !yearSelect || !grid) {
+      return;
+    }
+
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+
+    const today = new Date();
+    let selectedStart = null;
+    let selectedEnd = null;
+    let visibleMonth = today.getMonth();
+    let visibleYear = today.getFullYear();
+
+    function pad(value) {
+      return String(value).padStart(2, "0");
+    }
+
+    function toIsoDate(date) {
+      return date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate());
+    }
+
+    function formatDate(date) {
+      return pad(date.getDate()) + " " + monthNames[date.getMonth()].slice(0, 3) + " " + date.getFullYear();
+    }
+
+    function sameDate(a, b) {
+      return a && b && toIsoDate(a) === toIsoDate(b);
+    }
+
+    function isBetween(date, start, end) {
+      if (!start || !end) return false;
+      const time = date.getTime();
+      return time > start.getTime() && time < end.getTime();
+    }
+
+    function populateSelectors() {
+      monthSelect.innerHTML = "";
+      yearSelect.innerHTML = "";
+
+      monthNames.forEach((month, index) => {
+        const option = document.createElement("option");
+        option.value = String(index);
+        option.textContent = month;
+        monthSelect.appendChild(option);
+      });
+
+      for (let year = today.getFullYear() - 5; year <= today.getFullYear() + 5; year++) {
+        const yearOption = document.createElement("option");
+        yearOption.value = String(year);
+        yearOption.textContent = String(year);
+        yearSelect.appendChild(yearOption);
+      }
+
+      monthSelect.value = String(visibleMonth);
+      yearSelect.value = String(visibleYear);
+    }
+
+    function updateLabel() {
+      if (selectedStart && selectedEnd) {
+        label.textContent = formatDate(selectedStart) + " - " + formatDate(selectedEnd);
+      } else if (selectedStart) {
+        label.textContent = formatDate(selectedStart);
+      } else {
+        label.textContent = "Select date range";
+      }
+    }
+
+    function renderCalendar() {
+      grid.innerHTML = "";
+
+      const firstDay = new Date(visibleYear, visibleMonth, 1);
+      const lastDay = new Date(visibleYear, visibleMonth + 1, 0);
+      const startOffset = firstDay.getDay();
+      const totalDays = lastDay.getDate();
+
+      for (let blank = 0; blank < startOffset; blank++) {
+        const empty = document.createElement("button");
+        empty.type = "button";
+        empty.className = "calendar-day is-muted";
+        empty.disabled = true;
+        grid.appendChild(empty);
+      }
+
+      for (let day = 1; day <= totalDays; day++) {
+        const date = new Date(visibleYear, visibleMonth, day);
+        const dayButton = document.createElement("button");
+
+        dayButton.type = "button";
+        dayButton.className = "calendar-day";
+        dayButton.textContent = String(day);
+        dayButton.dataset.date = toIsoDate(date);
+
+        if (sameDate(date, selectedStart) || sameDate(date, selectedEnd)) {
+          dayButton.classList.add("is-selected");
+        } else if (isBetween(date, selectedStart, selectedEnd)) {
+          dayButton.classList.add("is-in-range");
+        }
+
+        dayButton.addEventListener("click", function () {
+          const parts = this.dataset.date.split("-");
+          const clicked = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+
+          if (!selectedStart || selectedEnd) {
+            selectedStart = clicked;
+            selectedEnd = null;
+          } else if (clicked.getTime() < selectedStart.getTime()) {
+            selectedEnd = selectedStart;
+            selectedStart = clicked;
+          } else {
+            selectedEnd = clicked;
+          }
+
+          updateLabel();
+          renderCalendar();
+
+          picker.dispatchEvent(new CustomEvent("construction-date-range-change", {
+            detail: {
+              startDate: selectedStart ? toIsoDate(selectedStart) : null,
+              endDate: selectedEnd ? toIsoDate(selectedEnd) : null
+            }
+          }));
+        });
+
+        grid.appendChild(dayButton);
+      }
+    }
+
+    button.addEventListener("click", function () {
+      panel.hidden = !panel.hidden;
+    });
+
+    monthSelect.addEventListener("change", function () {
+      visibleMonth = Number(monthSelect.value);
+      renderCalendar();
+    });
+
+    yearSelect.addEventListener("change", function () {
+      visibleYear = Number(yearSelect.value);
+      renderCalendar();
+    });
+
+    clearBtn.addEventListener("click", function () {
+      selectedStart = null;
+      selectedEnd = null;
+      updateLabel();
+      renderCalendar();
+
+      picker.dispatchEvent(new CustomEvent("construction-date-range-change", {
+        detail: {
+          startDate: null,
+          endDate: null
+        }
+      }));
+    });
+
+    applyBtn.addEventListener("click", function () {
+      panel.hidden = true;
+    });
+
+    document.addEventListener("click", function (event) {
+      if (!picker.contains(event.target)) {
+        panel.hidden = true;
+      }
+    });
+
+    populateSelectors();
+    renderCalendar();
+    updateLabel();
   }
 
   /* =========================
@@ -987,18 +1212,6 @@
 
       if (target.classList.contains("delete-pipeline")) {
         await deletePipeline(target.dataset.id);
-      }
-
-      if (target.id === "addHouseClusterBtn") {
-        openHouseModal();
-      }
-
-      if (target.classList.contains("edit-house")) {
-        openHouseModal(target.dataset.id);
-      }
-
-      if (target.classList.contains("delete-house")) {
-        await deleteHouseCluster(target.dataset.id);
       }
 
       if (target.id === "addTestingActivityBtn") {
@@ -1047,4 +1260,26 @@
 
     await loadDashboard();
   });
+
+  document.addEventListener("DOMContentLoaded", function () {
+    initConstructionDateRangePicker();
+
+    const areaFilter = document.getElementById("areaScopeFilter");
+
+    if (areaFilter) {
+      areaFilter.addEventListener("change", function () {
+        renderAreaProgressTable();
+        renderPipelineTable();
+      });
+    }
+
+    const picker = document.getElementById("constructionDateRangePicker");
+
+    if (picker) {
+      picker.addEventListener("construction-date-range-change", function (event) {
+        window.WSDP_CONSTRUCTION_DATE_RANGE = event.detail;
+      });
+    }
+  });
+
 })();
