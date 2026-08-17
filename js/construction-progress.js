@@ -15,6 +15,26 @@
   })();
   let dashboardData = null;
 
+  const REPORT_PIPELINE_SUMMARY = {
+    total: 70.0,
+    laid: 31.2005,
+    hydroTested: 0,
+    remaining: 38.7995,
+  };
+
+  const REPORT_HOUSE_CONNECTIONS = {
+    completed: 0,
+    inProgress: 0,
+    remaining: 5000,
+  };
+
+  const REPORT_VALVE_SUMMARY = {
+    planned: 11,
+    completed: 0,
+    inProgress: 0,
+    notStarted: 11,
+  };
+
   const FALLBACK_AREA_PROGRESS = [
     {
       area: "Casa Verde",
@@ -192,7 +212,7 @@
     return Number.isFinite(n) ? n : 0;
   }
 
-    function hasNumericValue(value) {
+  function hasNumericValue(value) {
     return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
   }
 
@@ -352,10 +372,10 @@
     renderMonthlyProgressTable();
     renderPipelineTable();
     updatePipelineAreaChart();
+
     renderHouseKpis();
-    
+
     renderTestingTable();
-    renderBridgeCrossingsTable();
 
     renderValveSummary();
 
@@ -367,51 +387,39 @@
   ========================= */
 
   function renderPipelineKpis() {
-    const totalLength = 70.0;
-
-    const pipeline = dashboardData?.pipeline || {
-      laid: 31.2005,
-      hydroTested: 0,
-      remaining: 38.7995
-    };
-
-    const laidPct =
-      ((pipeline.laid || 0) / totalLength) * 100;
-
-    const testedPct =
-      ((pipeline.hydroTested || 0) / totalLength) * 100;
-
-    const remainingPct =
-      ((pipeline.remaining || 0) / totalLength) * 100;
+    const pipeline = REPORT_PIPELINE_SUMMARY;
+    const totalLength = REPORT_PIPELINE_SUMMARY.total;
 
     setCountValue("pipelineLaidKm", pipeline.laid, 1);
+    setCountValue("pipelineHydroTestedKm", pipeline.hydroTested, 1);
+    setCountValue("pipelineRemainingKm", pipeline.remaining, 1);
 
-    setCountValue(
-      "pipelineHydroTestedKm",
-      pipeline.hydroTested,
-      1
-    );
+    const laidDelta = document
+      .getElementById("pipelineLaidKm")
+      ?.closest(".card-body")
+      ?.querySelector(".kpi-card__delta");
 
-    setCountValue(
-      "pipelineRemainingKm",
-      pipeline.remaining,
-      1
-    );
+    const testedDelta = document
+      .getElementById("pipelineHydroTestedKm")
+      ?.closest(".card-body")
+      ?.querySelector(".kpi-card__delta");
 
-    setText(
-      "pipelineLaidPct",
-      `${laidPct.toFixed(1)}% of total`
-    );
+    const remainingDelta = document
+      .getElementById("pipelineRemainingKm")
+      ?.closest(".card-body")
+      ?.querySelector(".kpi-card__delta");
 
-    setText(
-      "pipelineHydroTestedPct",
-      `${testedPct.toFixed(1)}% of total`
-    );
+    if (laidDelta) {
+      laidDelta.innerHTML = `<i class="fa-solid fa-arrow-trend-up"></i> ${((pipeline.laid / totalLength) * 100).toFixed(1)}% of total`;
+    }
 
-    setText(
-      "pipelineRemainingPct",
-      `${remainingPct.toFixed(1)}% of total`
-    );
+    if (testedDelta) {
+      testedDelta.textContent = `${((pipeline.hydroTested / totalLength) * 100).toFixed(1)}% of total`;
+    }
+
+    if (remainingDelta) {
+      remainingDelta.textContent = `${((pipeline.remaining / totalLength) * 100).toFixed(1)}% of total`;
+    }
   }
 
   function renderPipelineTable() {
@@ -471,11 +479,12 @@
     const tbody = document.querySelector("#areaProgressTableBody");
     if (!tbody) return;
 
-    const rows =
+    const source =
       dashboardData?.area_progress ||
       dashboardData?.areaProgress ||
-      dashboardData?.area_wise_progress ||
-      FALLBACK_AREA_PROGRESS;
+      dashboardData?.area_wise_progress;
+
+    const rows = pickRows(source, FALLBACK_AREA_PROGRESS);
 
     tbody.innerHTML = "";
 
@@ -485,30 +494,32 @@
     }
 
     rows.forEach((item) => {
-      const planned = numberValue(item.planned);
-      const actual = numberValue(item.actual);
+      const areaName = normalizeAreaName(item.area || item.zone || item.name);
+      const planned = item.planned;
+      const actual = item.actual;
       const varianceValue =
         item.variance !== undefined && item.variance !== null
-          ? numberValue(item.variance)
-          : actual - planned;
+          ? item.variance
+          : numberValue(actual) - numberValue(planned);
 
       const unit = item.unit || "km";
       const varianceClass =
-        varianceValue < 0 ? "down" : varianceValue > 0 ? "up" : "flat";
+        numberValue(varianceValue) < 0 ? "down" :
+        numberValue(varianceValue) > 0 ? "up" : "flat";
 
       tbody.insertAdjacentHTML(
         "beforeend",
         `
-        <tr>
-          <td>${escapeHtml(item.area || item.zone || item.name || "-")}</td>
-          <td class="num">${formatProgressValue(planned, unit)}</td>
-          <td class="num">${formatProgressValue(actual, unit)}</td>
-          <td class="num">
-            <span class="kpi-card__delta ${varianceClass}" style="justify-content:flex-end;">
-              ${formatSignedValue(varianceValue, unit)}
-            </span>
-          </td>
-        </tr>
+          <tr>
+            <td>${escapeHtml(areaName)}</td>
+            <td class="num">${formatProgressValue(planned, unit)}</td>
+            <td class="num">${formatProgressValue(actual, unit)}</td>
+            <td class="num">
+              <span class="kpi-card__delta ${varianceClass}" style="justify-content:flex-end;">
+                ${formatSignedValue(varianceValue, unit)}
+              </span>
+            </td>
+          </tr>
         `
       );
     });
@@ -518,11 +529,12 @@
     const tbody = document.querySelector("#pipeDiameterTableBody");
     if (!tbody) return;
 
-    const rows =
+    const source =
       dashboardData?.pipe_diameter_matrix ||
       dashboardData?.pipeDiameterMatrix ||
-      dashboardData?.diameter_matrix ||
-      FALLBACK_PIPE_DIAMETER_MATRIX;
+      dashboardData?.diameter_matrix;
+
+    const rows = pickRows(source, FALLBACK_PIPE_DIAMETER_MATRIX);
 
     tbody.innerHTML = "";
 
@@ -588,40 +600,14 @@
       return;
     }
 
-    const sourceRows =
-      dashboardData?.area_progress ||
-      dashboardData?.areaProgress ||
-      dashboardData?.area_wise_progress ||
-      FALLBACK_AREA_PROGRESS;
+    const rows = FALLBACK_AREA_PROGRESS;
 
-    const areaOrder = [
-      "Casa Verde",
-      "Escola Portuguesa",
-      "Cowboy I",
-      "Sofrio",
-      "João de Almeida",
-      "Caixote ou Socombar",
-      "Arimba"
-    ];
-
-    const planned = [];
-    const actual = [];
-
-    areaOrder.forEach((areaName) => {
-      const match = sourceRows.find((item) => {
-        return normalizeAreaName(item.area || item.zone || item.name) === areaName;
-      });
-
-      planned.push(hasNumericValue(match?.planned) ? numberValue(match.planned) : 0);
-      actual.push(hasNumericValue(match?.actual) ? numberValue(match.actual) : 0);
-    });
-
-    chart.data.labels = areaOrder;
-    chart.data.datasets[0].data = planned;
-    chart.data.datasets[1].data = actual;
+    chart.data.labels = rows.map((item) => item.area);
+    chart.data.datasets[0].data = rows.map((item) => numberValue(item.planned));
+    chart.data.datasets[1].data = rows.map((item) => numberValue(item.actual));
     chart.update();
   }
-  
+
   function openPipelineModal(id) {
     const existing = id
       ? dashboardData.pipeline_sections.find((x) => x.id === id)
@@ -688,15 +674,30 @@
   ========================= */
 
   function renderHouseKpis() {
-    const totals = dashboardData?.house_connections || {
-      completed: 0,
-      inProgress: 0,
-      remaining: 5000,
-    };
+    const totals = REPORT_HOUSE_CONNECTIONS;
 
     setCountValue("houseCompletedCount", totals.completed, 0);
     setCountValue("houseInProgressCount", totals.inProgress, 0);
     setCountValue("houseRemainingCount", totals.remaining, 0);
+
+    const completedDelta = document
+      .getElementById("houseCompletedCount")
+      ?.closest(".card-body")
+      ?.querySelector(".kpi-card__delta");
+
+    const inProgressDelta = document
+      .getElementById("houseInProgressCount")
+      ?.closest(".card-body")
+      ?.querySelector(".kpi-card__delta");
+
+    const remainingDelta = document
+      .getElementById("houseRemainingCount")
+      ?.closest(".card-body")
+      ?.querySelector(".kpi-card__delta");
+
+    if (completedDelta) completedDelta.textContent = "0.0% of scope";
+    if (inProgressDelta) inProgressDelta.textContent = "0.0% of scope";
+    if (remainingDelta) remainingDelta.textContent = "100.0% of scope";
   }
 
   /* =========================
@@ -704,53 +705,52 @@
   ========================= */
 
   function renderTestingTable() {
-  const tbody = document.querySelector("#testingActivityTableBody");
-  if (!tbody) return;
+    const tbody = document.querySelector("#testingActivityTableBody");
+    if (!tbody) return;
 
-  const rows =
-    dashboardData?.testing && dashboardData.testing.length
-      ? dashboardData.testing
-      : FALLBACK_TESTING_ACTIVITIES;
+    const rows = pickRows(dashboardData?.testing, FALLBACK_TESTING_ACTIVITIES);
 
-  tbody.innerHTML = "";
+    tbody.innerHTML = "";
 
-  if (!rows.length) {
-    tbody.innerHTML = emptyRow(5, "No testing activities added yet.");
-    return;
+    if (!rows.length) {
+      tbody.innerHTML = emptyRow(5, "No testing activities added yet.");
+      return;
+    }
+
+    rows.forEach((activity) => {
+      const isReportFallback = String(activity.id || "").startsWith("report-");
+
+      tbody.insertAdjacentHTML(
+        "beforeend",
+        `
+          <tr>
+            <td>${escapeHtml(activity.activityName || activity.name || "-")}</td>
+            <td class="num">${formatProgressValue(activity.plannedValue ?? activity.planned, activity.unit || "")}</td>
+            <td class="num">${formatProgressValue(activity.actualValue ?? activity.actual, activity.unit || "")}</td>
+            <td>
+              <span class="status-chip ${getStatusClass(activity.status)}">
+                ${escapeHtml(activity.status || "Not Started")}
+              </span>
+            </td>
+            <td class="actions-col">
+              ${
+                isReportFallback
+                  ? `<span style="color:var(--text-muted);font-size:12px;">Report data</span>`
+                  : `
+                    <button class="btn-ghost edit-testing" type="button" data-id="${activity.id}">
+                      Edit
+                    </button>
+                    <button class="btn-ghost delete-testing" type="button" data-id="${activity.id}">
+                      Delete
+                    </button>
+                  `
+              }
+            </td>
+          </tr>
+        `
+      );
+    });
   }
-
-  rows.forEach((activity) => {
-    tbody.insertAdjacentHTML(
-      "beforeend",
-      `
-        <tr>
-          <td>${escapeHtml(activity.activityName || activity.name || "-")}</td>
-          <td class="num">${formatProgressValue(activity.plannedValue ?? activity.planned, activity.unit || "")}</td>
-          <td class="num">${formatProgressValue(activity.actualValue ?? activity.actual, activity.unit || "")}</td>
-          <td>
-            <span class="status-chip ${getStatusClass(activity.status)}">
-              ${escapeHtml(activity.status || "In Progress")}
-            </span>
-          </td>
-          <td class="actions-col">
-            ${
-              String(activity.id || "").startsWith("report-")
-                ? `<span style="color:var(--text-muted);font-size:12px;">Report fallback</span>`
-                : `
-                  <button class="btn-ghost edit-testing" type="button" data-id="${activity.id}">
-                    Edit
-                  </button>
-                  <button class="btn-ghost delete-testing" type="button" data-id="${activity.id}">
-                    Delete
-                  </button>
-                `
-            }
-          </td>
-        </tr>
-      `
-    );
-  });
-}
 
   function openTestingModal(id) {
     const existing = id
@@ -814,12 +814,7 @@
   ========================= */
 
   function renderValveSummary() {
-    const valve = dashboardData?.valve || {
-      planned: 11,
-      completed: 0,
-      inProgress: 0,
-      notStarted: 11,
-    };
+    const valve = REPORT_VALVE_SUMMARY;
 
     setText("valvePlannedCount", valve.planned);
     setText("valveCompletedCount", valve.completed);
@@ -869,10 +864,7 @@
     const tbody = document.querySelector("#bridgeCrossingTableBody");
     if (!tbody) return;
 
-    const rows =
-      dashboardData?.crossings && dashboardData.crossings.length
-        ? dashboardData.crossings
-        : FALLBACK_BRIDGE_CROSSINGS;
+    const rows = pickRows(dashboardData?.crossings, FALLBACK_BRIDGE_CROSSINGS);
 
     tbody.innerHTML = "";
 
@@ -882,13 +874,15 @@
     }
 
     rows.forEach((crossing) => {
+      const isReportFallback = String(crossing.id || "").startsWith("report-");
+
       tbody.insertAdjacentHTML(
         "beforeend",
         `
           <tr>
             <td>${escapeHtml(crossing.area || crossing.crossingName || "-")}</td>
             <td>${escapeHtml(crossing.crossingType || crossing.type || "-")}</td>
-            <td class="num">${escapeHtml(crossing.span || crossing.method || "-")}</td>
+            <td class="num">${escapeHtml(crossing.span || "-")}</td>
             <td>
               <span class="status-chip ${getStatusClass(crossing.status)}">
                 ${escapeHtml(crossing.status || "Not Started")}
@@ -896,7 +890,7 @@
             </td>
             <td class="actions-col">
               ${
-                String(crossing.id || "").startsWith("report-")
+                isReportFallback
                   ? `<span style="color:var(--text-muted);font-size:12px;">Report fallback</span>`
                   : `
                     <button class="btn-ghost edit-bridge" type="button" data-id="${crossing.id}">
@@ -922,19 +916,21 @@
     openCrudModal({
       title: existing ? "Edit Bridge Crossing" : "Add Bridge Crossing",
       fields: [
-        inputField("Crossing Name", "crossingName", existing?.crossingName, "text", true),
-        inputField("Type", "crossingType", existing?.crossingType, "text", true),
-        inputField("Method", "method", existing?.method, "text", true),
+        inputField("Area", "area", existing?.area || existing?.crossingName, "text", true),
+        inputField("Type", "crossingType", existing?.crossingType || existing?.type, "text", true),
+        inputField("Span", "span", existing?.span || "", "text", true),
         selectField("Status", "status", existing?.status, [
           "Complete",
           "In Progress",
-          "Delayed — NOC",
+          "Delayed",
           "Not Started",
         ]),
-        inputField("Remarks", "remarks", existing?.remarks || "", "text", false),
       ],
       onSubmit: async (payload) => {
         payload.projectId = PROJECT_ID;
+
+        payload.crossingName = payload.area;
+        payload.method = payload.span;
 
         if (id) {
           await WSDP_API.request(
