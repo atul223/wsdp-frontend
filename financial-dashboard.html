@@ -371,53 +371,7 @@
     }
 
     var months = ["Feb", "Mar", "Apr", "May", "Jun", "Jul"];
-
-    var cf = document.getElementById("cashFlowChart");
-    if (cf && window.Chart) {
-      new Chart(cf, {
-        type: "bar",
-        data: {
-          labels: months,
-          datasets: [
-            {
-              label: "Planned (M AOA)",
-              data: [420, 515, 590, 650, 710, 760],
-              backgroundColor: cssVar("--color-neutral-light"),
-              borderRadius: 6
-            },
-            {
-              label: "Actual (M AOA)",
-              data: [404.66, 455.20, 520.80, 651.00, 651.00, 651.00],
-              backgroundColor: cssVar("--color-secondary"),
-              borderRadius: 6
-            }
-          ]
-        },
-        options: {
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              position: "top",
-              align: "end",
-              labels: {
-                boxWidth: 10,
-                boxHeight: 10,
-                usePointStyle: true,
-                pointStyle: "circle"
-              }
-            }
-          },
-          scales: {
-            x: {
-              grid: {
-                display: false
-              }
-            }
-          }
-        }
-      });
-    }
-
+    
     var fp = document.getElementById("finPhysChart");
     if (fp && window.Chart) {
       new Chart(fp, {
