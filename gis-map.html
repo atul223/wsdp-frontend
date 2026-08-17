@@ -905,63 +905,50 @@
         kmzLayer = L.geoJSON(geojson, {
           style: getDefaultStyle,
           pointToLayer: pointToLayer,
-          onEachFeature: function (feature, layer) {
-            var searchText = getFeatureSearchText(feature);
-            var area = detectArea(searchText);
-            var status = detectStatus(searchText);
+          onEachFeature: function(feature, layer) {
+            const props = feature.properties || {};
 
-            layer._gisSearchText = normalizeText(searchText);
-            layer._area = area;
-            layer._status = status;
+            const featureName = String(
+              props.name || ""
+            ).trim();
 
-            if (feature.properties && feature.properties.name) {
-              layer.bindTooltip(feature.properties.name, {
-                permanent: false,
-                sticky: true,
-                className: "gis-kmz-tooltip"
+            const dmaNames = [
+              "Casa Verde",
+              "Escola Portuguesa",
+              "Cowboy I",
+              "Sofrio",
+              "João de Almeida",
+              "Caixote ou Socombar",
+              "Arimba"
+            ];
+
+            const isDMA = dmaNames.some(function(name) {
+              return featureName
+                .toLowerCase()
+                .includes(name.toLowerCase());
+            });
+
+            if (isDMA && layer.getBounds) {
+              layer.setStyle({
+                color: "#666666",
+                weight: 2,
+                fillColor: "#fff600",
+                fillOpacity: 0.22
               });
+
+              const center = layer.getBounds().getCenter();
+
+              L.marker(center, {
+                icon: L.divIcon({
+                  className: "dma-home-label",
+                  html: '<div class="dma-home-tag">' +
+                    featureName +
+                    '</div>',
+                  iconSize: [150, 24],
+                  iconAnchor: [75, 12]
+                })
+              }).addTo(map);
             }
-
-            const properties =
-              feature.properties || {};
-
-            const featureName =
-              (
-                properties.name || ""
-              ).trim();
-
-            const featureDescription =
-              (
-                properties.description || ""
-              ).trim();
-
-            if (
-              featureName === "0" ||
-              featureName === "_0" ||
-              featureName === "__0" ||
-              featureName === "___0" ||
-              featureDescription.includes("ELEVATION")
-            ) {
-              return;
-            }
-
-            if (
-              featureDescription.includes("ELEVATION") ||
-              featureName === "0" ||
-              featureName === "_0" ||
-              featureName === "__0" ||
-              featureName === "___0"
-            ) {
-              map.removeLayer(layer);
-
-              return;
-            }
-
-            layer.bindPopup(
-              buildPopupHtml(feature)
-            );
-
-            kmzFeatureLayers.push(layer);
           }
         });
 
