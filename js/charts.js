@@ -722,6 +722,63 @@
 
         layer.addTo(map);
 
+        const dmaLabels = [
+          {
+            name: "Casa Verde",
+            coords: [-14.9610, 13.4725],
+            color: "#0A4595"
+          },
+          {
+            name: "Escola Portuguesa",
+            coords: [-14.9460, 13.5040],
+            color: "#0A4595"
+          },
+          {
+            name: "Sofrio",
+            coords: [-14.9190, 13.5200],
+            color: "#0A4595"
+          },
+          {
+            name: "Cowboy I",
+            coords: [-14.9700, 13.5250],
+            color: "#0A4595"
+          },
+          {
+            name: "João de Almeida",
+            coords: [-14.9005, 13.5240],
+            color: "#0A4595"
+          },
+          {
+            name: "Caixote ou Socombar",
+            coords: [-14.8930, 13.4770],
+            color: "#0A4595"
+          },
+          {
+            name: "Arimba",
+            coords: [-14.8810, 13.4740],
+            color: "#0A4595"
+          }
+        ];
+
+        dmaLabels.forEach(function(item){
+
+          L.marker(
+            item.coords,
+            {
+              icon: L.divIcon({
+                className: "home-dma-label",
+                html:
+                  '<div class="home-dma-tag">' +
+                  item.name +
+                  '</div>',
+                iconSize: [120,25],
+                iconAnchor:[60,12]
+              })
+            }
+          ).addTo(map);
+
+        });
+
         if (
           layer.getBounds().isValid()
         ) {
