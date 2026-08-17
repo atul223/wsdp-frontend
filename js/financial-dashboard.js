@@ -1170,27 +1170,41 @@
           }),
           datasets: [
             {
-              label: "Physical %",
-              data: progress.map(function (item) {
-                return item.physical_pct;
-              }),
-              borderColor: cssVar("--color-primary", "#0a4595"),
+              label: "Planned Physical %",
+              data: progress.map(item => item.planned_physical),
+              borderColor: "#2563eb",
               backgroundColor: "transparent",
-              tension: 0.35,
-              borderWidth: 3,
-              pointRadius: 3
-            },
-            {
-              label: "Financial %",
-              data: progress.map(function (item) {
-                return item.financial_pct;
-              }),
-              borderColor: cssVar("--color-secondary", "#0f8b8d"),
-              backgroundColor: "transparent",
-              tension: 0.35,
               borderWidth: 3,
               pointRadius: 3,
-              borderDash: [5, 4]
+              tension: 0.35
+            },
+            {
+              label: "Actual Physical %",
+              data: progress.map(item => item.actual_physical),
+              borderColor: "#16a34a",
+              backgroundColor: "transparent",
+              borderWidth: 3,
+              pointRadius: 3,
+              tension: 0.35
+            },
+            {
+              label: "Planned Financial %",
+              data: progress.map(item => item.planned_financial),
+              borderColor: "#f59e0b",
+              backgroundColor: "transparent",
+              borderWidth: 3,
+              pointRadius: 3,
+              borderDash: [6,4],
+              tension: 0.35
+            },
+            {
+              label: "Actual Financial %",
+              data: progress.map(item => item.actual_financial),
+              borderColor: "#dc2626",
+              backgroundColor: "transparent",
+              borderWidth: 3,
+              pointRadius: 3,
+              tension: 0.35
             }
           ]
         },
