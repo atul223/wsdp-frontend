@@ -18,96 +18,114 @@
   const FALLBACK_AREA_PROGRESS = [
     {
       area: "Casa Verde",
-      planned: 10.3,
-      actual: 8.2,
-      variance: -2.1,
+      planned: 0.180,
+      actual: 0.204,
+      variance: 0.024,
       unit: "km",
     },
     {
       area: "Escola Portuguesa",
-      planned: 12.5,
-      actual: 10.4,
-      variance: -2.1,
+      planned: 0.800,
+      actual: 0.324,
+      variance: -0.476,
       unit: "km",
     },
     {
-      area: "Comandante Cowboy",
-      planned: 8.4,
-      actual: 6.7,
-      variance: -1.7,
-      unit: "km",
-    },
-    {
-      area: "Caixote / Socombar",
-      planned: 13.2,
-      actual: 8.9,
-      variance: -4.3,
-      unit: "km",
-    },
-    {
-      area: "Joao de Almeida",
-      planned: 9.1,
-      actual: 7.4,
-      variance: -1.7,
-      unit: "km",
-    },
-    {
-      area: "Arimba",
-      planned: 8.6,
-      actual: 6.0,
-      variance: -2.6,
+      area: "Cowboy I",
+      planned: 0.000,
+      actual: 0.000,
+      variance: 0.000,
       unit: "km",
     },
     {
       area: "Sofrio",
-      planned: 8.6,
-      actual: 5.4,
-      variance: -3.2,
+      planned: 2.108,
+      actual: 0.798,
+      variance: -1.310,
+      unit: "km",
+    },
+    {
+      area: "João de Almeida",
+      planned: 2.500,
+      actual: 0.000,
+      variance: -2.500,
+      unit: "km",
+    },
+    {
+      area: "Caixote ou Socombar",
+      planned: 0.500,
+      actual: 0.342,
+      variance: -0.158,
+      unit: "km",
+    },
+    {
+      area: "Arimba",
+      planned: 0.000,
+      actual: 0.000,
+      variance: 0.000,
       unit: "km",
     }
   ];
 
   const FALLBACK_PIPE_DIAMETER_MATRIX = [
     {
-      diameter: "63 mm",
-      planned: 9.8,
-      installed: 8.1,
+      diameter: "De63 mm",
+      planned: 18.796,
+      installed: 16.763,
       unit: "km",
     },
     {
-      diameter: "90 mm",
-      planned: 14.2,
-      installed: 11.7,
+      diameter: "De75 mm",
+      planned: 1.078,
+      installed: 0.768,
       unit: "km",
     },
     {
-      diameter: "110 mm",
-      planned: 16.8,
-      installed: 13.9,
+      diameter: "De90 mm",
+      planned: 6.012,
+      installed: 5.277,
       unit: "km",
     },
     {
-      diameter: "160 mm",
-      planned: 12.9,
-      installed: 10.7,
+      diameter: "De110 mm",
+      planned: 2.075,
+      installed: 1.236,
       unit: "km",
     },
     {
-      diameter: "200 mm",
-      planned: 9.7,
-      installed: 6.2,
+      diameter: "De160 mm PN10",
+      planned: 4.929,
+      installed: 2.832,
       unit: "km",
     },
     {
-      diameter: "250 mm",
-      planned: 4.5,
-      installed: 2.8,
+      diameter: "De160 mm PN16",
+      planned: 0.299,
+      installed: 0.000,
       unit: "km",
     },
     {
-      diameter: "315 mm",
-      planned: 2.1,
-      installed: 1.3,
+      diameter: "De200 mm",
+      planned: 1.256,
+      installed: 1.152,
+      unit: "km",
+    },
+    {
+      diameter: "De250 mm",
+      planned: 2.203,
+      installed: 1.966,
+      unit: "km",
+    },
+    {
+      diameter: "De315 mm",
+      planned: 1.412,
+      installed: 1.0925,
+      unit: "km",
+    },
+    {
+      diameter: "Steel Pipe",
+      planned: 0.079,
+      installed: 0.000,
       unit: "km",
     }
   ];
@@ -115,34 +133,39 @@
   const FALLBACK_MONTHLY_PROGRESS = [
     {
       activity: "Pipeline Installation",
-      previousMonth: "5.8 km",
-      currentMonth: "8.2 km",
-      cumulative: "15.1 km",
+      previousMonth: 29.5325,
+      currentMonth: 1.668,
+      cumulative: 31.2005,
+      unit: "km",
     },
     {
       activity: "Hydro Testing",
-      previousMonth: "3.2 km",
-      currentMonth: "4.4 km",
-      cumulative: "7.6 km",
+      previousMonth: 0,
+      currentMonth: 0,
+      cumulative: 0,
+      unit: "km",
     },
     {
       activity: "House Connections",
-      previousMonth: "580 Nos",
-      currentMonth: "860 Nos",
-      cumulative: "1,440 Nos",
+      previousMonth: 0,
+      currentMonth: 0,
+      cumulative: 0,
+      unit: "Nos",
     },
     {
       activity: "Valve Chambers",
-      previousMonth: "8 Nos",
-      currentMonth: "12 Nos",
-      cumulative: "20 Nos",
+      previousMonth: 0,
+      currentMonth: 0,
+      cumulative: 0,
+      unit: "Nos",
     },
     {
-      activity: "Road Restoration",
-      previousMonth: "1,400 m²",
-      currentMonth: "2,250 m²",
-      cumulative: "3,650 m²",
-    },
+      activity: "Bridge Crossings",
+      previousMonth: "Not specified",
+      currentMonth: "Not specified",
+      cumulative: "3 Nos planned",
+      unit: "",
+    }
   ];
 
   function unwrap(result) {
@@ -344,22 +367,51 @@
   ========================= */
 
   function renderPipelineKpis() {
-    const pipeline = dashboardData?.pipeline;
+    const totalLength = 70.0;
 
-    if (!pipeline) {
-      setCountValue("pipelineLaidKm", null, 1);
-      setCountValue("pipelineHydroTestedKm", null, 1);
-      setCountValue("pipelineRemainingKm", null, 1);
-      return;
-    }
+    const pipeline = dashboardData?.pipeline || {
+      laid: 31.2005,
+      hydroTested: 0,
+      remaining: 38.7995
+    };
+
+    const laidPct =
+      ((pipeline.laid || 0) / totalLength) * 100;
+
+    const testedPct =
+      ((pipeline.hydroTested || 0) / totalLength) * 100;
+
+    const remainingPct =
+      ((pipeline.remaining || 0) / totalLength) * 100;
 
     setCountValue("pipelineLaidKm", pipeline.laid, 1);
+
     setCountValue(
       "pipelineHydroTestedKm",
-      pipeline.tested ?? pipeline.hydroTested ?? pipeline.hydro_tested ?? null,
+      pipeline.hydroTested,
       1
     );
-    setCountValue("pipelineRemainingKm", pipeline.remaining, 1);
+
+    setCountValue(
+      "pipelineRemainingKm",
+      pipeline.remaining,
+      1
+    );
+
+    setText(
+      "pipelineLaidPct",
+      `${laidPct.toFixed(1)}% of total`
+    );
+
+    setText(
+      "pipelineHydroTestedPct",
+      `${testedPct.toFixed(1)}% of total`
+    );
+
+    setText(
+      "pipelineRemainingPct",
+      `${remainingPct.toFixed(1)}% of total`
+    );
   }
 
   function renderPipelineTable() {
@@ -636,8 +688,11 @@
   ========================= */
 
   function renderHouseKpis() {
-    const totals = dashboardData?.house_connections;
-    if (!totals) return;
+    const totals = dashboardData?.house_connections || {
+      completed: 0,
+      inProgress: 0,
+      remaining: 5000,
+    };
 
     setCountValue("houseCompletedCount", totals.completed, 0);
     setCountValue("houseInProgressCount", totals.inProgress, 0);
@@ -649,53 +704,53 @@
   ========================= */
 
   function renderTestingTable() {
-    const tbody = document.querySelector("#testingActivityTableBody");
-    if (!tbody) return;
+  const tbody = document.querySelector("#testingActivityTableBody");
+  if (!tbody) return;
 
-    const rows =
-      dashboardData?.testing && dashboardData.testing.length
-        ? dashboardData.testing
-        : FALLBACK_TESTING_ACTIVITIES;
+  const rows =
+    dashboardData?.testing && dashboardData.testing.length
+      ? dashboardData.testing
+      : FALLBACK_TESTING_ACTIVITIES;
 
-    tbody.innerHTML = "";
+  tbody.innerHTML = "";
 
-    if (!rows.length) {
-      tbody.innerHTML = emptyRow(5, "No testing activities added yet.");
-      return;
-    }
-
-    rows.forEach((activity) => {
-      tbody.insertAdjacentHTML(
-        "beforeend",
-        `
-          <tr>
-            <td>${escapeHtml(activity.activityName || activity.name || "-")}</td>
-            <td class="num">${formatMaybeValue(activity.plannedValue ?? activity.planned, activity.unit || "")}</td>
-            <td class="num">${formatMaybeValue(activity.actualValue ?? activity.actual, activity.unit || "")}</td>
-            <td>
-              <span class="status-chip ${getStatusClass(activity.status)}">
-                ${escapeHtml(activity.status || "In Progress")}
-              </span>
-            </td>
-            <td class="actions-col">
-              ${
-                String(activity.id || "").startsWith("report-")
-                  ? `<span style="color:var(--text-muted);font-size:12px;">Report fallback</span>`
-                  : `
-                    <button class="btn-ghost edit-testing" type="button" data-id="${activity.id}">
-                      Edit
-                    </button>
-                    <button class="btn-ghost delete-testing" type="button" data-id="${activity.id}">
-                      Delete
-                    </button>
-                  `
-              }
-            </td>
-          </tr>
-        `
-      );
-    });
+  if (!rows.length) {
+    tbody.innerHTML = emptyRow(5, "No testing activities added yet.");
+    return;
   }
+
+  rows.forEach((activity) => {
+    tbody.insertAdjacentHTML(
+      "beforeend",
+      `
+        <tr>
+          <td>${escapeHtml(activity.activityName || activity.name || "-")}</td>
+          <td class="num">${formatProgressValue(activity.plannedValue ?? activity.planned, activity.unit || "")}</td>
+          <td class="num">${formatProgressValue(activity.actualValue ?? activity.actual, activity.unit || "")}</td>
+          <td>
+            <span class="status-chip ${getStatusClass(activity.status)}">
+              ${escapeHtml(activity.status || "In Progress")}
+            </span>
+          </td>
+          <td class="actions-col">
+            ${
+              String(activity.id || "").startsWith("report-")
+                ? `<span style="color:var(--text-muted);font-size:12px;">Report fallback</span>`
+                : `
+                  <button class="btn-ghost edit-testing" type="button" data-id="${activity.id}">
+                    Edit
+                  </button>
+                  <button class="btn-ghost delete-testing" type="button" data-id="${activity.id}">
+                    Delete
+                  </button>
+                `
+            }
+          </td>
+        </tr>
+      `
+    );
+  });
+}
 
   function openTestingModal(id) {
     const existing = id
@@ -760,10 +815,10 @@
 
   function renderValveSummary() {
     const valve = dashboardData?.valve || {
-      planned: 0,
+      planned: 11,
       completed: 0,
       inProgress: 0,
-      notStarted: 0,
+      notStarted: 11,
     };
 
     setText("valvePlannedCount", valve.planned);
@@ -814,7 +869,11 @@
     const tbody = document.querySelector("#bridgeCrossingTableBody");
     if (!tbody) return;
 
-    const rows = dashboardData?.crossings || [];
+    const rows =
+      dashboardData?.crossings && dashboardData.crossings.length
+        ? dashboardData.crossings
+        : FALLBACK_BRIDGE_CROSSINGS;
+
     tbody.innerHTML = "";
 
     if (!rows.length) {
@@ -827,21 +886,27 @@
         "beforeend",
         `
           <tr>
-            <td>${escapeHtml(crossing.crossingName)}</td>
-            <td>${escapeHtml(crossing.crossingType)}</td>
-            <td>${escapeHtml(crossing.method)}</td>
+            <td>${escapeHtml(crossing.area || crossing.crossingName || "-")}</td>
+            <td>${escapeHtml(crossing.crossingType || crossing.type || "-")}</td>
+            <td class="num">${escapeHtml(crossing.span || crossing.method || "-")}</td>
             <td>
               <span class="status-chip ${getStatusClass(crossing.status)}">
-                ${escapeHtml(crossing.status)}
+                ${escapeHtml(crossing.status || "Not Started")}
               </span>
             </td>
             <td class="actions-col">
-              <button class="btn-ghost edit-bridge" type="button" data-id="${crossing.id}">
-                Edit
-              </button>
-              <button class="btn-ghost delete-bridge" type="button" data-id="${crossing.id}">
-                Delete
-              </button>
+              ${
+                String(crossing.id || "").startsWith("report-")
+                  ? `<span style="color:var(--text-muted);font-size:12px;">Report fallback</span>`
+                  : `
+                    <button class="btn-ghost edit-bridge" type="button" data-id="${crossing.id}">
+                      Edit
+                    </button>
+                    <button class="btn-ghost delete-bridge" type="button" data-id="${crossing.id}">
+                      Delete
+                    </button>
+                  `
+              }
             </td>
           </tr>
         `
