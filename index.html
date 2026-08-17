@@ -27,6 +27,23 @@
     Existing website colors, cards, shell, sidebar, topbar and layout style are preserved.
   */
 
+  body[data-page="home"] .dma-home-tag {
+    background: #ffffff;
+    border: 1px solid #0A4595;
+    color: #0A4595;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.12);
+    white-space: nowrap;
+  }
+
+  body[data-page="home"] .dma-home-label {
+    background: transparent;
+    border: none;
+  }
+
   body[data-page="home"] .home-project-strip {
     display: flex;
     align-items: center;
@@ -453,21 +470,6 @@
       <div class="card">
         <div class="card-body">
           <div id="miniMap"></div>
-
-          <div class="map-legend" style="margin-top:14px;">
-            <div class="item">
-              <span class="dot" style="background:var(--color-success);"></span> Complete
-            </div>
-            <div class="item">
-              <span class="dot" style="background:var(--color-warning);"></span> In Progress
-            </div>
-            <div class="item">
-              <span class="dot" style="background:#F58232;"></span> Mobilising
-            </div>
-            <div class="item">
-              <span class="dot" style="background:var(--color-critical);"></span> Not Started
-            </div>
-          </div>
         </div>
       </div>
 

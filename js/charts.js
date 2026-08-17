@@ -693,28 +693,27 @@
             geojson,
             {
               style: function(feature) {
-
                 const type =
                   feature.geometry
                     ? feature.geometry.type
                     : "";
 
                 if (
-                  type === "Polygon" ||
-                  type === "MultiPolygon"
+                  type === "LineString" ||
+                  type === "MultiLineString"
                 ) {
                   return {
-                    color: "transparent",
-                    fillOpacity: 0,
                     opacity: 0,
-                    weight: 0
+                    weight: 0,
+                    color: "transparent"
                   };
                 }
 
                 return {
-                  color: "#0057ff",
-                  weight: 2,
-                  opacity: 0.9
+                  opacity: 0,
+                  weight: 0,
+                  color: "transparent",
+                  fillOpacity: 0
                 };
               }
             }
@@ -760,25 +759,6 @@
           }
         ];
 
-        dmaLabels.forEach(function(item){
-
-          L.marker(
-            item.coords,
-            {
-              icon: L.divIcon({
-                className: "home-dma-label",
-                html:
-                  '<div class="home-dma-tag">' +
-                  item.name +
-                  '</div>',
-                iconSize: [120,25],
-                iconAnchor:[60,12]
-              })
-            }
-          ).addTo(map);
-
-        });
-
         if (
           layer.getBounds().isValid()
         ) {
@@ -788,6 +768,115 @@
               padding: [25, 25]
             }
           );
+
+          const dmaRegions = [
+            {
+              name: "Casa Verde",
+              color: "#CDEB8B",
+              coords: [
+                [-14.9540, 13.4560],
+                [-14.9460, 13.4710],
+                [-14.9510, 13.4930],
+                [-14.9660, 13.4940],
+                [-14.9740, 13.4740]
+              ],
+              label: [-14.960, 13.476]
+            },
+            {
+              name: "Escola Portuguesa",
+              color: "#B9E0FF",
+              coords: [
+                [-14.9400, 13.4780],
+                [-14.9290, 13.4980],
+                [-14.9365, 13.5260],
+                [-14.9550, 13.5260],
+                [-14.9625, 13.5030]
+              ],
+              label: [-14.944, 13.505]
+            },
+            {
+              name: "Sofrio",
+              color: "#FFF29A",
+              coords: [
+                [-14.9150, 13.4980],
+                [-14.9020, 13.5170],
+                [-14.9090, 13.5440],
+                [-14.9280, 13.5410]
+              ],
+              label: [-14.918, 13.521]
+            },
+            {
+              name: "Cowboy I",
+              color: "#FFCCB2",
+              coords: [
+                [-14.9660, 13.4950],
+                [-14.9540, 13.5260],
+                [-14.9640, 13.5490],
+                [-14.9820, 13.5390]
+              ],
+              label: [-14.970, 13.525]
+            },
+            {
+              name: "João de Almeida",
+              color: "#E7D9FF",
+              coords: [
+                [-14.8980, 13.5030],
+                [-14.8845, 13.5200],
+                [-14.8940, 13.5450],
+                [-14.9100, 13.5410]
+              ],
+              label: [-14.899, 13.524]
+            },
+            {
+              name: "Caixote ou Socombar",
+              color: "#D2F5E3",
+              coords: [
+                [-14.8860, 13.4560],
+                [-14.8750, 13.4770],
+                [-14.8830, 13.5000],
+                [-14.9020, 13.5000]
+              ],
+              label: [-14.892, 13.477]
+            },
+            {
+              name: "Arimba",
+              color: "#FFD9D9",
+              coords: [
+                [-14.8800, 13.4540],
+                [-14.8660, 13.4720],
+                [-14.8730, 13.4960],
+                [-14.8900, 13.4930]
+              ],
+              label: [-14.881, 13.475]
+            }
+          ];
+
+          dmaRegions.forEach(function(region){
+            L.polygon(
+              region.coords,
+              {
+                color: "#666",
+                weight: 2,
+                fillColor: region.color,
+                fillOpacity: 0.32
+              }
+            ).addTo(map);
+
+            L.marker(
+              region.label,
+              {
+                icon:L.divIcon({
+                  className:"dma-home-label",
+                  html:
+                    '<div class="dma-home-tag">' +
+                    region.name +
+                    '</div>',
+                  iconSize:[140,24],
+                  iconAnchor:[70,12]
+                })
+              }
+            ).addTo(map);
+          });
         }
 
       }
