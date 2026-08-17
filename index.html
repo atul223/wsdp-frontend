@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>PDISA-2 Lubango — Landing Dashboard</title>
+<title>PDISA-2 Lubango — Dashboard</title>
 <meta name="description" content="Construction progress dashboard for PDISA-2 Lubango water supply distribution project." />
 
 <!-- Fonts -->
@@ -175,18 +175,22 @@
   }
 
   body[data-page="home"] .lubango-sidebar-logo {
-    width: 42px;
-    height: 42px;
+    width: 50px;
+    height: 50px;
     border-radius: 12px;
-    display: grid;
-    place-items: center;
-    background: rgba(255, 255, 255, 0.12);
-    color: #ffffff;
-    flex: 0 0 auto;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
   }
 
-  body[data-page="home"] .lubango-sidebar-logo i {
-    font-size: 20px;
+  body[data-page="home"] .lubango-sidebar-logo img {
+    width: 42px;
+    height: 42px;
+    object-fit: contain;
+    display: block;
   }
 </style>
 </head>
@@ -195,7 +199,7 @@
 
 <script>
   window.WSDP_PAGE = {
-    title: "Landing Dashboard",
+    title: " Dashboard",
     breadcrumb: "PDISA-2 Lubango <span class=\"separator\">/</span> Contract 44W3/LUBANGO/DNA18",
     statusClass: "status-pill--info",
     statusText: "IST"
@@ -506,7 +510,7 @@
 
       brand.innerHTML =
         '<div class="lubango-sidebar-logo">' +
-          '<i class="fa-solid fa-house-flood-water"></i>' +
+          '<imgts/images/pdisa-logo.png' +
         '</div>' +
         '<div>' +
           '<div style="font-weight:800;font-size:15px;line-height:1.1;color:#ffffff;">PDISA-2 LUBANGO</div>' +
