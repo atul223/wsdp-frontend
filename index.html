@@ -509,14 +509,14 @@
       if (!brand) return;
 
       brand.innerHTML =
-        '<div class="lubango-sidebar-logo">' +
-          '<imgts/images/pdisa-logo.png' +
-        '</div>' +
-        '<div>' +
-          '<div style="font-weight:800;font-size:15px;line-height:1.1;color:#ffffff;">PDISA-2 LUBANGO</div>' +
-          '<div style="font-size:12px;line-height:1.35;color:rgba(255,255,255,.76);margin-top:4px;">' +
-            'Construction Progress Dashboard<br>' +
-            'Contract 44W3/LUBANGO/DNA18' +
+        '<div class="lubango-sidebar-logo" style="display:flex;align-items:center;gap:12px;min-width:0;">' +
+          '<img src="./assets/images/pdisa-logo.png" alt="PDISA Logo" style="display:block;width:42px;height:42px;object-fit:contain;flex-shrink:0;" onerror="this.onerror=null;this.src=\'./assets/images/pdisa-logo.png\';">' +
+          '<div style="display:flex;flex-direction:column;min-width:0;">' +
+            '<div style="font-weight:800;font-size:15px;line-height:1.1;color:#ffffff;white-space:normal;">PDISA-2 LUBANGO</div>' +
+            '<div style="font-size:12px;line-height:1.35;color:rgba(255,255,255,.76);margin-top:4px;white-space:normal;">' +
+              'Construction Progress Dashboard<br>' +
+              'Contract 44W3/LUBANGO/DNA18' +
+            '</div>' +
           '</div>' +
         '</div>';
 
