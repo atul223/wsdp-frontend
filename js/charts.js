@@ -590,115 +590,167 @@
   }
 
   function initMiniMap() {
-    var mapElement = document.getElementById("miniMap");
 
-    if (!mapElement || typeof L === "undefined") return;
+    const mapElement =
+      document.getElementById(
+        "miniMap"
+      );
 
-    var map = L.map(mapElement, {
-      zoomControl: true,
-      attributionControl: true,
-      scrollWheelZoom: false
-    }).setView([-14.9177, 13.4925], 12);
+    if (
+      !mapElement ||
+      typeof L === "undefined"
+    ) return;
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: "&copy; OpenStreetMap"
-    }).addTo(map);
+    const map =
+      L.map(
+        mapElement,
+        {
+          zoomControl: true,
+          attributionControl: true,
+          scrollWheelZoom: false
+        }
+      );
 
-    var successColor = cssVar("--color-success", "#1E8449");
-    var warningColor = cssVar("--color-warning", "#B9770E");
-    var criticalColor = cssVar("--color-critical", "#C0392B");
-    var mobilisingColor = "#F58232";
+    const satellite =
+      L.tileLayer(
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        {
+          maxZoom: 19,
+          attribution: "Tiles © Esri"
+        }
+      );
 
-    var areas = [
-      {
-        name: "Casa Verde",
-        status: "In Progress",
-        color: warningColor,
-        coords: [-14.9621, 13.4585]
-      },
-      {
-        name: "Escola Portuguesa",
-        status: "In Progress",
-        color: warningColor,
-        coords: [-14.9558, 13.4662]
-      },
-      {
-        name: "Sofrio",
-        status: "In Progress",
-        color: warningColor,
-        coords: [-14.9484, 13.5098]
-      },
-      {
-        name: "Caixote / Socombar",
-        status: "In Progress",
-        color: warningColor,
-        coords: [-14.9349, 13.4789]
-      },
-      {
-        name: "Cowboy I",
-        status: "Mobilising",
-        color: mobilisingColor,
-        coords: [-14.9177, 13.4925]
-      },
-      {
-        name: "Joao de Almeida",
-        status: "Not Started",
-        color: criticalColor,
-        coords: [-14.9055, 13.5127]
-      },
-      {
-        name: "Arimba",
-        status: "Not Started",
-        color: criticalColor,
-        coords: [-14.8725, 13.5356]
+    satellite.addTo(map);
+
+    async function loadKmz() {
+
+      try {
+
+        const response =
+          await fetch(
+            "/assets/gis/lubango_Project.kmz"
+          );
+
+        if (!response.ok) {
+          throw new Error(
+            "KMZ not found"
+          );
+        }
+
+        const buffer =
+          await response.arrayBuffer();
+
+        const zip =
+          await JSZip.loadAsync(
+            buffer
+          );
+
+        let kmlText = null;
+
+        const files =
+          Object.values(
+            zip.files
+          );
+
+        for (
+          const file
+          of files
+        ) {
+
+          if (
+            file.name
+              .toLowerCase()
+              .endsWith(".kml")
+          ) {
+
+            kmlText =
+              await file.async(
+                "text"
+              );
+
+            break;
+          }
+        }
+
+        if (!kmlText) {
+          throw new Error(
+            "No KML found"
+          );
+        }
+
+        const xml =
+          new DOMParser()
+            .parseFromString(
+              kmlText,
+              "text/xml"
+            );
+
+        const geojson =
+          toGeoJSON.kml(xml);
+
+        const layer =
+          L.geoJSON(
+            geojson,
+            {
+              style: function(feature) {
+
+                const type =
+                  feature.geometry
+                    ? feature.geometry.type
+                    : "";
+
+                if (
+                  type === "Polygon" ||
+                  type === "MultiPolygon"
+                ) {
+                  return {
+                    color: "transparent",
+                    fillOpacity: 0,
+                    opacity: 0,
+                    weight: 0
+                  };
+                }
+
+                return {
+                  color: "#0057ff",
+                  weight: 2,
+                  opacity: 0.9
+                };
+              }
+            }
+          );
+
+        layer.addTo(map);
+
+        if (
+          layer.getBounds().isValid()
+        ) {
+          map.fitBounds(
+            layer.getBounds(),
+            {
+              padding: [25, 25]
+            }
+          );
+        }
+
       }
-    ];
+      catch (error) {
 
-    var route = [
-      [-14.9621, 13.4585],
-      [-14.9558, 13.4662],
-      [-14.9349, 13.4789],
-      [-14.9484, 13.5098],
-      [-14.9177, 13.4925],
-      [-14.9055, 13.5127],
-      [-14.8725, 13.5356]
-    ];
-
-    L.polyline(route, {
-      color: cssVar("--color-primary", "#0A4595"),
-      weight: 4,
-      opacity: 0.7,
-      dashArray: "7 7"
-    }).addTo(map);
-
-    areas.forEach(function (area) {
-      L.circleMarker(area.coords, {
-        radius: 12,
-        color: "#ffffff",
-        weight: 2,
-        fillColor: area.color,
-        fillOpacity: 0.85
-      })
-        .addTo(map)
-        .bindPopup(
-          "<strong>" + area.name + "</strong><br>" +
-          "Status: " + area.status
+        console.error(
+          "Home KMZ error",
+          error
         );
-    });
 
-    var bounds = L.latLngBounds(
-      areas.map(function (area) {
-        return area.coords;
-      })
+      }
+    }
+
+    loadKmz();
+
+    setTimeout(
+      () => map.invalidateSize(),
+      300
     );
-
-    map.fitBounds(bounds.pad(0.25));
-
-    setTimeout(function () {
-      map.invalidateSize();
-    }, 300);
-  }
+}
 
   document.addEventListener("DOMContentLoaded", function () {
     initMonthlyPipeChart();
