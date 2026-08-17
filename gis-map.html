@@ -19,6 +19,14 @@
     align-items: start;
   }
 
+  .legend-symbol-blue{
+    color:#0057ff;
+    font-size:17px;
+    font-weight:700;
+    text-align:center;
+    line-height:1;
+  }
+
   @media (max-width: 1400px) {
     .gis-layout {
       grid-template-columns: 280px minmax(0, 1fr);
@@ -318,15 +326,6 @@
 
         <div class="card">
           <div class="card-body">
-
-            <div class="filter-group">
-              <h4>GIS Source</h4>
-              <div class="gis-file-status" id="kmzStatus">
-                <strong>Loading KMZ...</strong><br>
-                Checking configured GIS asset paths.
-              </div>
-            </div>
-
             <div class="filter-group">
               <h4>Construction Stage</h4>
 
@@ -444,38 +443,73 @@
               <h4>Engineering Legend</h4>
 
               <div class="legend-row">
-                <div class="legend-line" style="border-top-color:#e53935;"></div>
-                <div>Pipeline or red KML layer</div>
+                <div class="legend-line dashed" style="border-top-color:#cfcfcf;"></div>
+                <div>Neighborhoods (bairros)</div>
               </div>
 
               <div class="legend-row">
-                <div class="legend-line" style="border-top-color:#111;"></div>
-                <div>Pipeline or black KML layer</div>
+                <div class="legend-dot" style="background:#fff600;border-color:#d9c900;"></div>
+                <div>Sector connection point</div>
+              </div>
+
+              <div class="legend-row">
+                <div class="legend-line" style="border-top-color:#ff0000;"></div>
+                <div>Water distribution pipeline /63mm HDPE</div>
+              </div>
+
+              <div class="legend-row">
+                <div class="legend-line" style="border-top-color:#111111;"></div>
+                <div>Water distribution pipeline /75mm HDPE</div>
               </div>
 
               <div class="legend-row">
                 <div class="legend-line" style="border-top-color:#ff00ea;"></div>
-                <div>Pipeline or magenta KML layer</div>
+                <div>Water distribution pipeline /90mm HDPE</div>
               </div>
 
               <div class="legend-row">
                 <div class="legend-line" style="border-top-color:#0057ff;"></div>
-                <div>Default KMZ line layer</div>
+                <div>Water distribution pipeline /110mm HDPE</div>
               </div>
 
               <div class="legend-row">
-                <div class="legend-line" style="border-top-color:#00bcd4;"></div>
-                <div>Cyan KML layer</div>
+                <div class="legend-line" style="border-top-color:#00d9d9;"></div>
+                <div>Water distribution pipeline /160mm HDPE</div>
               </div>
 
               <div class="legend-row">
-                <div class="legend-line" style="border-top-color:#00a651;"></div>
-                <div>Completed or green KML polygon</div>
+                <div class="legend-line" style="border-top-color:#00e226;"></div>
+                <div>Water distribution pipeline /200mm HDPE</div>
               </div>
 
               <div class="legend-row">
-                <div class="legend-dot" style="background:#fff600;"></div>
-                <div>Point or sector connection</div>
+                <div class="legend-line" style="border-top-color:#fff000;"></div>
+                <div>Water distribution pipeline /250mm HDPE</div>
+              </div>
+
+              <div class="legend-row">
+                <div class="legend-symbol-blue">▣</div>
+                <div>Gate Valve</div>
+              </div>
+
+              <div class="legend-row">
+                <div class="legend-symbol-blue">▣</div>
+                <div>Sludge Discharge valve</div>
+              </div>
+
+              <div class="legend-row">
+                <div class="legend-symbol-blue">▣</div>
+                <div>Air Valve</div>
+              </div>
+
+              <div class="legend-row">
+                <div class="legend-symbol-blue">▣</div>
+                <div>Pressure reducing valve</div>
+              </div>
+
+              <div class="legend-row">
+                <div class="legend-symbol-blue">◉</div>
+                <div>Flowmeter</div>
               </div>
             </div>
 
@@ -512,7 +546,6 @@
 <script>
   document.addEventListener("DOMContentLoaded", function () {
     var mapElement = document.getElementById("gisMap");
-    var kmzStatus = document.getElementById("kmzStatus");
     var fitKmzBtn = document.getElementById("fitKmzBtn");
     var resetFiltersBtn = document.getElementById("resetFiltersBtn");
 
@@ -606,18 +639,6 @@
     var kmzLayer = null;
     var kmzFeatureLayers = [];
     var loadedKmzUrl = "";
-
-    function setKmzStatus(message, type) {
-      if (!kmzStatus) return;
-
-      kmzStatus.classList.remove("success", "error");
-
-      if (type) {
-        kmzStatus.classList.add(type);
-      }
-
-      kmzStatus.innerHTML = message;
-    }
 
     function normalizeText(value) {
       return String(value || "")
@@ -851,10 +872,6 @@
 
     async function loadKmzFromServer() {
       try {
-        setKmzStatus(
-          "<strong>Loading KMZ...</strong><br>Trying configured asset paths.",
-          ""
-        );
 
         var parser = getToGeoJsonParser();
 
@@ -905,7 +922,45 @@
               });
             }
 
-            layer.bindPopup(buildPopupHtml(feature));
+            const properties =
+              feature.properties || {};
+
+            const featureName =
+              (
+                properties.name || ""
+              ).trim();
+
+            const featureDescription =
+              (
+                properties.description || ""
+              ).trim();
+
+            if (
+              featureName === "0" ||
+              featureName === "_0" ||
+              featureName === "__0" ||
+              featureName === "___0" ||
+              featureDescription.includes("ELEVATION")
+            ) {
+              return;
+            }
+
+            if (
+              featureDescription.includes("ELEVATION") ||
+              featureName === "0" ||
+              featureName === "_0" ||
+              featureName === "__0" ||
+              featureName === "___0"
+            ) {
+              map.removeLayer(layer);
+
+              return;
+            }
+
+            layer.bindPopup(
+              buildPopupHtml(feature)
+            );
+
             kmzFeatureLayers.push(layer);
           }
         });
@@ -919,23 +974,9 @@
           });
         }
 
-        setKmzStatus(
-          "<strong>KMZ loaded successfully.</strong><br>" +
-          "Source: " + escapeHtml(loadedKmzUrl) + "<br>" +
-          "Features: " + geojson.features.length,
-          "success"
-        );
-
         applyFilters();
       } catch (error) {
         console.error("KMZ Load Error:", error);
-
-        setKmzStatus(
-          "<strong>KMZ could not be loaded.</strong><br>" +
-          escapeHtml(error.message || "Unknown error") + "<br><br>" +
-          "Check that the file exists at assets/gis/lubango_Project.kmz or assets/lubango_Project.kmz.",
-          "error"
-        );
       }
     }
 
