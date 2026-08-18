@@ -191,60 +191,62 @@
     z-index: 1;
   }
 
-  body[data-page="home"] .lubango-sidebar-logo {
-    width: 50px;
-    height: 50px;
-    border-radius: 12px;
-    background: #ffffff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    overflow: hidden;
-  }
-
-  body[data-page="home"] .lubango-sidebar-logo img {
-    width: 42px;
-    height: 42px;
-    object-fit: contain;
-    display: block;
+  /*
+    Home-page-only: hide the topbar's title/breadcrumb block entirely.
+    js/shell.js (shared across all pages) falls back to "Dashboard" /
+    "Water Supply Distribution Project" whenever WSDP_PAGE.title/breadcrumb
+    are empty strings, so hiding via CSS (rather than matching text in JS)
+    removes it reliably regardless of what shell.js renders there. Scoped
+    to body[data-page="home"] so no other page is affected, and shell.js
+    itself is never modified.
+  */
+  body[data-page="home"] #topbarMount .topbar-title {
+    display: none !important;
   }
 
   /*
-    Sidebar brand text (title + contract) injected next to the existing logo.
-    Kept in this stylesheet so both home and inner pages share the same look
-    once the same injector script is reused.
+    Home-page-only: style the sidebar brand block that js/shell.js ALREADY
+    renders natively for every page
+    (.sidebar-brand > .sidebar-brand__mark + .sidebar-brand__text > .name/.sub).
+    No text is injected via JS here -- this purely restyles the existing
+    markup so the logo and the two text lines ("PDISA-2 LUBANGO" /
+    "Contract 44W3/LUBANGO/DNA18") sit cleanly side-by-side without
+    wrapping awkwardly or getting cut off, matching the sidebar's dark theme.
   */
-  .lubango-brand-text {
-    display: flex;
+  body[data-page="home"] #sidebarMount .sidebar-brand {
+    display: flex !important;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 16px 20px;
+  }
+
+  body[data-page="home"] #sidebarMount .sidebar-brand__mark {
+    flex-shrink: 0;
+  }
+
+  body[data-page="home"] #sidebarMount .sidebar-brand__text {
+    display: flex !important;
     flex-direction: column;
     min-width: 0;
+    overflow: hidden;
   }
 
-  .lubango-brand-text__title {
+  body[data-page="home"] #sidebarMount .sidebar-brand__text .name {
     font-weight: 800;
     font-size: 14px;
-    line-height: 1.15;
+    line-height: 1.2;
     color: #ffffff;
     white-space: normal;
+    overflow-wrap: break-word;
   }
 
-  .lubango-brand-text__sub {
+  body[data-page="home"] #sidebarMount .sidebar-brand__text .sub {
     font-size: 11px;
     line-height: 1.3;
     color: rgba(255, 255, 255, .72);
     margin-top: 3px;
     white-space: normal;
-  }
-
-  /*
-    Defensive fallback: if the topbar still renders an empty title/breadcrumb
-    node (instead of omitting it), collapse it so no empty gap is left behind
-    next to the search bar.
-  */
-  body[data-page="home"] #topbarMount h1:empty,
-  body[data-page="home"] #topbarMount .breadcrumb:empty {
-    display: none;
+    overflow-wrap: break-word;
   }
 </style>
 </head>
@@ -253,9 +255,13 @@
 
 <script>
   window.WSDP_PAGE = {
-    // Title/breadcrumb intentionally left blank: this text now lives in the
-    // sidebar next to the logo instead of the topbar (see brand injector
-    // script near the bottom of this file).
+    // Title/breadcrumb intentionally left blank: shell.js falls back to
+    // "Dashboard" / "Water Supply Distribution Project" when these are
+    // empty, but the entire .topbar-title block is hidden via CSS on this
+    // page (see body[data-page="home"] #topbarMount .topbar-title rule
+    // above), so nothing from either value is shown. The project name /
+    // contract text is already shown in the sidebar by shell.js itself
+    // (.sidebar-brand), which is only restyled -- not duplicated -- above.
     title: "",
     breadcrumb: "",
     statusClass: "status-pill--info",
@@ -530,97 +536,6 @@
 <script src="js/shell.js"></script>
 <script src="js/main.js"></script>
 <script src="js/charts.js"></script>
-
-<script>
-  /*
-    Sidebar brand text injector.
-    Adds "PDISA-2 LUBANGO / Contract 44W3/LUBANGO/DNA18" next to the EXISTING
-    sidebar logo/icon (the logo itself is left untouched -- we only APPEND a
-    text block beside it), matching the sidebar's dark theme.
-
-    A MutationObserver is used (instead of a fixed setTimeout) because
-    js/shell.js may inject/re-render the sidebar asynchronously; this makes
-    sure the text is added as soon as the logo actually appears, and keeps
-    re-checking if the sidebar content gets re-rendered later.
-  */
-  document.addEventListener("DOMContentLoaded", function () {
-    var sidebar = document.getElementById("sidebarMount");
-    if (!sidebar) return;
-
-    var injected = false;
-
-    function injectSidebarBrandText() {
-      if (injected) return;
-
-      var brand =
-        sidebar.querySelector(".sidebar-brand") ||
-        sidebar.querySelector(".brand") ||
-        sidebar.querySelector(".sidebar-header") ||
-        sidebar.firstElementChild;
-
-      if (!brand) return;
-
-      // Already injected (e.g. after a re-render put it back)? Skip.
-      if (brand.querySelector(".lubango-brand-text")) {
-        injected = true;
-        return;
-      }
-
-      // Lay the brand row out as logo + text, without removing the logo.
-      brand.style.display = "flex";
-      brand.style.alignItems = "center";
-      brand.style.gap = "12px";
-
-      var textWrap = document.createElement("div");
-      textWrap.className = "lubango-brand-text";
-      textWrap.innerHTML =
-        '<div class="lubango-brand-text__title">PDISA-2 LUBANGO</div>' +
-        '<div class="lubango-brand-text__sub">Contract 44W3/LUBANGO/DNA18</div>';
-
-      brand.appendChild(textWrap);
-      injected = true;
-    }
-
-    injectSidebarBrandText();
-
-    var brandObserver = new MutationObserver(function () {
-      if (!injected) injectSidebarBrandText();
-    });
-    brandObserver.observe(sidebar, { childList: true, subtree: true });
-
-    // Safety valve: stop watching after 10s so we don't run forever.
-    setTimeout(function () { brandObserver.disconnect(); }, 10000);
-  });
-
-  /*
-    Topbar title/breadcrumb cleanup (defensive fallback).
-    window.WSDP_PAGE.title / breadcrumb are already set to "" above, which
-    should be enough for js/shell.js to skip rendering them. This observer
-    is just a safety net: if shell.js ever renders an empty/legacy
-    "Dashboard" heading or the old breadcrumb text anyway, it hides just
-    that element (nothing else in the topbar is touched).
-  */
-  document.addEventListener("DOMContentLoaded", function () {
-    var topbar = document.getElementById("topbarMount");
-    if (!topbar) return;
-
-    function hideLegacyTitleBlock() {
-      var nodes = topbar.querySelectorAll("h1, .breadcrumb");
-      nodes.forEach(function (el) {
-        var text = (el.textContent || "").trim();
-        if (text === "Dashboard" || text.indexOf("44W3/LUBANGO") !== -1) {
-          el.style.display = "none";
-        }
-      });
-    }
-
-    hideLegacyTitleBlock();
-    var topbarObserver = new MutationObserver(hideLegacyTitleBlock);
-    topbarObserver.observe(topbar, { childList: true, subtree: true });
-
-    setTimeout(function () { topbarObserver.disconnect(); }, 10000);
-  });
-</script>
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
