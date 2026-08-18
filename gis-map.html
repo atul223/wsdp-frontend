@@ -295,6 +295,34 @@
     font-weight: 700;
     padding: 4px 7px;
   }
+
+  /* DMA / intervention-area map label - visible badge instead of plain black text */
+  .dma-home-label {
+    background: transparent;
+    border: none;
+  }
+
+  .dma-home-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: linear-gradient(135deg, #0a4595, #0057ff);
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .02em;
+    padding: 5px 10px;
+    border-radius: 20px;
+    border: 1.5px solid #ffffff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .35);
+    white-space: nowrap;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .35);
+  }
+
+  .dma-home-tag i {
+    color: #ffd400;
+    font-size: 12px;
+  }
 </style>
 </head>
 
@@ -659,7 +687,7 @@
         .replaceAll("<", "&lt;")
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
+        .replaceAll("'", "&#39;");
     }
 
     function detectArea(searchText) {
@@ -941,8 +969,8 @@
               L.marker(center, {
                 icon: L.divIcon({
                   className: "dma-home-label",
-                  html: '<div class="dma-home-tag">' +
-                    featureName +
+                  html: '<div class="dma-home-tag"><i class="fa-solid fa-location-dot"></i>' +
+                    escapeHtml(featureName) +
                     '</div>',
                   iconSize: [150, 24],
                   iconAnchor: [75, 12]
