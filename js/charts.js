@@ -691,90 +691,41 @@
         const layer = L.geoJSON(
           geojson,
           {
-            style: function() {
-
+            style: function(feature) {
               return {
                 color: "#0A4595",
                 weight: 2,
-                opacity: 0.8
+                opacity: 0.85
               };
-
             }
           }
         );
 
         layer.addTo(map);
-        /* ---------------------------------------------
-        Home Dashboard DMA Overlay
-        --------------------------------------------- */
-
-        /*======================================================
-        HOME DASHBOARD OVERLAY
-        ======================================================*/
-
-        const regions = [
-          {
-            name: "Casa Verde",
-            center: [-14.960,13.472],
-            color: "#FFF59D"
-          },
-          {
-            name: "Escola Portuguesa",
-            center: [-14.948,13.505],
-            color: "#81D4FA"
-          },
-          {
-            name: "Cowboy I",
-            center: [-14.953,13.487],
-            color: "#CE93D8"
-          },
-          {
-            name: "Sofrio",
-            center: [-14.924,13.515],
-            color: "#FFCC80"
-          },
-          {
-            name: "João de Almeida",
-            center: [-14.902,13.520],
-            color: "#A5D6A7"
-          },
-          {
-            name: "Caixote ou Socombar",
-            center: [-14.941,13.450],
-            color: "#F8BBD0"
-          },
-          {
-            name: "Arimba",
-            center: [-14.884,13.553],
-            color: "#EF9A9A"
-          }
+        const labels = [
+          ["Casa Verde", -14.960, 13.472],
+          ["Escola Portuguesa", -14.948, 13.505],
+          ["Cowboy I", -14.953, 13.487],
+          ["Sofrio", -14.924, 13.515],
+          ["João de Almeida", -14.902, 13.520],
+          ["Caixote ou Socombar", -14.941, 13.450],
+          ["Arimba", -14.884, 13.553]
         ];
 
-        regions.forEach(function(region){
-
-          L.circle(
-            region.center,
-            {
-              radius: 700,
-              color: region.color,
-              weight: 2,
-              fillColor: region.color,
-              fillOpacity: 0.28
-            }
-          ).addTo(map);
+        labels.forEach(function(item){
 
           L.marker(
-            region.center,
+            [item[1], item[2]],
             {
-              interactive:false,
-              icon:L.divIcon({
-                className:"dma-home-label",
+              interactive: false,
+              icon: L.divIcon({
+                className: "dma-home-label",
                 html:
                   '<div class="dma-home-tag">' +
-                  region.name +
+                  item[0] +
                   '</div>',
-                iconSize:[150,30],
-                iconAnchor:[75,15]
+                iconSize: [140, 24],
+                iconAnchor: [70, 12]
               })
             }
           ).addTo(map);
