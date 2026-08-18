@@ -15,6 +15,11 @@
   })();
   let dashboardData = null;
 
+  /* =========================================================
+     REPORT-BASED DATA
+     Source: 50CS3_LUBANGO_UCP-P_ENG_MR_Technical_July 2026 report
+     ========================================================= */
+
   const REPORT_PIPELINE_SUMMARY = {
     total: 70.0,
     laid: 31.2005,
@@ -35,6 +40,7 @@
     notStarted: 11,
   };
 
+  // Area-wise Progress (Section 3.2 Planning Control, monthly Planned/Executed per area)
   const FALLBACK_AREA_PROGRESS = [
     {
       area: "Casa Verde",
@@ -87,11 +93,13 @@
     }
   ];
 
+  // Pipe Diameter Progress Matrix (Design/Planned per diameter vs. Installed per
+  // "Materials and Equipment in Stock" - Quantity Used, Section 9)
   const FALLBACK_PIPE_DIAMETER_MATRIX = [
     {
       diameter: "De63 mm",
       planned: 18.796,
-      installed: 16.763,
+      installed: 16.877,
       unit: "km",
     },
     {
@@ -150,6 +158,7 @@
     }
   ];
 
+  // Monthly Progress Summary (Section 3.2 Planning Control + Executive Summary)
   const FALLBACK_MONTHLY_PROGRESS = [
     {
       activity: "Pipeline Installation",
@@ -188,6 +197,37 @@
     }
   ];
 
+  // Testing & Commissioning (Section 3.4 Tests / Executive Summary - Pressure/Disinfection Tests [E])
+  const FALLBACK_TESTING_ACTIVITIES = [
+    {
+      id: "report-testing-1",
+      activityName: "Pipeline Pressure Testing",
+      plannedValue: 70.0,
+      actualValue: 0,
+      unit: "km",
+      status: "Not Started",
+    },
+    {
+      id: "report-testing-2",
+      activityName: "Disinfection Testing",
+      plannedValue: 70.0,
+      actualValue: 0,
+      unit: "km",
+      status: "Not Started",
+    }
+  ];
+
+  // Bridge Crossings (Section 2.2 Table 1 - "Pipeline crossing a river/stream: 3 no's")
+  const FALLBACK_BRIDGE_CROSSINGS = [
+    {
+      id: "report-bridge-1",
+      area: "As per Detailed Design",
+      crossingType: "River/Stream Crossing",
+      span: "3 Nos Planned",
+      status: "Not Started",
+    }
+  ];
+
   function unwrap(result) {
     return result?.data?.data ?? result?.data ?? result;
   }
@@ -204,7 +244,7 @@
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
+      .replaceAll("'", "&#39;");
   }
 
   function numberValue(value) {
@@ -222,6 +262,17 @@
     }
 
     return formatProgressValue(value, unit);
+  }
+
+  // Returns `source` when it is a non-empty array, otherwise falls back to
+  // the provided report-based fallback rows. Used by every table renderer so
+  // that live backend data (once available) always takes priority over the
+  // static report fallback.
+  function pickRows(source, fallback) {
+    if (Array.isArray(source) && source.length) {
+      return source;
+    }
+    return Array.isArray(fallback) ? fallback : [];
   }
 
   function normalizeAreaName(value) {
@@ -370,7 +421,6 @@
     renderAreaProgressTable();
     renderPipeDiameterMatrix();
     renderMonthlyProgressTable();
-    renderPipelineTable();
     updatePipelineAreaChart();
 
     renderHouseKpis();
@@ -420,59 +470,6 @@
     if (remainingDelta) {
       remainingDelta.textContent = `${((pipeline.remaining / totalLength) * 100).toFixed(1)}% of total`;
     }
-  }
-
-  function renderPipelineTable() {
-    const tbody = document.querySelector("#pipelineTableBody");
-    if (!tbody) return;
-
-    const rows = dashboardData?.pipeline_sections || [];
-    const selectedArea = getSelectedArea();
-
-    const filteredRows = selectedArea === "all"
-      ? rows
-      : rows.filter((section) => areaMatchesSelection(section.zone || section.area));
-
-    tbody.innerHTML = "";
-
-    if (!filteredRows.length) {
-      tbody.innerHTML = emptyRow(5, "No pipeline sections added yet.");
-      return;
-    }
-
-    filteredRows.forEach((section) => {
-      const areaName = normalizeAreaName(section.zone || section.area);
-      const chainage = `${section.chainageFrom || "-"} - ${section.chainageTo || "-"}`;
-      const planned = section.plannedValue ?? section.lengthKm ?? section.planned ?? null;
-      const actual = section.actualValue ?? section.installed ?? section.laid ?? null;
-
-      tbody.insertAdjacentHTML(
-        "beforeend",
-        `
-          <tr data-area="${escapeHtml(areaName)}">
-            <td>
-              <strong>${escapeHtml(areaName)}</strong><br>
-              <span style="color:var(--text-muted);font-size:12px;">${escapeHtml(chainage)}</span>
-            </td>
-            <td class="num">${formatMaybeValue(planned, "km")}</td>
-            <td class="num">${formatMaybeValue(actual, "km")}</td>
-            <td>
-              <span class="status-chip ${getStatusClass(section.status)}">
-                ${escapeHtml(section.status || "In Progress")}
-              </span>
-            </td>
-            <td class="actions-col">
-              <button class="btn-ghost edit-pipeline" type="button" data-id="${section.id}">
-                Edit
-              </button>
-              <button class="btn-ghost delete-pipeline" type="button" data-id="${section.id}">
-                Delete
-              </button>
-            </td>
-          </tr>
-        `
-      );
-    });
   }
 
   function renderAreaProgressTable() {
@@ -606,67 +603,6 @@
     chart.data.datasets[0].data = rows.map((item) => numberValue(item.planned));
     chart.data.datasets[1].data = rows.map((item) => numberValue(item.actual));
     chart.update();
-  }
-
-  function openPipelineModal(id) {
-    const existing = id
-      ? dashboardData.pipeline_sections.find((x) => x.id === id)
-      : null;
-
-    openCrudModal({
-      title: existing ? "Edit Pipeline Section" : "Add Pipeline Section",
-      fields: [
-        inputField("Zone", "zone", existing?.zone, "text", true),
-        inputField("Chainage From", "chainageFrom", existing?.chainageFrom, "text", true),
-        inputField("Chainage To", "chainageTo", existing?.chainageTo, "text", true),
-        inputField("Diameter", "diameter", existing?.diameter, "text", true),
-        inputField("Length KM", "lengthKm", existing?.lengthKm, "number", true, "0.01"),
-        inputField("Laying %", "layingPct", existing?.layingPct ?? 0, "number", true, "0.01"),
-        inputField("Testing %", "testingPct", existing?.testingPct ?? 0, "number", true, "0.01"),
-        selectField("Status", "status", existing?.status, [
-          "Complete",
-          "In Progress",
-          "Testing",
-          "Not Started",
-          "Delayed",
-        ]),
-      ],
-      onSubmit: async (payload) => {
-        payload.projectId = PROJECT_ID;
-        payload.lengthKm = numberValue(payload.lengthKm);
-        payload.layingPct = numberValue(payload.layingPct);
-        payload.testingPct = numberValue(payload.testingPct);
-
-        if (id) {
-          await WSDP_API.request(
-            "PUT",
-            `/construction-progress/pipeline-section/${id}`,
-            payload
-          );
-        } else {
-          await WSDP_API.request(
-            "POST",
-            "/construction-progress/pipeline-section",
-            payload
-          );
-        }
-
-        toast("Pipeline section saved successfully");
-        await loadDashboard();
-      },
-    });
-  }
-
-  async function deletePipeline(id) {
-    if (!confirm("Delete this pipeline section?")) return;
-
-    await WSDP_API.request(
-      "DELETE",
-      `/construction-progress/pipeline-section/${id}`
-    );
-
-    toast("Pipeline section deleted");
-    await loadDashboard();
   }
 
   /* =========================
@@ -1263,18 +1199,6 @@
     if (!target) return;
 
     try {
-      if (target.id === "addPipelineSectionBtn") {
-        openPipelineModal();
-      }
-
-      if (target.classList.contains("edit-pipeline")) {
-        openPipelineModal(target.dataset.id);
-      }
-
-      if (target.classList.contains("delete-pipeline")) {
-        await deletePipeline(target.dataset.id);
-      }
-
       if (target.id === "addTestingActivityBtn") {
         openTestingModal();
       }
@@ -1330,7 +1254,6 @@
     if (areaFilter) {
       areaFilter.addEventListener("change", function () {
         renderAreaProgressTable();
-        renderPipelineTable();
       });
     }
 
