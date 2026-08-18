@@ -626,131 +626,92 @@
 
       try {
 
-        const response =
-          await fetch(
-            "/assets/gis/lubango_Project.kmz"
-          );
+        const response = await fetch("/assets/gis/lubango_Project.kmz");
 
         if (!response.ok) {
-          throw new Error(
-            "KMZ not found"
-          );
+          throw new Error("KMZ not found");
         }
 
-        const buffer =
-          await response.arrayBuffer();
-
-        const zip =
-          await JSZip.loadAsync(
-            buffer
-          );
+        const buffer = await response.arrayBuffer();
+        const zip = await JSZip.loadAsync(buffer);
 
         let kmlText = null;
+        const files = Object.values(zip.files);
 
-        const files =
-          Object.values(
-            zip.files
-          );
-
-        for (
-          const file
-          of files
-        ) {
-
-          if (
-            file.name
-              .toLowerCase()
-              .endsWith(".kml")
-          ) {
-
-            kmlText =
-              await file.async(
-                "text"
-              );
-
+        for (const file of files) {
+          if (file.name.toLowerCase().endsWith(".kml")) {
+            kmlText = await file.async("text");
             break;
           }
         }
 
         if (!kmlText) {
-          throw new Error(
-            "No KML found"
-          );
+          throw new Error("No KML found");
         }
 
-        const xml =
-          new DOMParser()
-            .parseFromString(
-              kmlText,
-              "text/xml"
-            );
+        const xml = new DOMParser().parseFromString(kmlText, "text/xml");
+        const geojson = toGeoJSON.kml(xml);
 
-        const geojson =
-          toGeoJSON.kml(xml);
-
-        const layer = L.geoJSON(
-          geojson,
-          {
-            style: function(feature) {
-              return {
-                color: "#0A4595",
-                weight: 2,
-                opacity: 0.85
-              };
-            }
-          }
-        );
-
-        layer.addTo(map);
-        const labels = [
-          ["Casa Verde", -14.960, 13.472],
-          ["Escola Portuguesa", -14.948, 13.505],
-          ["Cowboy I", -14.953, 13.487],
-          ["Sofrio", -14.924, 13.515],
-          ["João de Almeida", -14.902, 13.520],
-          ["Caixote ou Socombar", -14.941, 13.450],
-          ["Arimba", -14.884, 13.553]
-        ];
-
-        labels.forEach(function(item){
-
-          L.marker(
-            [item[1], item[2]],
-            {
-              interactive: false,
-              icon: L.divIcon({
-                className: "dma-home-label",
-                html:
-                  '<div class="dma-home-tag">' +
-                  item[0] +
-                  '</div>',
-                iconSize: [140, 24],
-                iconAnchor: [70, 12]
-              })
-            }
-          ).addTo(map);
-
+        // Keep only polygon/multipolygon features for the intervention-area
+        // boundaries. Any LineString/Point placemarks in the KMZ (pipe routes,
+        // roads, survey points, etc.) are dropped here so they stop rendering
+        // as stray lines inside the highlighted areas.
+        const polygonFeatures = geojson.features.filter(function (f) {
+          return (
+            f.geometry &&
+            (f.geometry.type === "Polygon" || f.geometry.type === "MultiPolygon")
+          );
         });
 
-        if (
-          layer.getBounds().isValid()
-        ) {
-          map.fitBounds(
-            layer.getBounds(),
-            {
-              padding: [25, 25]
-            }
-          );
+        const boundaryGeoJson = {
+          type: "FeatureCollection",
+          features: polygonFeatures
+        };
+
+        const layer = L.geoJSON(boundaryGeoJson, {
+          style: function () {
+            return {
+              color: "#0A4595",
+              weight: 2,
+              opacity: 0.85,
+              fill: true,
+              fillColor: "#0A4595",
+              fillOpacity: 0.10
+            };
+          }
+        });
+
+        layer.addTo(map);
+
+        // Place each label at the actual centroid of its own polygon, using the
+        // name stored in the KML itself — this replaces the hardcoded lat/lng
+        // list (which also had lat/lng swapped) so labels can never drift out
+        // of sync with where the shapes actually are.
+        layer.eachLayer(function (featureLayer) {
+          const props = (featureLayer.feature && featureLayer.feature.properties) || {};
+          const name = props.name || props.Name || "";
+
+          if (!name) return;
+
+          const center = featureLayer.getBounds().getCenter();
+
+          L.marker(center, {
+            interactive: false,
+            icon: L.divIcon({
+              className: "dma-home-label",
+              html: '<div class="dma-home-tag">' + name + "</div>",
+              iconSize: [140, 24],
+              iconAnchor: [70, 12]
+            })
+          }).addTo(map);
+        });
+
+        if (layer.getBounds().isValid()) {
+          map.fitBounds(layer.getBounds(), { padding: [25, 25] });
         }
 
-      }
-      catch (error) {
-
-        console.error(
-          "Home KMZ error",
-          error
-        );
-
+      } catch (error) {
+        console.error("Home KMZ error", error);
       }
     }
 
