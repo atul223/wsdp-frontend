@@ -43,12 +43,15 @@
       <div class="filter-bar">
         <span class="filter-bar__label"><i class="fa-solid fa-sliders"></i> Scope</span>
 
-        <select class="filter-select" aria-label="Filter by zone">
-          <option>All Zones</option>
-          <option>Zone A</option>
-          <option>Zone B</option>
-          <option>Zone C</option>
-          <option>Zone D</option>
+        <select class="filter-select" aria-label="Filter by area" id="areaFilterSelect">
+          <option value="all">Areas</option>
+          <option value="Casa Verde">Casa Verde</option>
+          <option value="Escola Portuguesa">Escola Portuguesa</option>
+          <option value="Cowboy I">Cowboy I</option>
+          <option value="Sofrio">Sofrio</option>
+          <option value="João de Almeida">João de Almeida</option>
+          <option value="Caixote ou Socombar">Caixote ou Socombar</option>
+          <option value="Arimba">Arimba</option>
         </select>
 
         <select class="filter-select" aria-label="Filter by date range">
@@ -64,8 +67,8 @@
       </div>
 
       <div class="subnav">
-        #ehsEHS Dashboard</a>
-        #social-environmentalSocial & Environmental</a>
+        <a href="#ehs" class="subnav__link subnav__link--active">EHS Dashboard</a>
+        <a href="#social-environmental" class="subnav__link">Social & Environmental</a>
       </div>
 
       <section id="ehs">
