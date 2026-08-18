@@ -58,15 +58,15 @@
   ];
 
   const EQUIPMENT_DEPLOYMENT = [
-    { category: "Earthmoving (Excavator, dump truck, backhoe)", planned: null, deployed: 4, variance: null },
-    { category: "Welding (Butt fusion, manual, handheld)", planned: null, deployed: 11, variance: null },
-    { category: "Generators (30/15/10/2.5 kW)", planned: null, deployed: 5, variance: null },
-    { category: "Light Vehicles (Pickups + truck)", planned: null, deployed: 7, variance: null },
-    { category: "Tamping, cutting, grinder, jackhammer", planned: null, deployed: 12, variance: null },
-    { category: "Survey (GPS, level)", planned: null, deployed: 2, variance: null },
-    { category: "Test equipment (Pump, tanks)", planned: null, deployed: 3, variance: null },
-    { category: "Other", planned: null, deployed: 2, variance: null },
-    { category: "TOTAL", planned: 61, deployed: 46, variance: -15, isTotal: true }
+    { category: "Earthmoving (Excavator, dump truck, backhoe)", planned: null, deployed: 4, variance: null, remarks: "No planned baseline set; utilization to be monitored against June work-front ramp-up" },
+    { category: "Welding (Butt fusion, manual, handheld)", planned: null, deployed: 11, variance: null, remarks: "Adequate coverage for current pipe-fusion works" },
+    { category: "Generators (30/15/10/2.5 kW)", planned: null, deployed: 5, variance: null, remarks: "Sufficient for active work fronts" },
+    { category: "Light Vehicles (Pickups + truck)", planned: null, deployed: 7, variance: null, remarks: "Adequate site mobility support" },
+    { category: "Tamping, cutting, grinder, jackhammer", planned: null, deployed: 12, variance: null, remarks: "Adequate for pavement and concrete works" },
+    { category: "Survey (GPS, level)", planned: null, deployed: 2, variance: null, remarks: "Minimum required; no spare unit available" },
+    { category: "Test equipment (Pump, tanks)", planned: null, deployed: 3, variance: null, remarks: "Repeat pressure test required (DN250, 463 m) due to equipment failure" },
+    { category: "Other", planned: null, deployed: 2, variance: null, remarks: "Miscellaneous support equipment" },
+    { category: "TOTAL", planned: 61, deployed: 46, variance: -15, remarks: "Shortfall of 15 units vs May plan; additional mobilization pending", isTotal: true }
   ];
 
   const MANPOWER_PROGRESS = [
@@ -420,6 +420,14 @@
         background: rgba(10, 69, 149, 0.06);
       }
 
+      .resource-report-table td.remarks-cell {
+        color: var(--text-muted, #5B6B7C);
+        font-size: 12.5px;
+        max-width: 280px;
+        white-space: normal;
+        line-height: 1.4;
+      }
+
       .resource-total-row {
         background: rgba(10, 69, 149, 0.12) !important;
         font-weight: 800;
@@ -702,60 +710,6 @@
     `;
   }
 
-  function renderEquipmentCards() {
-    const section = document.getElementById("equipment");
-    if (!section) return;
-
-    const grid = section.querySelector(".grid");
-    if (!grid) return;
-
-    const equipment = byType("equipment");
-
-    if (!equipment.length) {
-      grid.innerHTML = `
-        <div class="card" style="grid-column:1/-1;">
-          <div class="resource-empty">
-            <i class="fa-solid fa-truck-monster"></i>
-            <p>No equipment records found.</p>
-            ${buttonHTML("fa-plus", "Add Equipment", "btn-primary-lite", 'data-resource-add="equipment"')}
-          </div>
-        </div>
-      `;
-      return;
-    }
-
-    grid.innerHTML = equipment
-      .map(function (item) {
-        const total = Number(item.total_capacity || 0);
-        const allocated = Number(item.allocated_quantity || 0);
-        const utilization = total > 0 ? Math.round((allocated / total) * 100) : 0;
-        const accent = utilization >= 80 ? "success" : utilization >= 50 ? "secondary" : "warning";
-
-        return `
-          <div class="card card-accent card-accent--${accent}" data-resource-id="${escapeAttr(item.id)}">
-            <div class="card-body">
-              <div class="kpi-card__label">${escapeHTML(item.name)}</div>
-              <div class="kpi-card__value" style="font-size:1.5rem;">
-                ${formatNumber(allocated)} / ${formatNumber(total)}
-              </div>
-              <div class="kpi-card__delta ${utilization >= 75 ? "up" : "flat"}">
-                ${utilization}% utilization · ${escapeHTML(item.unit || "unit")}
-              </div>
-              <div class="resource-action-cell" style="margin-top:12px;justify-content:flex-start;">
-                <button type="button" title="Edit" data-resource-edit="${escapeAttr(item.id)}">
-                  <i class="fa-solid fa-pen"></i>
-                </button>
-                <button type="button" title="Delete" class="danger" data-resource-delete="${escapeAttr(item.id)}">
-                  <i class="fa-solid fa-trash"></i>
-                </button>
-              </div>
-            </div>
-          </div>
-        `;
-      })
-      .join("");
-  }
-
   function renderEquipmentDeploymentTable() {
     const section = document.getElementById("equipment");
     if (!section) return;
@@ -783,6 +737,7 @@
               <th scope="col" class="num">Planned</th>
               <th scope="col" class="num">Deployed</th>
               <th scope="col" class="num">Variance</th>
+              <th scope="col">Remarks</th>
             </tr>
           </thead>
           <tbody>
@@ -793,6 +748,7 @@
                   <td class="num">${formatNumber(item.planned)}</td>
                   <td class="num">${formatNumber(item.deployed)}</td>
                   <td class="num">${formatNumber(item.variance)}</td>
+                  <td class="remarks-cell">${escapeHTML(item.remarks || "—")}</td>
                 </tr>
               `;
             }).join("")}
@@ -841,18 +797,72 @@
     }).join("");
   }
 
+  // Builds an array of { name, total, categories: { categoryLabel: headcount } }
+  // from the WORKFORCE_BY_EMPLOYER table rows (forward-filling blank group cells),
+  // so the Manpower chart always mirrors whatever the Workforce By Employer table shows.
+  function buildWorkforceGroups() {
+    const groups = [];
+    let current = null;
+
+    WORKFORCE_BY_EMPLOYER.forEach(function (row) {
+      if (row.isTotal) return;
+
+      if (row.group) {
+        current = { name: row.group, total: 0, categories: {} };
+        groups.push(current);
+      }
+
+      if (!current) return;
+
+      current.categories[row.category] = (current.categories[row.category] || 0) + Number(row.headcount || 0);
+      current.total += Number(row.headcount || 0);
+    });
+
+    return groups;
+  }
+
   function renderManpowerChart() {
     const el = document.getElementById("manpowerChart");
     if (!el || !window.Chart) return;
 
-    const manpower = byType("manpower");
+    const groups = buildWorkforceGroups();
 
-    const labels = manpower.map(function (item) {
-      return item.name;
+    const categoryOrder = [];
+    groups.forEach(function (group) {
+      Object.keys(group.categories).forEach(function (cat) {
+        if (categoryOrder.indexOf(cat) === -1) categoryOrder.push(cat);
+      });
     });
 
-    const values = manpower.map(function (item) {
-      return Number(item.total_capacity || 0);
+    const cssVar = function (name) {
+      return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    };
+
+    const palette = [
+      cssVar("--color-primary") || "#2563EB",
+      cssVar("--color-secondary") || "#7C3AED",
+      cssVar("--color-warning") || "#D97706",
+      cssVar("--color-success") || "#059669",
+      "#0EA5E9",
+      "#F97316",
+      "#14B8A6",
+      "#EC4899"
+    ];
+
+    const labels = groups.map(function (group) {
+      return group.name;
+    });
+
+    const datasets = categoryOrder.map(function (cat, idx) {
+      return {
+        label: cat,
+        data: groups.map(function (group) {
+          return group.categories[cat] || 0;
+        }),
+        backgroundColor: palette[idx % palette.length],
+        borderRadius: 4,
+        maxBarThickness: 46
+      };
     });
 
     if (state.chart) {
@@ -860,41 +870,44 @@
       state.chart = null;
     }
 
-    const cssVar = function (name) {
-      return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    };
-
     state.chart = new Chart(el, {
-      type: "doughnut",
+      type: "bar",
       data: {
-        labels: labels.length ? labels : ["No manpower data"],
-        datasets: [
-          {
-            data: values.length ? values : [1],
-            backgroundColor: [
-              cssVar("--color-primary") || "#2563EB",
-              cssVar("--color-secondary") || "#7C3AED",
-              cssVar("--color-warning") || "#D97706",
-              cssVar("--color-success") || "#059669",
-              "#0EA5E9",
-              "#F97316",
-              "#14B8A6"
-            ],
-            borderWidth: 0
-          }
-        ]
+        labels: labels.length ? labels : ["No workforce data"],
+        datasets: datasets.length ? datasets : [{ label: "Headcount", data: [0], backgroundColor: palette[0] }]
       },
       options: {
         maintainAspectRatio: false,
-        cutout: "65%",
+        responsive: true,
+        interaction: { mode: "index", intersect: false },
+        scales: {
+          x: {
+            stacked: true,
+            grid: { display: false }
+          },
+          y: {
+            stacked: true,
+            beginAtZero: true,
+            ticks: { precision: 0 }
+          }
+        },
         plugins: {
           legend: {
-            position: "right",
+            position: "bottom",
             labels: {
               boxWidth: 10,
               boxHeight: 10,
               usePointStyle: true,
               pointStyle: "circle"
+            }
+          },
+          tooltip: {
+            callbacks: {
+              afterBody: function (items) {
+                if (!items.length) return "";
+                const group = groups[items[0].dataIndex];
+                return group ? "Total: " + group.total : "";
+              }
             }
           }
         }
@@ -1053,7 +1066,9 @@
     renderMaterialsTable();
     renderHdpePipeStockTable();
 
-    renderEquipmentCards();
+    // Note: the 3 Equipment info cards (Dewatering Pumps, Excavators, HDD Rigs)
+    // have been intentionally removed from the Equipment section per updated design.
+    // Only the Equipment Deployment table (with Remarks) is shown below.
     renderEquipmentDeploymentTable();
 
     renderManpowerProgressCards();
@@ -1284,6 +1299,20 @@
     });
   }
 
+  function initAreaFilter() {
+    const select = document.getElementById("areaFilterSelect");
+    if (!select) return;
+
+    select.addEventListener("change", function () {
+      const value = select.value;
+
+      document.querySelectorAll("#materials tbody tr[data-area]").forEach(function (row) {
+        const area = row.getAttribute("data-area");
+        row.style.display = value === "all" || area === value ? "" : "none";
+      });
+    });
+  }
+
   function initExportButton() {
     const exportBtn = Array.from(document.querySelectorAll(".filter-bar button")).find(function (btn) {
       return /export/i.test(btn.textContent || "");
@@ -1349,6 +1378,7 @@
     injectSectionActions();
     initGlobalClicks();
     initExportButton();
+    initAreaFilter();
 
     state.projectId = await resolveProjectId();
 

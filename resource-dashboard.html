@@ -33,12 +33,15 @@
       <div class="filter-bar">
         <span class="filter-bar__label"><i class="fa-solid fa-sliders"></i> Scope</span>
 
-        <select class="filter-select" aria-label="Filter by zone">
-          <option>All Zones</option>
-          <option>Zone A</option>
-          <option>Zone B</option>
-          <option>Zone C</option>
-          <option>Zone D</option>
+        <select class="filter-select" aria-label="Filter by area" id="areaFilterSelect">
+          <option value="all">Areas</option>
+          <option value="Casa Verde">Casa Verde</option>
+          <option value="Escola Portuguesa">Escola Portuguesa</option>
+          <option value="Cowboy I">Cowboy I</option>
+          <option value="Sofrio">Sofrio</option>
+          <option value="João de Almeida">João de Almeida</option>
+          <option value="Caixote ou Socombar">Caixote ou Socombar</option>
+          <option value="Arimba">Arimba</option>
         </select>
 
         <select class="filter-select" aria-label="Filter by date range">
@@ -139,7 +142,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr data-zone="Zone A">
+                <tr data-area="Casa Verde">
                   <td>DI Pipe - 600mm</td>
                   <td>m</td>
                   <td class="num">1,200</td>
@@ -151,7 +154,7 @@
                     </span>
                   </td>
                 </tr>
-                <tr data-zone="Zone B">
+                <tr data-area="Escola Portuguesa">
                   <td>DI Pipe - 450mm</td>
                   <td>m</td>
                   <td class="num">3,100</td>
@@ -163,7 +166,7 @@
                     </span>
                   </td>
                 </tr>
-                <tr data-zone="Zone C">
+                <tr data-area="Cowboy I">
                   <td>HDPE Pipe - 315mm</td>
                   <td>m</td>
                   <td class="num">5,400</td>
@@ -175,7 +178,7 @@
                     </span>
                   </td>
                 </tr>
-                <tr data-zone="Zone A">
+                <tr data-area="Sofrio">
                   <td>Cement (OPC 53)</td>
                   <td>bags</td>
                   <td class="num">2,850</td>
@@ -187,7 +190,7 @@
                     </span>
                   </td>
                 </tr>
-                <tr data-zone="Zone D">
+                <tr data-area="João de Almeida">
                   <td>Sluice Valves</td>
                   <td>nos</td>
                   <td class="num">34</td>
@@ -209,40 +212,6 @@
         <div class="section-heading">
           <h2>Equipment</h2>
           <span class="section-sub">Availability, utilization &amp; maintenance</span>
-        </div>
-
-        <div class="grid grid-4">
-          <div class="card card-accent card-accent--success">
-            <div class="card-body">
-              <div class="kpi-card__label">Excavators</div>
-              <div class="kpi-card__value" style="font-size:1.5rem;">8 / 10</div>
-              <div class="kpi-card__delta up">80% utilization</div>
-            </div>
-          </div>
-
-          <div class="card card-accent card-accent--secondary">
-            <div class="card-body">
-              <div class="kpi-card__label">HDD Rigs</div>
-              <div class="kpi-card__value" style="font-size:1.5rem;">2 / 3</div>
-              <div class="kpi-card__delta flat">67% utilization</div>
-            </div>
-          </div>
-
-          <div class="card card-accent card-accent--success">
-            <div class="card-body">
-              <div class="kpi-card__label">Dewatering Pumps</div>
-              <div class="kpi-card__value" style="font-size:1.5rem;">11 / 12</div>
-              <div class="kpi-card__delta up">92% utilization</div>
-            </div>
-          </div>
-
-          <div class="card card-accent card-accent--warning">
-            <div class="card-body">
-              <div class="kpi-card__label">Idle / Under Maintenance</div>
-              <div class="kpi-card__value" style="font-size:1.5rem;color:var(--color-warning);">6</div>
-              <div class="kpi-card__delta flat">Across all categories</div>
-            </div>
-          </div>
         </div>
       </section>
 
