@@ -379,5 +379,53 @@
 <script src="js/shell.js"></script>
 <script src="js/main.js"></script>
 <script src="js/financial-dashboard.js"></script>
+
+<script>
+  /*
+    Minimal, non-invasive color patch.
+    Purpose: change ONLY the "Planned Expenditure (M AOA)" dataset color
+    in the Cash Flow chart from grey to a professional, visible blue.
+    Nothing else on the page (layout, KPIs, tables, other charts) is touched.
+  */
+  (function applyPlannedExpenditureColorFix() {
+    var PLANNED_BORDER = "#2F6FED";              // professional blue border
+    var PLANNED_FILL = "rgba(47, 111, 237, 0.35)"; // visible, still soft fill
+    var PLANNED_HOVER = "rgba(47, 111, 237, 0.55)";
+
+    function recolorPlannedDataset() {
+      if (!window.Chart) return false;
+
+      var canvas = document.getElementById("cashFlowChart");
+      if (!canvas) return false;
+
+      var chart = Chart.getChart(canvas);
+      if (!chart || !chart.data || !Array.isArray(chart.data.datasets)) return false;
+
+      var changed = false;
+
+      chart.data.datasets.forEach(function (dataset) {
+        if ((dataset.label || "").trim() === "Planned Expenditure (M AOA)") {
+          dataset.backgroundColor = PLANNED_FILL;
+          dataset.borderColor = PLANNED_BORDER;
+          dataset.hoverBackgroundColor = PLANNED_HOVER;
+          dataset.borderWidth = 1;
+          changed = true;
+        }
+      });
+
+      if (changed) chart.update();
+      return changed;
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+      var attempts = 0;
+      (function retry() {
+        attempts++;
+        if (recolorPlannedDataset() || attempts >= 50) return;
+        setTimeout(retry, 100);
+      })();
+    });
+  })();
+</script>
 </body>
 </html>
