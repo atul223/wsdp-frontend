@@ -688,20 +688,20 @@
         const geojson =
           toGeoJSON.kml(xml);
 
-        const layer =
-          L.geoJSON(
-            geojson,
-            {
-              style: function() {
-                return {
-                  opacity: 0,
-                  weight: 0,
-                  color: "transparent",
-                  fillOpacity: 0
-                };
-              }
+        const layer = L.geoJSON(
+          geojson,
+          {
+            style: function() {
+
+              return {
+                color: "#0A4595",
+                weight: 2,
+                opacity: 0.8
+              };
+
             }
-          );
+          }
+        );
 
         layer.addTo(map);
         /* ---------------------------------------------
@@ -775,37 +775,6 @@
                   '</div>',
                 iconSize:[150,30],
                 iconAnchor:[75,15]
-              })
-            }
-          ).addTo(map);
-
-        });
-
-        dashboardRegions.forEach(function(region){
-
-          L.circle(
-            region.center,
-            {
-              radius: region.radius,
-              color: region.color,
-              weight: 2,
-              fillColor: region.color,
-              fillOpacity: 0.28
-            }
-          ).addTo(map);
-
-          L.marker(
-            region.center,
-            {
-              interactive:false,
-              icon:L.divIcon({
-                className:"dma-home-label",
-                html:
-                  '<div class="dma-home-tag">' +
-                  region.name +
-                  '</div>',
-                iconSize:[140,24],
-                iconAnchor:[70,12]
               })
             }
           ).addTo(map);
