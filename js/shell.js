@@ -119,7 +119,14 @@
 
     return `
       <div class="sidebar-brand">
-        <div class="sidebar-brand__mark"><i class="fa-solid fa-droplet"></i></div>
+        <div class="sidebar-brand__mark">
+          <img
+            src="assets/images/pdisa-logo.png"
+            alt="PDISA Logo"
+            class="sidebar-brand__logo-img"
+            onerror="this.onerror=null;this.replaceWith(Object.assign(document.createElement('i'),{className:'fa-solid fa-droplet'}));"
+          />
+        </div>
         <div class="sidebar-brand__text">
           <div class="name">PDISA-2 LUBANGO</div>
           <div class="sub"> Contract 44W3/LUBANGO/DNA18</div>
@@ -216,6 +223,26 @@
     document.head.appendChild(style);
   }
 
+  /** Injects the minimal CSS the sidebar brand logo image needs, once per
+   *  page. Kept in JS (not styles.css) so this stays a single, self-
+   *  contained change in shell.js -- no other stylesheet needs touching.
+   *  Sizing/rounding mirrors the previous droplet-icon mark so the sidebar
+   *  layout is visually unaffected aside from the logo artwork itself. */
+  function injectSidebarBrandLogoStyles() {
+    if (document.getElementById("wsdpSidebarBrandLogoStyles")) return;
+    const style = document.createElement("style");
+    style.id = "wsdpSidebarBrandLogoStyles";
+    style.textContent = `
+      .sidebar-brand__logo-img {
+        width: 32px;
+        height: 32px;
+        object-fit: contain;
+        display: block;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   function initials(name) {
     if (!name) return "?";
     const parts = name.trim().split(/\s+/);
@@ -294,6 +321,8 @@
 
     if (sidebarMount) sidebarMount.innerHTML = buildSidebar(activeKey);
     if (topbarMount) topbarMount.innerHTML = buildTopbar(cfg);
+
+    injectSidebarBrandLogoStyles();
 
     if (!document.querySelector(".sidebar-backdrop")) {
       const backdrop = document.createElement("div");
