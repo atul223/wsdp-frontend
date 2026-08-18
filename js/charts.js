@@ -692,23 +692,7 @@
           L.geoJSON(
             geojson,
             {
-              style: function(feature) {
-                const type =
-                  feature.geometry
-                    ? feature.geometry.type
-                    : "";
-
-                if (
-                  type === "LineString" ||
-                  type === "MultiLineString"
-                ) {
-                  return {
-                    opacity: 0,
-                    weight: 0,
-                    color: "transparent"
-                  };
-                }
-
+              style: function() {
                 return {
                   opacity: 0,
                   weight: 0,
@@ -720,44 +704,85 @@
           );
 
         layer.addTo(map);
+        /* ---------------------------------------------
+        Home Dashboard DMA Overlay
+        --------------------------------------------- */
 
-        const dmaLabels = [
+        const dashboardRegions = [
           {
             name: "Casa Verde",
-            coords: [-14.9610, 13.4725],
-            color: "#0A4595"
+            center: [-14.962, 13.468],
+            color: "#FFF59D",
+            radius: 450
           },
           {
             name: "Escola Portuguesa",
-            coords: [-14.9460, 13.5040],
-            color: "#0A4595"
-          },
-          {
-            name: "Sofrio",
-            coords: [-14.9190, 13.5200],
-            color: "#0A4595"
+            center: [-14.948, 13.505],
+            color: "#81D4FA",
+            radius: 500
           },
           {
             name: "Cowboy I",
-            coords: [-14.9700, 13.5250],
-            color: "#0A4595"
+            center: [-14.954, 13.485],
+            color: "#CE93D8",
+            radius: 420
+          },
+          {
+            name: "Sofrio",
+            center: [-14.925, 13.512],
+            color: "#FFCC80",
+            radius: 500
           },
           {
             name: "João de Almeida",
-            coords: [-14.9005, 13.5240],
-            color: "#0A4595"
+            center: [-14.904, 13.520],
+            color: "#A5D6A7",
+            radius: 500
           },
           {
             name: "Caixote ou Socombar",
-            coords: [-14.8930, 13.4770],
-            color: "#0A4595"
+            center: [-14.940, 13.450],
+            color: "#F8BBD0",
+            radius: 550
           },
           {
             name: "Arimba",
-            coords: [-14.8810, 13.4740],
-            color: "#0A4595"
+            center: [-14.885, 13.552],
+            color: "#EF9A9A",
+            radius: 600
           }
         ];
+
+        dashboardRegions.forEach(function(region){
+
+          L.circle(
+            region.center,
+            {
+              radius: region.radius,
+              color: region.color,
+              weight: 2,
+              fillColor: region.color,
+              fillOpacity: 0.28
+            }
+          ).addTo(map);
+
+          L.marker(
+            region.center,
+            {
+              interactive:false,
+              icon:L.divIcon({
+                className:"dma-home-label",
+                html:
+                  '<div class="dma-home-tag">' +
+                  region.name +
+                  '</div>',
+                iconSize:[140,24],
+                iconAnchor:[70,12]
+              })
+            }
+          ).addTo(map);
+
+        });
 
         if (
           layer.getBounds().isValid()
