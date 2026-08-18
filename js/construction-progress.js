@@ -408,11 +408,16 @@
 
       renderAll();
     } catch (error) {
-      console.error(error);
+      console.error("[construction-progress] dashboard fetch failed, showing report fallback data:", error);
       toast(
-        error.message || "Failed to load construction data",
+        error.message || "Live data unavailable — showing latest report figures",
         "fa-circle-exclamation"
       );
+      // Even if the backend call fails (404 / 500 / CORS / not authenticated yet),
+      // still render the tables using the report-based fallback data so the
+      // page is never left blank.
+      dashboardData = null;
+      renderAll();
     }
   }
 
@@ -1248,6 +1253,13 @@
 
   document.addEventListener("DOMContentLoaded", function () {
     initConstructionDateRangePicker();
+
+    // Render tables immediately with report-based fallback data (dashboardData
+    // is still null at this point). This guarantees the tables are never left
+    // blank, even if the "wsdp:authready" event is delayed, never fires, or the
+    // backend dashboard endpoint errors out. Once live data loads successfully
+    // (see loadDashboard/renderAll below), this gets overwritten automatically.
+    renderAll();
 
     const areaFilter = document.getElementById("areaScopeFilter");
 
