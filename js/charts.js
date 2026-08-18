@@ -708,50 +708,78 @@
         Home Dashboard DMA Overlay
         --------------------------------------------- */
 
-        const dashboardRegions = [
+        /*======================================================
+        HOME DASHBOARD OVERLAY
+        ======================================================*/
+
+        const regions = [
           {
             name: "Casa Verde",
-            center: [-14.962, 13.468],
-            color: "#FFF59D",
-            radius: 450
+            center: [-14.960,13.472],
+            color: "#FFF59D"
           },
           {
             name: "Escola Portuguesa",
-            center: [-14.948, 13.505],
-            color: "#81D4FA",
-            radius: 500
+            center: [-14.948,13.505],
+            color: "#81D4FA"
           },
           {
             name: "Cowboy I",
-            center: [-14.954, 13.485],
-            color: "#CE93D8",
-            radius: 420
+            center: [-14.953,13.487],
+            color: "#CE93D8"
           },
           {
             name: "Sofrio",
-            center: [-14.925, 13.512],
-            color: "#FFCC80",
-            radius: 500
+            center: [-14.924,13.515],
+            color: "#FFCC80"
           },
           {
             name: "João de Almeida",
-            center: [-14.904, 13.520],
-            color: "#A5D6A7",
-            radius: 500
+            center: [-14.902,13.520],
+            color: "#A5D6A7"
           },
           {
             name: "Caixote ou Socombar",
-            center: [-14.940, 13.450],
-            color: "#F8BBD0",
-            radius: 550
+            center: [-14.941,13.450],
+            color: "#F8BBD0"
           },
           {
             name: "Arimba",
-            center: [-14.885, 13.552],
-            color: "#EF9A9A",
-            radius: 600
+            center: [-14.884,13.553],
+            color: "#EF9A9A"
           }
         ];
+
+        regions.forEach(function(region){
+
+          L.circle(
+            region.center,
+            {
+              radius: 700,
+              color: region.color,
+              weight: 2,
+              fillColor: region.color,
+              fillOpacity: 0.28
+            }
+          ).addTo(map);
+
+          L.marker(
+            region.center,
+            {
+              interactive:false,
+              icon:L.divIcon({
+                className:"dma-home-label",
+                html:
+                  '<div class="dma-home-tag">' +
+                  region.name +
+                  '</div>',
+                iconSize:[150,30],
+                iconAnchor:[75,15]
+              })
+            }
+          ).addTo(map);
+
+        });
 
         dashboardRegions.forEach(function(region){
 
