@@ -323,6 +323,40 @@
     color: #ffd400;
     font-size: 12px;
   }
+
+  /* On-page match diagnostics - visible without opening DevTools */
+  .gis-diagnostics-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .gis-diagnostics-list li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  .gis-diag-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    flex: 0 0 auto;
+  }
+
+  .gis-diag-dot.ok { background: #2e7d32; }
+  .gis-diag-dot.fail { background: #c62828; }
+
+  .gis-diagnostics-note {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 8px;
+    line-height: 1.4;
+  }
 </style>
 </head>
 
@@ -550,6 +584,14 @@
               </div>
             </div>
 
+            <div class="gis-panel-section" id="gisDiagnosticsSection" style="display:none;">
+              <h4>Data Match Diagnostics</h4>
+              <ul class="gis-diagnostics-list" id="gisDiagnosticsList"></ul>
+              <div class="gis-diagnostics-note">
+                Green = area matched in KMZ and tick-controls are wired correctly. Red = no KMZ feature matched this area name; its highlight/label cannot be tagged until the raw KML text is confirmed.
+              </div>
+            </div>
+
           </div>
         </div>
 
@@ -576,6 +618,8 @@
     var mapElement = document.getElementById("gisMap");
     var fitKmzBtn = document.getElementById("fitKmzBtn");
     var resetFiltersBtn = document.getElementById("resetFiltersBtn");
+    var diagnosticsSection = document.getElementById("gisDiagnosticsSection");
+    var diagnosticsList = document.getElementById("gisDiagnosticsList");
 
     if (!mapElement || typeof L === "undefined") {
       return;
@@ -599,12 +643,24 @@
     ];
 
     // Known alternate spellings/variants seen for area names inside KML
-    // placemark name/description/folder fields (e.g. Roman numeral "I" vs
-    // digit "1", punctuation differences). Every variant is compared after
-    // normalizeText() runs, so case/diacritics/punctuation are already
-    // folded - these cover the remaining, non-generic differences.
+    // placemark name/description/folder fields (Roman numeral vs digit,
+    // punctuation differences). Compared after normalizeText() runs, so
+    // case/diacritics/punctuation are already folded.
     var AREA_NAME_ALIASES = {
       "Cowboy I": ["cowboy i", "cowboy 1", "cowboy1", "cowboy01", "cowboy 01", "cowboyi"]
+    };
+
+    // First significant, unique word of each area name - used only as a
+    // last-resort fuzzy fallback if no exact/alias match is found. Safe
+    // here because all 7 area names start with a distinct word.
+    var AREA_FIRST_WORD = {
+      "Casa Verde": "casa",
+      "Escola Portuguesa": "escola",
+      "Cowboy I": "cowboy",
+      "Sofrio": "sofrio",
+      "João de Almeida": "joao",
+      "Caixote ou Socombar": "caixote",
+      "Arimba": "arimba"
     };
 
     // Authoritative construction-stage status for each intervention area.
@@ -618,12 +674,6 @@
       "João de Almeida": "notStarted",
       "Caixote ou Socombar": "progress",
       "Arimba": "notStarted"
-    };
-
-    // Optional context for areas awaiting stakeholder approval.
-    var AREA_STATUS_NOTE = {
-      "Cowboy I": "Approval is awaiting from local stakeholders",
-      "João de Almeida": "Approval is awaiting from local stakeholders"
     };
 
     var STATUS_KEYWORDS = [
@@ -734,6 +784,24 @@
         .trim();
     }
 
+    // Converts a trailing Roman numeral token (i, ii, iii, iv, v) into its
+    // Arabic digit equivalent, e.g. "cowboy i" -> "cowboy 1". This makes
+    // area matching resilient regardless of whether the KML author typed
+    // the region as "Cowboy I" or "Cowboy 1".
+    var ROMAN_TO_ARABIC = { i: "1", ii: "2", iii: "3", iv: "4", v: "5" };
+
+    function normalizeTrailingRomanNumeral(normalizedValue) {
+      var tokens = normalizedValue.split(" ");
+      var lastToken = tokens[tokens.length - 1];
+
+      if (Object.prototype.hasOwnProperty.call(ROMAN_TO_ARABIC, lastToken)) {
+        tokens[tokens.length - 1] = ROMAN_TO_ARABIC[lastToken];
+        return tokens.join(" ");
+      }
+
+      return normalizedValue;
+    }
+
     function stripHtml(value) {
       var div = document.createElement("div");
       div.innerHTML = String(value || "");
@@ -751,16 +819,34 @@
 
     function detectArea(searchText) {
       var normalized = normalizeText(searchText);
+      var normalizedWithArabic = normalizeTrailingRomanNumeral(normalized);
 
       for (var i = 0; i < AREA_NAMES.length; i += 1) {
         var areaName = AREA_NAMES[i];
         var variants = (AREA_NAME_ALIASES[areaName] || []).slice();
         variants.push(normalizeText(areaName));
+        variants.push(normalizeTrailingRomanNumeral(normalizeText(areaName)));
 
         for (var j = 0; j < variants.length; j += 1) {
-          if (normalized.indexOf(variants[j]) !== -1) {
+          if (
+            normalized.indexOf(variants[j]) !== -1 ||
+            normalizedWithArabic.indexOf(variants[j]) !== -1
+          ) {
             return areaName;
           }
+        }
+      }
+
+      // Last-resort fuzzy fallback: match on the area's first significant
+      // word as a whole word (e.g. "cowboy"), only if that word is unique
+      // across all configured area names.
+      for (var k = 0; k < AREA_NAMES.length; k += 1) {
+        var candidate = AREA_NAMES[k];
+        var firstWord = AREA_FIRST_WORD[candidate];
+        var wordRegex = new RegExp("(^|\\s)" + firstWord + "(\\s|$)");
+
+        if (firstWord && wordRegex.test(normalized)) {
+          return candidate;
         }
       }
 
@@ -783,12 +869,54 @@
       return "";
     }
 
+    // Walks the parsed KML XML (before toGeoJSON conversion) and builds an
+    // ordered list of each Placemark's nearest ancestor <Folder>/<name>.
+    // The togeojson v0.16 library does not reliably expose Folder names as
+    // a feature property, so if an area's name only appears in its KML
+    // Folder (not on the placemark itself), the previous text-only match
+    // would always fail. This restores that missing signal and is very
+    // likely why "Cowboy I" specifically failed to match while the other
+    // 6 regions (which apparently carry their name directly on the
+    // placemark) worked fine.
+    function buildPlacemarkFolderNames(xmlDoc) {
+      var placemarks = Array.prototype.slice.call(xmlDoc.getElementsByTagName("Placemark"));
+
+      return placemarks.map(function (placemark) {
+        var node = placemark.parentNode;
+
+        while (node && node.nodeType === 1) {
+          var tagName = (node.tagName || "").toLowerCase();
+
+          if (tagName === "folder" || tagName === "document") {
+            var nameNode = null;
+
+            for (var i = 0; i < node.childNodes.length; i += 1) {
+              var child = node.childNodes[i];
+              if (child.nodeType === 1 && (child.tagName || "").toLowerCase() === "name") {
+                nameNode = child;
+                break;
+              }
+            }
+
+            if (nameNode && nameNode.textContent && nameNode.textContent.trim()) {
+              return nameNode.textContent.trim();
+            }
+          }
+
+          node = node.parentNode;
+        }
+
+        return "";
+      });
+    }
+
     function getFeatureSearchText(feature) {
       var properties = feature && feature.properties ? feature.properties : {};
       return [
         properties.name,
         stripHtml(properties.description),
         properties.folder,
+        properties.__kmlFolder,
         properties.styleUrl
       ].filter(Boolean).join(" ");
     }
@@ -963,6 +1091,34 @@
       return zip.file(kmlFileName).async("text");
     }
 
+    // Renders the on-page (no DevTools required) match diagnostics panel.
+    function renderDiagnostics(rows) {
+      if (!diagnosticsSection || !diagnosticsList) {
+        return;
+      }
+
+      diagnosticsList.innerHTML = "";
+
+      AREA_NAMES.forEach(function (areaName) {
+        var matched = rows.some(function (row) {
+          return row.matchedArea === areaName;
+        });
+
+        var li = document.createElement("li");
+        var dot = document.createElement("span");
+        dot.className = "gis-diag-dot " + (matched ? "ok" : "fail");
+
+        var label = document.createElement("span");
+        label.textContent = areaName + " - " + (matched ? "matched (label + tick working)" : "NOT matched in KMZ text");
+
+        li.appendChild(dot);
+        li.appendChild(label);
+        diagnosticsList.appendChild(li);
+      });
+
+      diagnosticsSection.style.display = "";
+    }
+
     async function loadKmzFromServer() {
       try {
 
@@ -989,11 +1145,23 @@
           throw new Error("The KMZ loaded, but no map features were found in the KML.");
         }
 
+        // Attach each feature's KML Folder name (if any) as a fallback
+        // matching signal - see buildPlacemarkFolderNames() above.
+        var folderNames = buildPlacemarkFolderNames(xml);
+        geojson.features.forEach(function (feature, index) {
+          if (folderNames[index]) {
+            feature.properties = feature.properties || {};
+            feature.properties.__kmlFolder = folderNames[index];
+          }
+        });
+
         if (kmzLayer && map.hasLayer(kmzLayer)) {
           map.removeLayer(kmzLayer);
         }
 
         kmzFeatureLayers = [];
+
+        var diagnosticRows = [];
 
         kmzLayer = L.geoJSON(geojson, {
           style: getDefaultStyle,
@@ -1005,25 +1173,22 @@
               props.name || ""
             ).trim();
 
-            // Match against name + description + KML folder + styleUrl,
-            // with accent/diacritic and punctuation-insensitive comparison
-            // plus known alias variants (e.g. "Cowboy I" vs "Cowboy 1").
             const searchText = getFeatureSearchText(feature);
             const matchedArea = detectArea(searchText);
 
             // Tag every layer so the Construction Stage / Intervention
-            // Area checkboxes can actually find and toggle it. This is
-            // what makes the tick-boxes work at all.
+            // Area checkboxes can actually find and toggle it. Status
+            // tagging is intentionally NOT dependent on layer.getBounds -
+            // only label placement needs a computable center point.
             layer._area = matchedArea || "";
 
-            if (matchedArea && layer.getBounds) {
-              // Use the authoritative status map first (KML text does not
-              // reliably encode construction stage); fall back to keyword
-              // detection for any area not explicitly listed.
-              const matchedStatus = AREA_STATUS_MAP[matchedArea] || detectStatus(searchText) || "notStarted";
+            var matchedStatus = "";
+
+            if (matchedArea) {
+              matchedStatus = AREA_STATUS_MAP[matchedArea] || detectStatus(searchText) || "notStarted";
               layer._status = matchedStatus;
 
-              const statusStyle = STATUS_STYLES[matchedStatus] || STATUS_STYLES.notStarted;
+              var statusStyle = STATUS_STYLES[matchedStatus] || STATUS_STYLES.notStarted;
 
               layer.setStyle({
                 color: statusStyle.color,
@@ -1032,32 +1197,39 @@
                 fillOpacity: statusStyle.fillOpacity
               });
 
-              const center = layer.getBounds().getCenter();
-              const labelText = featureName || matchedArea;
+              if (typeof layer.getBounds === "function") {
+                var center = layer.getBounds().getCenter();
+                var labelText = featureName || matchedArea;
 
-              const labelMarker = L.marker(center, {
-                icon: L.divIcon({
-                  className: "dma-home-label",
-                  html: '<div class="dma-home-tag"><i class="fa-solid fa-location-dot"></i>' +
-                    escapeHtml(labelText) +
-                    '</div>',
-                  iconSize: [150, 24],
-                  iconAnchor: [75, 12]
-                }),
-                interactive: false
-              });
+                var labelMarker = L.marker(center, {
+                  icon: L.divIcon({
+                    className: "dma-home-label",
+                    html: '<div class="dma-home-tag"><i class="fa-solid fa-location-dot"></i>' +
+                      escapeHtml(labelText) +
+                      '</div>',
+                    iconSize: [150, 24],
+                    iconAnchor: [75, 12]
+                  }),
+                  interactive: false
+                });
 
-              // Tag the label with the same area/status as its polygon so
-              // unticking the region hides the highlight cover AND its
-              // label together, and ticking it restores both together.
-              labelMarker._area = matchedArea;
-              labelMarker._status = matchedStatus;
+                labelMarker._area = matchedArea;
+                labelMarker._status = matchedStatus;
 
-              labelMarker.addTo(map);
-              kmzFeatureLayers.push(labelMarker);
+                labelMarker.addTo(map);
+                kmzFeatureLayers.push(labelMarker);
+              }
             } else {
               layer._status = detectStatus(searchText) || "";
             }
+
+            diagnosticRows.push({
+              rawName: featureName || "(empty)",
+              folder: props.__kmlFolder || props.folder || "",
+              geometryType: getGeometryType(feature),
+              matchedArea: matchedArea || "UNMATCHED",
+              matchedStatus: matchedStatus || layer._status || "(none)"
+            });
 
             kmzFeatureLayers.push(layer);
           }
@@ -1073,8 +1245,34 @@
         }
 
         applyFilters();
+        renderDiagnostics(diagnosticRows);
+
+        // Plain (non-collapsed) console output as a secondary diagnostic
+        // channel - visible immediately without expanding anything.
+        console.log("GIS Map: KMZ feature matching diagnostics", diagnosticRows);
+        AREA_NAMES.forEach(function (areaName) {
+          var found = diagnosticRows.some(function (row) {
+            return row.matchedArea === areaName;
+          });
+          if (!found) {
+            console.warn("GIS Map: no KMZ feature matched intervention area \"" + areaName + "\".");
+          }
+        });
       } catch (error) {
         console.error("KMZ Load Error:", error);
+
+        if (diagnosticsSection && diagnosticsList) {
+          diagnosticsList.innerHTML = "";
+          var li = document.createElement("li");
+          var dot = document.createElement("span");
+          dot.className = "gis-diag-dot fail";
+          var label = document.createElement("span");
+          label.textContent = "KMZ failed to load/parse: " + (error && error.message ? error.message : String(error));
+          li.appendChild(dot);
+          li.appendChild(label);
+          diagnosticsList.appendChild(li);
+          diagnosticsSection.style.display = "";
+        }
       }
     }
 
