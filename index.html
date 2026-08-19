@@ -248,6 +248,75 @@
     white-space: normal;
     overflow-wrap: break-word;
   }
+
+  /*
+    ============ DUAL CLOCK DISPLAY (IST + Angola) ============
+    Home-page-only. Restyles the EXISTING .status-pill element that
+    js/shell.js already renders (using WSDP_PAGE.statusClass /
+    statusText) into a compact "digital clock" chip, and adds one
+    matching sibling chip for Angola time right next to it. Both reuse
+    the .status-pill / .status-pill--info base classes so background,
+    border and color already defined in css/styles.css keep working
+    exactly as before -- only internal layout/typography is enhanced
+    here, purely via CSS. shell.js is never modified.
+  */
+  body[data-page="home"] .wsdp-clock-cluster {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  body[data-page="home"] .status-pill.wsdp-clock-chip {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px 6px 10px;
+  }
+
+  body[data-page="home"] .wsdp-clock-chip__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .35);
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+
+  body[data-page="home"] .wsdp-clock-chip__icon .dot {
+    margin: 0;
+  }
+
+  body[data-page="home"] .wsdp-clock-chip__body {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+  }
+
+  body[data-page="home"] .wsdp-clock-chip__label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    opacity: .82;
+  }
+
+  body[data-page="home"] .wsdp-clock-chip__time {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 13px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .5px;
+  }
+
+  @media (max-width: 640px) {
+    body[data-page="home"] .wsdp-clock-chip__label {
+      display: none;
+    }
+  }
 </style>
 </head>
 
@@ -540,21 +609,56 @@
 <script>
 document.addEventListener("DOMContentLoaded", () => {
 
-  function updateClock() {
-
-    const time = new Intl.DateTimeFormat("en-IN", {
-      timeZone: "Asia/Kolkata",
+  // Formats "HH:MM:SS" (24h) for a given IANA time zone, without
+  // relying on locale string parsing quirks.
+  function formatZoneTime(timeZone) {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone,
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
       hour12: false
-    }).format(new Date());
+    }).formatToParts(new Date());
+    const get = (type) => (parts.find((p) => p.type === type) || {}).value || "--";
+    return get("hour") + ":" + get("minute") + ":" + get("second");
+  }
 
-    const statusPill = document.querySelector(".status-pill");
+  // Creates (once) the Angola clock chip as a sibling of the existing
+  // .status-pill element, reusing the same base classes so it inherits
+  // the identical background/border/color already defined in
+  // css/styles.css. Returns the element, or null if the anchor
+  // (.status-pill, rendered by js/shell.js) isn't in the DOM yet.
+  function ensureAngolaChip(istPill) {
+    let chip = document.getElementById("angolaClockChip");
+    if (chip) return chip;
 
-    if (statusPill) {
-      statusPill.innerHTML =
-        '<span class="dot"></span> IST ' + time;
+    chip = document.createElement("span");
+    chip.id = "angolaClockChip";
+    chip.className = istPill.className + " wsdp-clock-chip";
+    istPill.insertAdjacentElement("afterend", chip);
+    return chip;
+  }
+
+  function updateClock() {
+    const istPill = document.querySelector(".status-pill");
+    if (!istPill) return; // shell.js hasn't mounted the topbar yet; next tick will retry
+
+    istPill.classList.add("wsdp-clock-chip");
+    istPill.innerHTML =
+      '<span class="wsdp-clock-chip__icon"><span class="dot"></span></span>' +
+      '<span class="wsdp-clock-chip__body">' +
+        '<span class="wsdp-clock-chip__label">🇮🇳 IST</span>' +
+        '<span class="wsdp-clock-chip__time">' + formatZoneTime("Asia/Kolkata") + '</span>' +
+      '</span>';
+
+    const angolaChip = ensureAngolaChip(istPill);
+    if (angolaChip) {
+      angolaChip.innerHTML =
+        '<span class="wsdp-clock-chip__icon"><i class="fa-regular fa-clock"></i></span>' +
+        '<span class="wsdp-clock-chip__body">' +
+          '<span class="wsdp-clock-chip__label">🇦🇴 Angola (WAT)</span>' +
+          '<span class="wsdp-clock-chip__time">' + formatZoneTime("Africa/Luanda") + '</span>' +
+        '</span>';
     }
   }
 
