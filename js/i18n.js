@@ -129,6 +129,55 @@
     "Within Budget": "Dentro do Orçamento",
     "At Risk — Schedule": "Em Risco - Cronograma",
     "At Risk - Schedule": "Em Risco - Cronograma",
+    "Project Snapshot": "Resumo do Projeto",
+    "Scope, contract, and key parties at a glance": "Âmbito, contrato e principais partes em resumo",
+    "Project Information": "Informações do Projeto",
+    "Project Name": "Nome do Projeto",
+    "Design and Construction of Network and Home Connections for Peri-Urban Areas in the City of Lubango": "Conceção e Construção da Rede e Ligações Domiciliárias para Áreas Periurbanas na Cidade do Lubango",
+    "Project Type": "Tipo de Projeto",
+    "Water Supply Distribution — Pipe Laying, Home Connections & Ancillary Works": "Distribuição de Abastecimento de Água - Assentamento de Tubagens, Ligações Domiciliárias e Obras Auxiliares",
+    "Water Supply Distribution - Pipe Laying, Home Connections & Ancillary Works": "Distribuição de Abastecimento de Água - Assentamento de Tubagens, Ligações Domiciliárias e Obras Auxiliares",
+    "Total Pipeline Length (Contract)": "Extensão Total da Conduta (Contrato)",
+    "Total House Connections (Contract)": "Total de Ligações Domiciliárias (Contrato)",
+    "Contract Start Date": "Data de Início do Contrato",
+    "Construction Commencement Date": "Data de Início da Construção",
+    "Completion of Construction": "Conclusão da Construção",
+    "Current Overall Physical Progress": "Progresso Físico Global Atual",
+
+    "Project Information Panel": "Painel de Informações do Projeto",
+    "Contract parties, dates, advance payment and securities": "Partes contratuais, datas, adiantamento e garantias",
+    "Contract Information": "Informações do Contrato",
+    "Contractor": "Empreiteiro",
+    "Consultant": "Consultor",
+    "Contract End Date": "Data de Fim do Contrato",
+    "Revised Completion Date": "Data de Conclusão Revista",
+    "Performance Guarantee": "Garantia de Execução",
+    "Advance Payment Guarantee": "Garantia de Adiantamento",
+    "Advance Payment %": "% de Adiantamento",
+
+    "Bank of China · USD 559,970.45 · Valid up to 31 Dec 2026": "Bank of China · USD 559.970,45 · Válido até 31 Dez 2026",
+    "20% of the Accepted contract amount with Provisional Sum. Employer claimed - 156,248.79 USD against IPC-01 out of 1,119,940.90 USD. Remaining - 963,692.11 USD.": "20% do valor contratual aceite com Soma Provisória. O Dono da Obra deduziu 156.248,79 USD no IPC-01 de um total de 1.119.940,90 USD. Remanescente - 963.692,11 USD.",
+
+    "Key Stakeholders": "Principais Partes Interessadas",
+    "Roles & responsibilities": "Funções e responsabilidades",
+    "Roles and responsibilities": "Funções e responsabilidades",
+    "Client / Owner": "Cliente / Dono da Obra",
+    "Funding Agency": "Agência Financiadora",
+
+    "Explore the Dashboard": "Explorar o Painel",
+    "Jump to a module": "Ir para um módulo",
+    "Pipeline, connections, testing": "Condutas, ligações, ensaios",
+    "Corridor & site locations": "Corredor e localizações da obra",
+    "Corridor and site locations": "Corredor e localizações da obra",
+    "IPCs, cash flow, budget": "IPCs, fluxo de caixa, orçamento",
+    "Monthly report exports": "Exportação de relatórios mensais",
+
+    "Water Supply Distribution Project — Monitoring Dashboard": "Projeto de Distribuição de Abastecimento de Água - Painel de Monitorização",
+    "Water Supply Distribution Project - Monitoring Dashboard": "Projeto de Distribuição de Abastecimento de Água - Painel de Monitorização",
+
+    "Project overview for the Water Supply Distribution Project.": "Visão geral do projeto para o Projeto de Distribuição de Abastecimento de Água.",
+    "Project Overview — Water Supply Distribution Project": "Visão Geral do Projeto - Projeto de Distribuição de Abastecimento de Água",
+    "Project Overview - Water Supply Distribution Project": "Visão Geral do Projeto - Projeto de Distribuição de Abastecimento de Água",
     "Landing Dashboard": "Painel Inicial",
     "Construction Progress Dashboard": "Painel de Progresso da Construção",
     "Contract 44W3/LUBANGO/DNA18": "Contrato 44W3/LUBANGO/DNA18",
@@ -536,6 +585,79 @@
     return translatePattern(raw);
   }
 
+  function translateHtmlString(value) {
+    var html = String(value == null ? "" : value);
+
+    if (!html) return html;
+
+    return html
+      .split(/(<[^>]+>)/g)
+      .map(function (part) {
+        if (!part || /^<[^>]+>$/.test(part)) return part;
+        return translateText(part);
+      })
+      .join("");
+  }
+
+  function translatePageConfig() {
+    var page;
+
+    if (!window.WSDP_PAGE) return;
+
+    page = window.WSDP_PAGE;
+
+    if (!page.__wsdpOriginals) {
+      page.__wsdpOriginals = {
+        title: page.title,
+        breadcrumb: page.breadcrumb,
+        statusText: page.statusText
+      };
+    }
+
+    if (isPortuguese()) {
+      if (typeof page.__wsdpOriginals.title === "string") {
+        page.title = translateText(page.__wsdpOriginals.title);
+      }
+
+      if (typeof page.__wsdpOriginals.breadcrumb === "string") {
+        page.breadcrumb = translateHtmlString(page.__wsdpOriginals.breadcrumb);
+      }
+
+      if (typeof page.__wsdpOriginals.statusText === "string") {
+        page.statusText = translateText(page.__wsdpOriginals.statusText);
+      }
+    } else {
+      page.title = page.__wsdpOriginals.title;
+      page.breadcrumb = page.__wsdpOriginals.breadcrumb;
+      page.statusText = page.__wsdpOriginals.statusText;
+    }
+  }
+
+  function updateDocumentMeta() {
+    var description;
+
+    if (!document.__wsdpOriginalTitle) {
+      document.__wsdpOriginalTitle = document.title;
+    }
+
+    if (document.__wsdpOriginalTitle) {
+      document.title = isPortuguese() ? translateText(document.__wsdpOriginalTitle) : document.__wsdpOriginalTitle;
+    }
+
+    description = document.querySelector('meta[name="description"]');
+
+    if (description) {
+      if (!description.__wsdpOriginalContent) {
+        description.__wsdpOriginalContent = description.getAttribute("content") || "";
+      }
+
+      description.setAttribute(
+        "content",
+        isPortuguese() ? translateText(description.__wsdpOriginalContent) : description.__wsdpOriginalContent
+      );
+    }
+  }
+
   function shouldSkipTextNode(node) {
     var parent;
     var tag;
@@ -798,6 +920,8 @@
     selector = document.getElementById("languageSelector");
     if (selector) selector.value = getLanguage();
 
+    translatePageConfig();
+    updateDocumentMeta();
     translateDom(root || document.body);
     updateHeaderDate();
     translateCharts();
