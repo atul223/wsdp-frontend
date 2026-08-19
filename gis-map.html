@@ -336,7 +336,7 @@
 
   .gis-diagnostics-list li {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 8px;
     font-size: 12px;
   }
@@ -346,9 +346,11 @@
     height: 9px;
     border-radius: 999px;
     flex: 0 0 auto;
+    margin-top: 3px;
   }
 
   .gis-diag-dot.ok { background: #2e7d32; }
+  .gis-diag-dot.warn { background: #f59e0b; }
   .gis-diag-dot.fail { background: #c62828; }
 
   .gis-diagnostics-note {
@@ -588,7 +590,7 @@
               <h4>Data Match Diagnostics</h4>
               <ul class="gis-diagnostics-list" id="gisDiagnosticsList"></ul>
               <div class="gis-diagnostics-note">
-                Green = area matched in KMZ and tick-controls are wired correctly. Red = no KMZ feature matched this area name; its highlight/label cannot be tagged until the raw KML text is confirmed.
+                Green = boundary polygon matched and highlight/tick fully working. Amber = area name matched a feature, but no fillable boundary polygon was found for it (a shape's own name/folder text did not resolve, and no matched point was spatially inside it). Red = no KMZ feature matched this area name at all.
               </div>
             </div>
 
@@ -785,9 +787,7 @@
     }
 
     // Converts a trailing Roman numeral token (i, ii, iii, iv, v) into its
-    // Arabic digit equivalent, e.g. "cowboy i" -> "cowboy 1". This makes
-    // area matching resilient regardless of whether the KML author typed
-    // the region as "Cowboy I" or "Cowboy 1".
+    // Arabic digit equivalent, e.g. "cowboy i" -> "cowboy 1".
     var ROMAN_TO_ARABIC = { i: "1", ii: "2", iii: "3", iv: "4", v: "5" };
 
     function normalizeTrailingRomanNumeral(normalizedValue) {
@@ -817,7 +817,7 @@
         .replaceAll("'", "&#39;");
     }
 
-    function detectArea(searchText) {
+    function detectAreaByText(searchText) {
       var normalized = normalizeText(searchText);
       var normalizedWithArabic = normalizeTrailingRomanNumeral(normalized);
 
@@ -871,13 +871,6 @@
 
     // Walks the parsed KML XML (before toGeoJSON conversion) and builds an
     // ordered list of each Placemark's nearest ancestor <Folder>/<name>.
-    // The togeojson v0.16 library does not reliably expose Folder names as
-    // a feature property, so if an area's name only appears in its KML
-    // Folder (not on the placemark itself), the previous text-only match
-    // would always fail. This restores that missing signal and is very
-    // likely why "Cowboy I" specifically failed to match while the other
-    // 6 regions (which apparently carry their name directly on the
-    // placemark) worked fine.
     function buildPlacemarkFolderNames(xmlDoc) {
       var placemarks = Array.prototype.slice.call(xmlDoc.getElementsByTagName("Placemark"));
 
@@ -923,6 +916,107 @@
 
     function getGeometryType(feature) {
       return feature && feature.geometry ? feature.geometry.type : "";
+    }
+
+    // --- Spatial (geometry-based) area matching -----------------------
+    // Some KMZ exports only attach a region's name to a small anchor
+    // Point placemark (used to position a label), while the boundary
+    // Polygon/MultiPolygon itself carries no identifying name or folder
+    // text at all. Text-only matching can never recover that polygon.
+    // This ray-casting point-in-polygon check lets an unmatched polygon
+    // inherit the area tag of any text-matched point found inside it.
+    function pointInRing(point, ring) {
+      var x = point[0];
+      var y = point[1];
+      var inside = false;
+
+      for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        var xi = ring[i][0];
+        var yi = ring[i][1];
+        var xj = ring[j][0];
+        var yj = ring[j][1];
+
+        var intersect = ((yi > y) !== (yj > y)) &&
+          (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+
+        if (intersect) {
+          inside = !inside;
+        }
+      }
+
+      return inside;
+    }
+
+    function pointInPolygonGeometry(pointCoords, geometry) {
+      if (!geometry || !pointCoords) {
+        return false;
+      }
+
+      if (geometry.type === "Polygon") {
+        var rings = geometry.coordinates;
+        return !!(rings && rings.length && pointInRing(pointCoords, rings[0]));
+      }
+
+      if (geometry.type === "MultiPolygon") {
+        return (geometry.coordinates || []).some(function (poly) {
+          return poly && poly.length && pointInRing(pointCoords, poly[0]);
+        });
+      }
+
+      return false;
+    }
+
+    // Runs a two-pass match over the raw GeoJSON features (before Leaflet
+    // layer creation): pass 1 resolves area/status by text on every
+    // feature; pass 2 lets unmatched Polygon/MultiPolygon features
+    // inherit an area tag spatially from any text-matched Point found
+    // within their boundary. Mutates feature.properties in place with
+    // __resolvedArea / __resolvedStatus / __matchSource for later use.
+    function resolveFeatureAreasWithSpatialFallback(features) {
+      features.forEach(function (feature) {
+        var props = feature.properties || (feature.properties = {});
+        var searchText = getFeatureSearchText(feature);
+        var textArea = detectAreaByText(searchText);
+
+        props.__resolvedArea = textArea || "";
+        props.__matchSource = textArea ? "text" : "";
+        props.__resolvedStatus = textArea
+          ? (AREA_STATUS_MAP[textArea] || detectStatus(searchText) || "notStarted")
+          : (detectStatus(searchText) || "");
+      });
+
+      var matchedPoints = features.filter(function (feature) {
+        return getGeometryType(feature) === "Point" && feature.properties.__resolvedArea;
+      });
+
+      if (!matchedPoints.length) {
+        return;
+      }
+
+      features.forEach(function (feature) {
+        if (feature.properties.__resolvedArea) {
+          return;
+        }
+
+        var geometryType = getGeometryType(feature);
+
+        if (geometryType !== "Polygon" && geometryType !== "MultiPolygon") {
+          return;
+        }
+
+        var match = matchedPoints.find(function (point) {
+          return pointInPolygonGeometry(point.geometry.coordinates, feature.geometry);
+        });
+
+        if (match) {
+          feature.properties.__resolvedArea = match.properties.__resolvedArea;
+          feature.properties.__matchSource = "spatial";
+          feature.properties.__resolvedStatus =
+            AREA_STATUS_MAP[match.properties.__resolvedArea] ||
+            feature.properties.__resolvedStatus ||
+            "notStarted";
+        }
+      });
     }
 
     function getDefaultStyle(feature) {
@@ -1100,16 +1194,39 @@
       diagnosticsList.innerHTML = "";
 
       AREA_NAMES.forEach(function (areaName) {
-        var matched = rows.some(function (row) {
+        var polygonMatch = rows.some(function (row) {
+          return row.matchedArea === areaName && (row.geometryType === "Polygon" || row.geometryType === "MultiPolygon");
+        });
+        var anyMatch = rows.some(function (row) {
           return row.matchedArea === areaName;
         });
 
         var li = document.createElement("li");
         var dot = document.createElement("span");
-        dot.className = "gis-diag-dot " + (matched ? "ok" : "fail");
+        var status;
+
+        if (polygonMatch) {
+          status = "ok";
+        } else if (anyMatch) {
+          status = "warn";
+        } else {
+          status = "fail";
+        }
+
+        dot.className = "gis-diag-dot " + status;
 
         var label = document.createElement("span");
-        label.textContent = areaName + " - " + (matched ? "matched (label + tick working)" : "NOT matched in KMZ text");
+        var text;
+
+        if (polygonMatch) {
+          text = areaName + " - boundary polygon matched (highlight + label + tick working)";
+        } else if (anyMatch) {
+          text = areaName + " - name matched a non-polygon feature only; no fillable boundary found (KMZ likely has no named/enclosing shape for this area)";
+        } else {
+          text = areaName + " - NOT matched to any KMZ feature";
+        }
+
+        label.textContent = text;
 
         li.appendChild(dot);
         li.appendChild(label);
@@ -1146,7 +1263,7 @@
         }
 
         // Attach each feature's KML Folder name (if any) as a fallback
-        // matching signal - see buildPlacemarkFolderNames() above.
+        // matching signal.
         var folderNames = buildPlacemarkFolderNames(xml);
         geojson.features.forEach(function (feature, index) {
           if (folderNames[index]) {
@@ -1154,6 +1271,10 @@
             feature.properties.__kmlFolder = folderNames[index];
           }
         });
+
+        // Resolve area/status for every feature up front (text pass, then
+        // spatial fallback pass for unnamed boundary polygons).
+        resolveFeatureAreasWithSpatialFallback(geojson.features);
 
         if (kmzLayer && map.hasLayer(kmzLayer)) {
           map.removeLayer(kmzLayer);
@@ -1173,19 +1294,16 @@
               props.name || ""
             ).trim();
 
-            const searchText = getFeatureSearchText(feature);
-            const matchedArea = detectArea(searchText);
+            const matchedArea = props.__resolvedArea || "";
 
             // Tag every layer so the Construction Stage / Intervention
-            // Area checkboxes can actually find and toggle it. Status
-            // tagging is intentionally NOT dependent on layer.getBounds -
-            // only label placement needs a computable center point.
-            layer._area = matchedArea || "";
+            // Area checkboxes can actually find and toggle it.
+            layer._area = matchedArea;
 
             var matchedStatus = "";
 
             if (matchedArea) {
-              matchedStatus = AREA_STATUS_MAP[matchedArea] || detectStatus(searchText) || "notStarted";
+              matchedStatus = props.__resolvedStatus || AREA_STATUS_MAP[matchedArea] || "notStarted";
               layer._status = matchedStatus;
 
               var statusStyle = STATUS_STYLES[matchedStatus] || STATUS_STYLES.notStarted;
@@ -1197,7 +1315,14 @@
                 fillOpacity: statusStyle.fillOpacity
               });
 
-              if (typeof layer.getBounds === "function") {
+              // Only place a text label on actual boundary shapes
+              // (Polygon/MultiPolygon), not on the anchor point itself,
+              // so we don't get a duplicate/misplaced label sitting on
+              // top of a valve or connection-point marker.
+              var geometryType = getGeometryType(feature);
+              var isBoundaryShape = geometryType === "Polygon" || geometryType === "MultiPolygon";
+
+              if (isBoundaryShape && typeof layer.getBounds === "function") {
                 var center = layer.getBounds().getCenter();
                 var labelText = featureName || matchedArea;
 
@@ -1220,13 +1345,14 @@
                 kmzFeatureLayers.push(labelMarker);
               }
             } else {
-              layer._status = detectStatus(searchText) || "";
+              layer._status = props.__resolvedStatus || "";
             }
 
             diagnosticRows.push({
               rawName: featureName || "(empty)",
               folder: props.__kmlFolder || props.folder || "",
               geometryType: getGeometryType(feature),
+              matchSource: props.__matchSource || "",
               matchedArea: matchedArea || "UNMATCHED",
               matchedStatus: matchedStatus || layer._status || "(none)"
             });
@@ -1247,15 +1373,13 @@
         applyFilters();
         renderDiagnostics(diagnosticRows);
 
-        // Plain (non-collapsed) console output as a secondary diagnostic
-        // channel - visible immediately without expanding anything.
         console.log("GIS Map: KMZ feature matching diagnostics", diagnosticRows);
         AREA_NAMES.forEach(function (areaName) {
-          var found = diagnosticRows.some(function (row) {
-            return row.matchedArea === areaName;
+          var polygonMatch = diagnosticRows.some(function (row) {
+            return row.matchedArea === areaName && (row.geometryType === "Polygon" || row.geometryType === "MultiPolygon");
           });
-          if (!found) {
-            console.warn("GIS Map: no KMZ feature matched intervention area \"" + areaName + "\".");
+          if (!polygonMatch) {
+            console.warn("GIS Map: no boundary polygon resolved for intervention area \"" + areaName + "\".");
           }
         });
       } catch (error) {
