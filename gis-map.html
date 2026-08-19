@@ -590,7 +590,7 @@
               <h4>Data Match Diagnostics</h4>
               <ul class="gis-diagnostics-list" id="gisDiagnosticsList"></ul>
               <div class="gis-diagnostics-note">
-                Green = boundary polygon matched and highlight/tick fully working. Amber = area name matched a feature, but no fillable boundary polygon was found for it (a shape's own name/folder text did not resolve, and no matched point was spatially inside it). Red = no KMZ feature matched this area name at all.
+                Green = boundary polygon matched and highlight/tick fully working. Amber = area name matched a feature, but no fillable boundary polygon was found for it. Red = no KMZ feature matched this area name at all.
               </div>
             </div>
 
@@ -922,9 +922,9 @@
     // Some KMZ exports only attach a region's name to a small anchor
     // Point placemark (used to position a label), while the boundary
     // Polygon/MultiPolygon itself carries no identifying name or folder
-    // text at all. Text-only matching can never recover that polygon.
-    // This ray-casting point-in-polygon check lets an unmatched polygon
-    // inherit the area tag of any text-matched point found inside it.
+    // text at all. This ray-casting point-in-polygon check lets an
+    // unmatched polygon inherit the area tag of any text-matched point
+    // found inside it.
     function pointInRing(point, ring) {
       var x = point[0];
       var y = point[1];
@@ -970,8 +970,7 @@
     // layer creation): pass 1 resolves area/status by text on every
     // feature; pass 2 lets unmatched Polygon/MultiPolygon features
     // inherit an area tag spatially from any text-matched Point found
-    // within their boundary. Mutates feature.properties in place with
-    // __resolvedArea / __resolvedStatus / __matchSource for later use.
+    // within their boundary. Mutates feature.properties in place.
     function resolveFeatureAreasWithSpatialFallback(features) {
       features.forEach(function (feature) {
         var props = feature.properties || (feature.properties = {});
@@ -1017,6 +1016,23 @@
             "notStarted";
         }
       });
+    }
+
+    // Approximate bounding-box "area" (in degrees^2) of a Leaflet
+    // LatLngBounds, used only to pick the largest polygon per
+    // intervention area as the single label anchor - so that when a
+    // region has multiple matched shapes (e.g. an outer boundary plus a
+    // smaller sub-shape sharing the same name/folder text), only ONE
+    // label badge is drawn instead of one per matched shape.
+    function boundsSpanArea(bounds) {
+      if (!bounds || !bounds.isValid || !bounds.isValid()) {
+        return 0;
+      }
+
+      var latSpan = Math.abs(bounds.getNorth() - bounds.getSouth());
+      var lngSpan = Math.abs(bounds.getEast() - bounds.getWest());
+
+      return latSpan * lngSpan;
     }
 
     function getDefaultStyle(feature) {
@@ -1194,7 +1210,7 @@
       diagnosticsList.innerHTML = "";
 
       AREA_NAMES.forEach(function (areaName) {
-        var polygonMatch = rows.some(function (row) {
+        var polygonMatches = rows.filter(function (row) {
           return row.matchedArea === areaName && (row.geometryType === "Polygon" || row.geometryType === "MultiPolygon");
         });
         var anyMatch = rows.some(function (row) {
@@ -1205,7 +1221,7 @@
         var dot = document.createElement("span");
         var status;
 
-        if (polygonMatch) {
+        if (polygonMatches.length) {
           status = "ok";
         } else if (anyMatch) {
           status = "warn";
@@ -1218,10 +1234,12 @@
         var label = document.createElement("span");
         var text;
 
-        if (polygonMatch) {
+        if (polygonMatches.length > 1) {
+          text = areaName + " - " + polygonMatches.length + " boundary shapes matched (highlight + tick working; single label shown on the largest shape)";
+        } else if (polygonMatches.length === 1) {
           text = areaName + " - boundary polygon matched (highlight + label + tick working)";
         } else if (anyMatch) {
-          text = areaName + " - name matched a non-polygon feature only; no fillable boundary found (KMZ likely has no named/enclosing shape for this area)";
+          text = areaName + " - name matched a non-polygon feature only; no fillable boundary found";
         } else {
           text = areaName + " - NOT matched to any KMZ feature";
         }
@@ -1284,6 +1302,16 @@
 
         var diagnosticRows = [];
 
+        // Boundary shapes (Polygon/MultiPolygon) that resolved to an area
+        // are collected here first WITHOUT creating a label yet. Once all
+        // features are processed, exactly one label is created per area -
+        // anchored on whichever matched shape has the largest bounding
+        // box (the true outer DMA boundary, not a smaller sub-shape that
+        // happens to share the same name/folder text). This prevents the
+        // "double label" issue where every matched shape got its own
+        // badge.
+        var boundaryCandidatesByArea = {};
+
         kmzLayer = L.geoJSON(geojson, {
           style: getDefaultStyle,
           pointToLayer: pointToLayer,
@@ -1315,34 +1343,19 @@
                 fillOpacity: statusStyle.fillOpacity
               });
 
-              // Only place a text label on actual boundary shapes
-              // (Polygon/MultiPolygon), not on the anchor point itself,
-              // so we don't get a duplicate/misplaced label sitting on
-              // top of a valve or connection-point marker.
               var geometryType = getGeometryType(feature);
               var isBoundaryShape = geometryType === "Polygon" || geometryType === "MultiPolygon";
 
               if (isBoundaryShape && typeof layer.getBounds === "function") {
-                var center = layer.getBounds().getCenter();
-                var labelText = featureName || matchedArea;
+                if (!boundaryCandidatesByArea[matchedArea]) {
+                  boundaryCandidatesByArea[matchedArea] = [];
+                }
 
-                var labelMarker = L.marker(center, {
-                  icon: L.divIcon({
-                    className: "dma-home-label",
-                    html: '<div class="dma-home-tag"><i class="fa-solid fa-location-dot"></i>' +
-                      escapeHtml(labelText) +
-                      '</div>',
-                    iconSize: [150, 24],
-                    iconAnchor: [75, 12]
-                  }),
-                  interactive: false
+                boundaryCandidatesByArea[matchedArea].push({
+                  layer: layer,
+                  status: matchedStatus,
+                  labelText: featureName || matchedArea
                 });
-
-                labelMarker._area = matchedArea;
-                labelMarker._status = matchedStatus;
-
-                labelMarker.addTo(map);
-                kmzFeatureLayers.push(labelMarker);
               }
             } else {
               layer._status = props.__resolvedStatus || "";
@@ -1359,6 +1372,38 @@
 
             kmzFeatureLayers.push(layer);
           }
+        });
+
+        // Now create exactly ONE label per area, anchored on the largest
+        // matched boundary shape for that area.
+        Object.keys(boundaryCandidatesByArea).forEach(function (areaName) {
+          var candidates = boundaryCandidatesByArea[areaName];
+
+          var largest = candidates.reduce(function (best, candidate) {
+            var candidateArea = boundsSpanArea(candidate.layer.getBounds());
+            var bestArea = boundsSpanArea(best.layer.getBounds());
+            return candidateArea > bestArea ? candidate : best;
+          }, candidates[0]);
+
+          var center = largest.layer.getBounds().getCenter();
+
+          var labelMarker = L.marker(center, {
+            icon: L.divIcon({
+              className: "dma-home-label",
+              html: '<div class="dma-home-tag"><i class="fa-solid fa-location-dot"></i>' +
+                escapeHtml(largest.labelText) +
+                '</div>',
+              iconSize: [150, 24],
+              iconAnchor: [75, 12]
+            }),
+            interactive: false
+          });
+
+          labelMarker._area = areaName;
+          labelMarker._status = largest.status;
+
+          labelMarker.addTo(map);
+          kmzFeatureLayers.push(labelMarker);
         });
 
         kmzLayer.addTo(map);
