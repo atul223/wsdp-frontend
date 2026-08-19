@@ -670,6 +670,8 @@
 
     function normalizeText(value) {
       return String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase()
         .replace(/\s+/g, " ")
         .trim();
@@ -940,23 +942,23 @@
               props.name || ""
             ).trim();
 
-            const dmaNames = [
-              "Casa Verde",
-              "Escola Portuguesa",
-              "Cowboy I",
-              "Sofrio",
-              "João de Almeida",
-              "Caixote ou Socombar",
-              "Arimba"
-            ];
+            // Match against name + description + KML folder + styleUrl,
+            // not just the placemark's own "name" field, and use accent
+            // /diacritic-insensitive comparison. Some regions only carry
+            // their area name inside the KML <Folder>, which the old
+            // name-only check missed - that is why their labels/highlight
+            // never rendered.
+            const searchText = getFeatureSearchText(feature);
+            const matchedArea = detectArea(searchText);
+            const matchedStatus = detectStatus(searchText);
 
-            const isDMA = dmaNames.some(function(name) {
-              return featureName
-                .toLowerCase()
-                .includes(name.toLowerCase());
-            });
+            // Tag every layer so the Construction Stage / Intervention
+            // Area checkboxes can actually find and toggle it.
+            layer._area = matchedArea || "";
+            layer._status = matchedStatus || "";
+            kmzFeatureLayers.push(layer);
 
-            if (isDMA && layer.getBounds) {
+            if (matchedArea && layer.getBounds) {
               layer.setStyle({
                 color: "#666666",
                 weight: 2,
@@ -965,17 +967,28 @@
               });
 
               const center = layer.getBounds().getCenter();
+              const labelText = featureName || matchedArea;
 
-              L.marker(center, {
+              const labelMarker = L.marker(center, {
                 icon: L.divIcon({
                   className: "dma-home-label",
                   html: '<div class="dma-home-tag"><i class="fa-solid fa-location-dot"></i>' +
-                    escapeHtml(featureName) +
+                    escapeHtml(labelText) +
                     '</div>',
                   iconSize: [150, 24],
                   iconAnchor: [75, 12]
-                })
-              }).addTo(map);
+                }),
+                interactive: false
+              });
+
+              // Tag the label with the same area/status as its polygon so
+              // unticking the region hides the highlight cover AND its
+              // label together, and ticking it restores both together.
+              labelMarker._area = matchedArea;
+              labelMarker._status = matchedStatus || "";
+
+              labelMarker.addTo(map);
+              kmzFeatureLayers.push(labelMarker);
             }
           }
         });
