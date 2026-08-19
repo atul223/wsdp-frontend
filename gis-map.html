@@ -598,6 +598,34 @@
       "Arimba"
     ];
 
+    // Known alternate spellings/variants seen for area names inside KML
+    // placemark name/description/folder fields (e.g. Roman numeral "I" vs
+    // digit "1", punctuation differences). Every variant is compared after
+    // normalizeText() runs, so case/diacritics/punctuation are already
+    // folded - these cover the remaining, non-generic differences.
+    var AREA_NAME_ALIASES = {
+      "Cowboy I": ["cowboy i", "cowboy 1", "cowboy1", "cowboy01", "cowboy 01", "cowboyi"]
+    };
+
+    // Authoritative construction-stage status for each intervention area.
+    // The KMZ/KML text does not reliably encode this, so it is defined
+    // explicitly here per the confirmed project status.
+    var AREA_STATUS_MAP = {
+      "Casa Verde": "progress",
+      "Escola Portuguesa": "progress",
+      "Cowboy I": "notStarted",
+      "Sofrio": "progress",
+      "João de Almeida": "notStarted",
+      "Caixote ou Socombar": "progress",
+      "Arimba": "notStarted"
+    };
+
+    // Optional context for areas awaiting stakeholder approval.
+    var AREA_STATUS_NOTE = {
+      "Cowboy I": "Approval is awaiting from local stakeholders",
+      "João de Almeida": "Approval is awaiting from local stakeholders"
+    };
+
     var STATUS_KEYWORDS = [
       {
         status: "complete",
@@ -620,6 +648,34 @@
         keywords: ["not started", "not-started", "pending", "to start"]
       }
     ];
+
+    function getCssVarColor(varName, fallback) {
+      try {
+        var value = getComputedStyle(document.documentElement).getPropertyValue(varName);
+        value = (value || "").trim();
+        return value || fallback;
+      } catch (error) {
+        return fallback;
+      }
+    }
+
+    // Highlight-cover colors per construction stage, matching the swatches
+    // shown in the "Construction Stage" legend/filter list.
+    var STATUS_STYLES = {
+      complete: { color: "#00a651", fillColor: "#00a651", fillOpacity: 0.24 },
+      planned: { color: "#e53935", fillColor: "#e53935", fillOpacity: 0.22 },
+      progress: {
+        color: getCssVarColor("--color-warning", "#f59e0b"),
+        fillColor: getCssVarColor("--color-warning", "#f59e0b"),
+        fillOpacity: 0.24
+      },
+      mobilising: { color: "#F58232", fillColor: "#F58232", fillOpacity: 0.24 },
+      notStarted: {
+        color: getCssVarColor("--color-critical", "#c62828"),
+        fillColor: getCssVarColor("--color-critical", "#c62828"),
+        fillOpacity: 0.22
+      }
+    };
 
     var map = L.map(mapElement, {
       zoomControl: true,
@@ -673,6 +729,7 @@
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
         .replace(/\s+/g, " ")
         .trim();
     }
@@ -696,8 +753,14 @@
       var normalized = normalizeText(searchText);
 
       for (var i = 0; i < AREA_NAMES.length; i += 1) {
-        if (normalized.indexOf(normalizeText(AREA_NAMES[i])) !== -1) {
-          return AREA_NAMES[i];
+        var areaName = AREA_NAMES[i];
+        var variants = (AREA_NAME_ALIASES[areaName] || []).slice();
+        variants.push(normalizeText(areaName));
+
+        for (var j = 0; j < variants.length; j += 1) {
+          if (normalized.indexOf(variants[j]) !== -1) {
+            return areaName;
+          }
         }
       }
 
@@ -711,7 +774,7 @@
         var group = STATUS_KEYWORDS[i];
 
         for (var j = 0; j < group.keywords.length; j += 1) {
-          if (normalized.indexOf(group.keywords[j]) !== -1) {
+          if (normalized.indexOf(normalizeText(group.keywords[j])) !== -1) {
             return group.status;
           }
         }
@@ -943,27 +1006,30 @@
             ).trim();
 
             // Match against name + description + KML folder + styleUrl,
-            // not just the placemark's own "name" field, and use accent
-            // /diacritic-insensitive comparison. Some regions only carry
-            // their area name inside the KML <Folder>, which the old
-            // name-only check missed - that is why their labels/highlight
-            // never rendered.
+            // with accent/diacritic and punctuation-insensitive comparison
+            // plus known alias variants (e.g. "Cowboy I" vs "Cowboy 1").
             const searchText = getFeatureSearchText(feature);
             const matchedArea = detectArea(searchText);
-            const matchedStatus = detectStatus(searchText);
 
             // Tag every layer so the Construction Stage / Intervention
-            // Area checkboxes can actually find and toggle it.
+            // Area checkboxes can actually find and toggle it. This is
+            // what makes the tick-boxes work at all.
             layer._area = matchedArea || "";
-            layer._status = matchedStatus || "";
-            kmzFeatureLayers.push(layer);
 
             if (matchedArea && layer.getBounds) {
+              // Use the authoritative status map first (KML text does not
+              // reliably encode construction stage); fall back to keyword
+              // detection for any area not explicitly listed.
+              const matchedStatus = AREA_STATUS_MAP[matchedArea] || detectStatus(searchText) || "notStarted";
+              layer._status = matchedStatus;
+
+              const statusStyle = STATUS_STYLES[matchedStatus] || STATUS_STYLES.notStarted;
+
               layer.setStyle({
-                color: "#666666",
+                color: statusStyle.color,
                 weight: 2,
-                fillColor: "#fff600",
-                fillOpacity: 0.22
+                fillColor: statusStyle.fillColor,
+                fillOpacity: statusStyle.fillOpacity
               });
 
               const center = layer.getBounds().getCenter();
@@ -985,11 +1051,15 @@
               // unticking the region hides the highlight cover AND its
               // label together, and ticking it restores both together.
               labelMarker._area = matchedArea;
-              labelMarker._status = matchedStatus || "";
+              labelMarker._status = matchedStatus;
 
               labelMarker.addTo(map);
               kmzFeatureLayers.push(labelMarker);
+            } else {
+              layer._status = detectStatus(searchText) || "";
             }
+
+            kmzFeatureLayers.push(layer);
           }
         });
 
