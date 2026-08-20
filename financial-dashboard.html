@@ -9,9 +9,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="css/styles.css">
 </head>
-
 <body data-page="financial">
-
 <script>
   window.WSDP_PAGE = {
     title: "Financial Dashboard",
@@ -20,15 +18,11 @@
     statusText: "Within Budget"
   };
 </script>
-
 <div class="app-shell">
   <aside class="sidebar" id="sidebarMount"></aside>
-
   <div class="main-column">
     <header class="topbar" id="topbarMount"></header>
-
     <main class="main-content">
-
       <div class="grid grid-4 fade-in">
         <div class="card kpi-card card-accent card-accent--primary">
           <div class="kpi-card__top">
@@ -41,10 +35,9 @@
             <span class="count-up" data-count="17.96" data-decimals="2">17.96</span><span class="unit">%</span>
           </div>
           <div class="kpi-card__delta up">
-            <i class="fa-solid fa-arrow-trend-up"></i> Cumulative IPC invoiced
+            <i class="fa-solid fa-arrow-trend-up"></i> Cumulation of both IPC-01 and IPC-02
           </div>
         </div>
-
         <div class="card kpi-card card-accent card-accent--secondary">
           <div class="kpi-card__top">
             <div class="kpi-card__label">Physical Progress</div>
@@ -53,11 +46,10 @@
             </div>
           </div>
           <div class="kpi-card__value">
-            <span class="count-up" data-count="19.36" data-decimals="1">19.36</span><span class="unit">%</span>
+            <span class="count-up" data-count="19.36" data-decimals="2">19.36</span><span class="unit">%</span>
           </div>
-          <div class="kpi-card__delta flat">Physical ahead of financial by 43.44pp</div>
+          <div class="kpi-card__delta flat">Overall physical work progress from the average of activities</div>
         </div>
-
         <div class="card kpi-card card-accent card-accent--success">
           <div class="kpi-card__top">
             <div class="kpi-card__label">Cumulative Expenditure</div>
@@ -70,7 +62,6 @@
           </div>
           <div class="kpi-card__delta flat">USD 1.01M of USD 5.60M contract value</div>
         </div>
-
         <div class="card kpi-card card-accent card-accent--warning">
           <div class="kpi-card__top">
             <div class="kpi-card__label">IPC Status</div>
@@ -78,11 +69,13 @@
               <i class="fa-solid fa-file-invoice-dollar"></i>
             </div>
           </div>
-          <div class="kpi-card__value" style="font-size:1.3rem;">IPC-02</div>
-          <div class="kpi-card__delta flat">IPC-01 Approved · IPC-02 Submitted</div>
+          <div class="kpi-card__value" style="font-size:1.3rem;">
+            IPC-02
+            <div class="kpi-card__subvalue">(Withhold by Employer due to Quality of Work)</div>
+          </div>
+          <div class="kpi-card__delta flat">IPC-01 released, IPC-02 Withhold</div>
         </div>
       </div>
-
       <div class="grid grid-4 fade-in financial-reference-kpis">
         <div class="card kpi-card card-accent card-accent--primary">
           <div class="kpi-card__top">
@@ -96,7 +89,6 @@
           </div>
           <div class="kpi-card__delta flat">USD 5.60M contract value</div>
         </div>
-
         <div class="card kpi-card card-accent card-accent--secondary">
           <div class="kpi-card__top">
             <div class="kpi-card__label">Advance Payment 20%</div>
@@ -109,7 +101,6 @@
           </div>
           <div class="kpi-card__delta flat">USD 1.12M disbursed</div>
         </div>
-
         <div class="card kpi-card card-accent card-accent--warning">
           <div class="kpi-card__top">
             <div class="kpi-card__label">Contract Balance</div>
@@ -122,26 +113,23 @@
           </div>
           <div class="kpi-card__delta flat">USD 4.59M remaining</div>
         </div>
-
         <div class="card kpi-card card-accent card-accent--success">
           <div class="kpi-card__top">
-            <div class="kpi-card__label">Prov. Sum (50%)</div>
+            <div class="kpi-card__label">Prov. Sum (15%)</div>
             <div class="kpi-card__icon icon-tone-green">
               <i class="fa-solid fa-circle-check"></i>
             </div>
           </div>
           <div class="kpi-card__value">
-            <span>1.94</span><span class="unit">M AOA</span>
+            <span>472.90</span><span class="unit">M AOA</span>
           </div>
-          <div class="kpi-card__delta flat">USD 0.003M verified in IPC-02</div>
+          <div class="kpi-card__delta flat">USD 0.73M — 3,000 USD is claimed in IPC-02. Available balance is 727,396.24 USD.</div>
         </div>
       </div>
-
       <div class="section-heading">
         <h2>Cash Flow</h2>
         <span class="section-sub">Planned vs actual cumulative expenditure in AOA</span>
       </div>
-
       <div class="card">
         <div class="card-body">
           <div style="height:280px;">
@@ -149,14 +137,12 @@
           </div>
         </div>
       </div>
-
       <div class="section-heading">
         <h2>Planned vs Actual Progress</h2>
         <span class="section-sub">
           Physical and Financial Progress Comparison
         </span>
       </div>
-
       <div class="card">
         <div class="card-body">
           <div style="height:260px;">
@@ -164,12 +150,10 @@
           </div>
         </div>
       </div>
-
       <div class="section-heading">
         <h2>Payment Tracking</h2>
         <span class="section-sub">Contract value, invoicing, paid and outstanding amounts</span>
       </div>
-
       <div class="card" id="paymentTrackingCard">
         <div class="card-body table-scroll">
           <table class="data-table" id="paymentTrackingTable">
@@ -200,12 +184,10 @@
           </table>
         </div>
       </div>
-
       <div class="section-heading">
         <h2>IPC Tracker</h2>
         <span class="section-sub">Interim payment certificates</span>
       </div>
-
       <div class="card" id="ipcTrackerCard">
         <div class="card-body table-scroll">
           <table class="data-table" id="ipcTrackerTable">
@@ -261,12 +243,10 @@
           </table>
         </div>
       </div>
-
       <div class="section-heading">
         <h2>Bank Guarantees</h2>
         <span class="section-sub">Guarantee validity and renewal status</span>
       </div>
-
       <div class="card">
         <div class="card-body table-scroll">
           <table class="data-table" id="bankGuaranteesTable">
@@ -298,12 +278,10 @@
           </table>
         </div>
       </div>
-
       <div class="section-heading">
         <h2>Addenda / Amendments</h2>
         <span class="section-sub">Contract amendments and scope changes</span>
       </div>
-
       <div class="card">
         <div class="card-body table-scroll">
           <table class="data-table" id="addendaAmendmentsTable">
@@ -350,36 +328,29 @@
           </table>
         </div>
       </div>
-
     </main>
-
     <footer style="text-align:center;padding:24px;color:var(--text-muted);font-size:12px;">
       Water Supply Distribution Project — Monitoring Dashboard · Contract 44W3/LUBANGO/DNA18
     </footer>
   </div>
 </div>
-
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="js/api.js"></script>
 <script src="js/shell.js"></script>
 <script src="js/main.js"></script>
-
 <script>
   document.addEventListener("DOMContentLoaded", function () {
     function cssVar(name) {
       return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
     }
-
     var months = ["Feb", "Mar", "Apr", "May", "Jun", "Jul"];
   });
 </script>
-
 <script src="js/api.js"></script>
 <script src="js/i18n.js"></script>
 <script src="js/shell.js"></script>
 <script src="js/main.js"></script>
 <script src="js/financial-dashboard.js"></script>
-
 <script>
   /*
     Minimal, non-invasive color patch.
@@ -391,18 +362,13 @@
     var PLANNED_BORDER = "#2F6FED";              // professional blue border
     var PLANNED_FILL = "rgba(47, 111, 237, 0.35)"; // visible, still soft fill
     var PLANNED_HOVER = "rgba(47, 111, 237, 0.55)";
-
     function recolorPlannedDataset() {
       if (!window.Chart) return false;
-
       var canvas = document.getElementById("cashFlowChart");
       if (!canvas) return false;
-
       var chart = Chart.getChart(canvas);
       if (!chart || !chart.data || !Array.isArray(chart.data.datasets)) return false;
-
       var changed = false;
-
       chart.data.datasets.forEach(function (dataset) {
         if ((dataset.label || "").trim() === "Planned Expenditure (M AOA)") {
           dataset.backgroundColor = PLANNED_FILL;
@@ -412,11 +378,9 @@
           changed = true;
         }
       });
-
       if (changed) chart.update();
       return changed;
     }
-
     document.addEventListener("DOMContentLoaded", function () {
       var attempts = 0;
       (function retry() {
