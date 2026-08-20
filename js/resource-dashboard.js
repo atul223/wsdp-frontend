@@ -1,15 +1,16 @@
 /* ============================================================
    resource-dashboard.js
    DB-backed Resource Dashboard CRUD for:
-   - Materials
-   - Equipment
-   - Manpower
+   - Materials            (Resource, type=material)
+   - Equipment            (Resource, type=equipment)
+   - Manpower             (Resource, type=manpower)
+   - HDPE Pipe Stock       (HdpePipeStock)   <- now DB-backed, full CRUD
+   - Equipment Deployment  (EquipmentDeployment) <- now DB-backed, full CRUD
+   - Workforce By Employer (WorkforceEmployer)   <- now DB-backed, full CRUD
 
-   Added reporting sections:
-   - HDPE Pipe Stock (May 2026)
-   - Equipment Deployment (May 2026)
-   - Manpower KPI cards
-   - Workforce By Employer
+   All data tables in this module now include an "S.No." column and
+   full Add / Edit / Delete / Update support, consistent with the rest
+   of the site.
 
    Requires:
    - js/api.js
@@ -42,32 +43,45 @@
     }
   };
 
-  const HDPE_PIPE_STOCK = [
-    { diameter: "De20 PN16", received: 41100, used: 1200, stock: 39900, cover: "OK" },
-    { diameter: "De25 PN16", received: 44844, used: 7200, stock: 37644, cover: "OK" },
-    { diameter: "De63 PN10", received: 32784, used: 12960, stock: 19824, cover: "OK" },
-    { diameter: "De75 PN10", received: 1968, used: 0, stock: 1968, cover: "OK" },
-    { diameter: "De90 PN10", received: 7728, used: 4836, stock: 2892, cover: "Watch" },
-    { diameter: "De110 PN10", received: 3420, used: 1032, stock: 2388, cover: "OK" },
-    { diameter: "De160 PN10", received: 6860, used: 912, stock: 5948, cover: "OK" },
-    { diameter: "De200 PN10", received: 4896, used: 1152, stock: 3744, cover: "OK" },
-    { diameter: "De250 PN10", received: 2592, used: 1964, stock: 628, cover: "Re-order" },
-    { diameter: "De315 PN10", received: 1872, used: 888, stock: 984, cover: "OK" },
-    { diameter: "De110 PN16", received: 12, used: 0, stock: 12, cover: "OK" },
-    { diameter: "De160 PN16", received: 300, used: 0, stock: 300, cover: "OK" }
-  ];
-
-  const EQUIPMENT_DEPLOYMENT = [
-    { category: "Earthmoving (Excavator, dump truck, backhoe)", planned: null, deployed: 4, variance: null, remarks: "No planned baseline set; utilization to be monitored against June work-front ramp-up" },
-    { category: "Welding (Butt fusion, manual, handheld)", planned: null, deployed: 11, variance: null, remarks: "Adequate coverage for current pipe-fusion works" },
-    { category: "Generators (30/15/10/2.5 kW)", planned: null, deployed: 5, variance: null, remarks: "Sufficient for active work fronts" },
-    { category: "Light Vehicles (Pickups + truck)", planned: null, deployed: 7, variance: null, remarks: "Adequate site mobility support" },
-    { category: "Tamping, cutting, grinder, jackhammer", planned: null, deployed: 12, variance: null, remarks: "Adequate for pavement and concrete works" },
-    { category: "Survey (GPS, level)", planned: null, deployed: 2, variance: null, remarks: "Minimum required; no spare unit available" },
-    { category: "Test equipment (Pump, tanks)", planned: null, deployed: 3, variance: null, remarks: "Repeat pressure test required (DN250, 463 m) due to equipment failure" },
-    { category: "Other", planned: null, deployed: 2, variance: null, remarks: "Miscellaneous support equipment" },
-    { category: "TOTAL", planned: 61, deployed: 46, variance: -15, remarks: "Shortfall of 15 units vs May plan; additional mobilization pending", isTotal: true }
-  ];
+  // Field definitions for the 3 DB-backed report tables. Driving the
+  // Add/Edit modal generically from this config keeps the CRUD pattern
+  // identical for all 3 tables while matching each table's own columns.
+  const REPORT_TYPES = {
+    hdpe: {
+      label: "HDPE Pipe Stock Entry",
+      listPath: function (projectId) { return "/projects/" + projectId + "/hdpe-pipe-stock?limit=200"; },
+      createPath: function (projectId) { return "/projects/" + projectId + "/hdpe-pipe-stock"; },
+      itemPath: function (id) { return "/hdpe-pipe-stock/" + id; },
+      fields: [
+        { key: "diameter", label: "Diameter", type: "text", required: true, full: true },
+        { key: "received_m", label: "Received (m)", type: "number", step: "0.01", min: "0", required: true },
+        { key: "used_m", label: "Used (m)", type: "number", step: "0.01", min: "0", required: true }
+      ]
+    },
+    equipmentDeployment: {
+      label: "Equipment Deployment Entry",
+      listPath: function (projectId) { return "/projects/" + projectId + "/equipment-deployments?limit=200"; },
+      createPath: function (projectId) { return "/projects/" + projectId + "/equipment-deployments"; },
+      itemPath: function (id) { return "/equipment-deployments/" + id; },
+      fields: [
+        { key: "category", label: "Category", type: "text", required: true, full: true },
+        { key: "planned", label: "Planned", type: "number", step: "0.01", min: "0", required: false },
+        { key: "deployed", label: "Deployed", type: "number", step: "0.01", min: "0", required: true },
+        { key: "remarks", label: "Remarks", type: "textarea", required: false, full: true }
+      ]
+    },
+    workforce: {
+      label: "Workforce Entry",
+      listPath: function (projectId) { return "/projects/" + projectId + "/workforce-employers?limit=200"; },
+      createPath: function (projectId) { return "/projects/" + projectId + "/workforce-employers"; },
+      itemPath: function (id) { return "/workforce-employers/" + id; },
+      fields: [
+        { key: "group_name", label: "Group / Employer", type: "text", required: false },
+        { key: "category", label: "Category", type: "text", required: false },
+        { key: "headcount", label: "Headcount", type: "number", step: "1", min: "0", required: true }
+      ]
+    }
+  };
 
   const MANPOWER_PROGRESS = [
     {
@@ -120,43 +134,12 @@
     }
   ];
 
-  const WORKFORCE_BY_EMPLOYER = [
-    { group: "CTCE Direct (17)", category: "Construction Manager", headcount: 1 },
-    { group: "", category: "Site Engineers", headcount: 2 },
-    { group: "", category: "Land Surveyor", headcount: 1 },
-    { group: "", category: "HSE Officer + Assistant", headcount: 2 },
-    { group: "", category: "Social Expert + Assistants", headcount: 9 },
-    { group: "", category: "Other Specialists", headcount: 2 },
-    { group: "XINYI Subcontractor (58)", category: "Skilled", headcount: 4 },
-    { group: "", category: "Unskilled", headcount: 54 },
-    { group: "SHIGUO Subcontractor (40)", category: "Skilled", headcount: 4 },
-    { group: "", category: "Unskilled", headcount: 36 },
-    { group: "Grand Total", category: "", headcount: 115, isTotal: true }
-  ];
-
-  const FALLBACK_PAYMENT_TRACKING = [
-    {
-      description: "Contract Value",
-      amount: 3625580000
-    },
-    {
-      description: "Amount Invoiced",
-      amount: 650999524.39
-    },
-    {
-      description: "Amount Paid",
-      amount: 404659374.56
-    },
-    {
-      description: "Outstanding",
-      amount: 246340149.83
-    }
-  ];
-
   let state = {
     projectId: null,
     resources: [],
-    editingResourceId: null,
+    hdpeStock: [],
+    equipmentDeployments: [],
+    workforceRows: [],
     chart: null,
     initialized: false
   };
@@ -398,8 +381,20 @@
         margin-top: 18px;
       }
 
-      .resource-report-heading {
+      .resource-report-heading-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
         padding: 18px 20px 0;
+      }
+
+      .resource-report-heading-row .resource-report-heading {
+        padding: 0;
+      }
+
+      .resource-report-heading-row .resource-actions {
+        margin-bottom: 0;
       }
 
       .resource-report-heading h3 {
@@ -428,6 +423,15 @@
         line-height: 1.4;
       }
 
+      .resource-report-table td.sno-cell,
+      .resource-report-table th.sno-col,
+      .data-table th.sno-col,
+      .data-table td.sno-cell {
+        width: 48px;
+        text-align: center;
+        color: var(--text-muted, #8A99AA);
+      }
+
       .resource-total-row {
         background: rgba(10, 69, 149, 0.12) !important;
         font-weight: 800;
@@ -453,6 +457,10 @@
 
       @media (max-width: 720px) {
         .resource-heading-row {
+          flex-direction: column;
+        }
+
+        .resource-report-heading-row {
           flex-direction: column;
         }
 
@@ -610,6 +618,7 @@
       <table class="data-table">
         <thead>
           <tr>
+            <th scope="col" class="sno-col">S.No.</th>
             <th scope="col">Material</th>
             <th scope="col">Unit</th>
             <th scope="col" class="num">Total Capacity</th>
@@ -621,11 +630,12 @@
         </thead>
         <tbody>
           ${materials
-            .map(function (item) {
+            .map(function (item, idx) {
               const status = getStatusForMaterial(item);
 
               return `
                 <tr data-resource-id="${escapeAttr(item.id)}">
+                  <td class="sno-cell">${idx + 1}</td>
                   <td>${escapeHTML(item.name)}</td>
                   <td>${escapeHTML(item.unit || "")}</td>
                   <td class="num">${formatNumber(item.total_capacity)}</td>
@@ -668,44 +678,76 @@
       section.appendChild(card);
     }
 
-    card.innerHTML = `
-      <div class="resource-report-heading">
-        <h3>HDPE Pipe Stock (May 2026)</h3>
-        <p>Received, used and available HDPE pipe stock summary</p>
-      </div>
+    const rows = state.hdpeStock;
 
-      <div class="card-body table-scroll">
+    const tableOrEmpty = !rows.length
+      ? `
+        <div class="resource-empty">
+          <i class="fa-solid fa-box-open"></i>
+          <p>No HDPE pipe stock records found.</p>
+          ${buttonHTML("fa-plus", "Add Entry", "btn-primary-lite", 'data-report-add="hdpe"')}
+        </div>
+      `
+      : `
         <table class="data-table resource-report-table">
           <thead>
             <tr>
+              <th scope="col" class="sno-col">S.No.</th>
               <th scope="col">Diameter</th>
               <th scope="col" class="num">Received (m)</th>
               <th scope="col" class="num">Used (m)</th>
               <th scope="col" class="num">Stock (m)</th>
               <th scope="col">Cover</th>
+              <th scope="col" class="num">Actions</th>
             </tr>
           </thead>
           <tbody>
-            ${HDPE_PIPE_STOCK.map(function (item) {
+            ${rows.map(function (item, idx) {
               const statusClass = getCoverStatusClass(item.cover);
               const statusIcon = getCoverStatusIcon(item.cover);
 
               return `
-                <tr>
+                <tr data-report-id="${escapeAttr(item.id)}">
+                  <td class="sno-cell">${idx + 1}</td>
                   <td>${escapeHTML(item.diameter)}</td>
-                  <td class="num">${formatNumber(item.received)}</td>
-                  <td class="num">${formatNumber(item.used)}</td>
-                  <td class="num">${formatNumber(item.stock)}</td>
+                  <td class="num">${formatNumber(item.received_m)}</td>
+                  <td class="num">${formatNumber(item.used_m)}</td>
+                  <td class="num">${formatNumber(item.stock_m)}</td>
                   <td>
                     <span class="status-chip ${statusClass}">
                       <i class="fa-solid ${statusIcon}"></i> ${escapeHTML(item.cover)}
                     </span>
+                  </td>
+                  <td>
+                    <div class="resource-action-cell">
+                      <button type="button" title="Edit" data-report-edit="${escapeAttr(item.id)}" data-report-type="hdpe">
+                        <i class="fa-solid fa-pen"></i>
+                      </button>
+                      <button type="button" title="Delete" class="danger" data-report-delete="${escapeAttr(item.id)}" data-report-type="hdpe">
+                        <i class="fa-solid fa-trash"></i>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               `;
             }).join("")}
           </tbody>
         </table>
+      `;
+
+    card.innerHTML = `
+      <div class="resource-report-heading-row">
+        <div class="resource-report-heading">
+          <h3>HDPE Pipe Stock</h3>
+          <p>Received, used and available HDPE pipe stock summary</p>
+        </div>
+        <div class="resource-actions">
+          ${buttonHTML("fa-plus", "Add Entry", "btn-primary-lite", 'data-report-add="hdpe"')}
+        </div>
+      </div>
+
+      <div class="card-body table-scroll">
+        ${tableOrEmpty}
       </div>
     `;
   }
@@ -723,37 +765,69 @@
       section.appendChild(card);
     }
 
-    card.innerHTML = `
-      <div class="resource-report-heading">
-        <h3>Equipment Deployment (May 2026)</h3>
-        <p>Planned versus deployed equipment summary</p>
-      </div>
+    const rows = state.equipmentDeployments;
 
-      <div class="card-body table-scroll">
+    const tableOrEmpty = !rows.length
+      ? `
+        <div class="resource-empty">
+          <i class="fa-solid fa-truck-monster"></i>
+          <p>No equipment deployment records found.</p>
+          ${buttonHTML("fa-plus", "Add Entry", "btn-primary-lite", 'data-report-add="equipmentDeployment"')}
+        </div>
+      `
+      : `
         <table class="data-table resource-report-table">
           <thead>
             <tr>
+              <th scope="col" class="sno-col">S.No.</th>
               <th scope="col">Category</th>
               <th scope="col" class="num">Planned</th>
               <th scope="col" class="num">Deployed</th>
               <th scope="col" class="num">Variance</th>
               <th scope="col">Remarks</th>
+              <th scope="col" class="num">Actions</th>
             </tr>
           </thead>
           <tbody>
-            ${EQUIPMENT_DEPLOYMENT.map(function (item) {
+            ${rows.map(function (item, idx) {
               return `
-                <tr class="${item.isTotal ? "resource-total-row" : ""}">
+                <tr data-report-id="${escapeAttr(item.id)}" class="${item.is_total ? "resource-total-row" : ""}">
+                  <td class="sno-cell">${idx + 1}</td>
                   <td>${escapeHTML(item.category)}</td>
                   <td class="num">${formatNumber(item.planned)}</td>
                   <td class="num">${formatNumber(item.deployed)}</td>
                   <td class="num">${formatNumber(item.variance)}</td>
                   <td class="remarks-cell">${escapeHTML(item.remarks || "—")}</td>
+                  <td>
+                    <div class="resource-action-cell">
+                      <button type="button" title="Edit" data-report-edit="${escapeAttr(item.id)}" data-report-type="equipmentDeployment">
+                        <i class="fa-solid fa-pen"></i>
+                      </button>
+                      <button type="button" title="Delete" class="danger" data-report-delete="${escapeAttr(item.id)}" data-report-type="equipmentDeployment">
+                        <i class="fa-solid fa-trash"></i>
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               `;
             }).join("")}
           </tbody>
         </table>
+      `;
+
+    card.innerHTML = `
+      <div class="resource-report-heading-row">
+        <div class="resource-report-heading">
+          <h3>Equipment Deployment (Month 2026)</h3>
+          <p>Planned versus deployed equipment summary</p>
+        </div>
+        <div class="resource-actions">
+          ${buttonHTML("fa-plus", "Add Entry", "btn-primary-lite", 'data-report-add="equipmentDeployment"')}
+        </div>
+      </div>
+
+      <div class="card-body table-scroll">
+        ${tableOrEmpty}
       </div>
     `;
   }
@@ -798,23 +872,25 @@
   }
 
   // Builds an array of { name, total, categories: { categoryLabel: headcount } }
-  // from the WORKFORCE_BY_EMPLOYER table rows (forward-filling blank group cells),
-  // so the Manpower chart always mirrors whatever the Workforce By Employer table shows.
+  // from state.workforceRows (forward-filling blank group cells), so the
+  // Manpower chart always mirrors whatever the Workforce By Employer table
+  // currently holds in the database.
   function buildWorkforceGroups() {
     const groups = [];
     let current = null;
 
-    WORKFORCE_BY_EMPLOYER.forEach(function (row) {
-      if (row.isTotal) return;
+    state.workforceRows.forEach(function (row) {
+      if (row.is_total) return;
 
-      if (row.group) {
-        current = { name: row.group, total: 0, categories: {} };
+      if (row.group_name) {
+        current = { name: row.group_name, total: 0, categories: {} };
         groups.push(current);
       }
 
       if (!current) return;
 
-      current.categories[row.category] = (current.categories[row.category] || 0) + Number(row.headcount || 0);
+      const cat = row.category || "Other";
+      current.categories[cat] = (current.categories[cat] || 0) + Number(row.headcount || 0);
       current.total += Number(row.headcount || 0);
     });
 
@@ -938,6 +1014,7 @@
               <table class="data-table">
                 <thead>
                   <tr>
+                    <th class="sno-col">S.No.</th>
                     <th>Category</th>
                     <th>Unit</th>
                     <th class="num">Total</th>
@@ -948,9 +1025,10 @@
                 </thead>
                 <tbody>
                   ${manpower
-                    .map(function (item) {
+                    .map(function (item, idx) {
                       return `
                         <tr data-resource-id="${escapeAttr(item.id)}">
+                          <td class="sno-cell">${idx + 1}</td>
                           <td>${escapeHTML(item.name)}</td>
                           <td>${escapeHTML(item.unit || "")}</td>
                           <td class="num">${formatNumber(item.total_capacity)}</td>
@@ -998,33 +1076,65 @@
       section.appendChild(card);
     }
 
-    card.innerHTML = `
-      <div class="resource-report-heading">
-        <h3>Workforce By Employer</h3>
-        <p>Employer, category and headcount breakdown</p>
-      </div>
+    const rows = state.workforceRows;
 
-      <div class="card-body table-scroll">
+    const tableOrEmpty = !rows.length
+      ? `
+        <div class="resource-empty">
+          <i class="fa-solid fa-people-group"></i>
+          <p>No workforce records found.</p>
+          ${buttonHTML("fa-plus", "Add Entry", "btn-primary-lite", 'data-report-add="workforce"')}
+        </div>
+      `
+      : `
         <table class="data-table resource-report-table">
           <thead>
             <tr>
+              <th scope="col" class="sno-col">S.No.</th>
               <th scope="col">Group</th>
               <th scope="col">Category</th>
               <th scope="col" class="num">Headcount</th>
+              <th scope="col" class="num">Actions</th>
             </tr>
           </thead>
           <tbody>
-            ${WORKFORCE_BY_EMPLOYER.map(function (item) {
+            ${rows.map(function (item, idx) {
               return `
-                <tr class="${item.isTotal ? "resource-total-row" : ""}">
-                  <td>${escapeHTML(item.group)}</td>
+                <tr data-report-id="${escapeAttr(item.id)}" class="${item.is_total ? "resource-total-row" : ""}">
+                  <td class="sno-cell">${idx + 1}</td>
+                  <td>${escapeHTML(item.group_name)}</td>
                   <td>${escapeHTML(item.category)}</td>
                   <td class="num">${formatNumber(item.headcount)}</td>
+                  <td>
+                    <div class="resource-action-cell">
+                      <button type="button" title="Edit" data-report-edit="${escapeAttr(item.id)}" data-report-type="workforce">
+                        <i class="fa-solid fa-pen"></i>
+                      </button>
+                      <button type="button" title="Delete" class="danger" data-report-delete="${escapeAttr(item.id)}" data-report-type="workforce">
+                        <i class="fa-solid fa-trash"></i>
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               `;
             }).join("")}
           </tbody>
         </table>
+      `;
+
+    card.innerHTML = `
+      <div class="resource-report-heading-row">
+        <div class="resource-report-heading">
+          <h3>Workforce</h3>
+          <p>Employer, category and headcount breakdown</p>
+        </div>
+        <div class="resource-actions">
+          ${buttonHTML("fa-plus", "Add Entry", "btn-primary-lite", 'data-report-add="workforce"')}
+        </div>
+      </div>
+
+      <div class="card-body table-scroll">
+        ${tableOrEmpty}
       </div>
     `;
   }
@@ -1077,15 +1187,26 @@
     renderWorkforceByEmployerTable();
   }
 
-  async function loadResources() {
+  async function loadAllData() {
     if (!state.projectId) {
       showNoProjectState();
       return;
     }
 
     try {
-      const result = await api().request("GET", "/projects/" + state.projectId + "/resources?limit=200");
-      state.resources = Array.isArray(result && result.data) ? result.data : [];
+      const [resourcesRes, hdpeRes, equipRes, workforceRes] = await Promise.all([
+        api().request("GET", "/projects/" + state.projectId + "/resources?limit=200"),
+        api().request("GET", REPORT_TYPES.hdpe.listPath(state.projectId)),
+        api().request("GET", REPORT_TYPES.equipmentDeployment.listPath(state.projectId)),
+        api().request("GET", REPORT_TYPES.workforce.listPath(state.projectId))
+      ]);
+
+      state.resources = Array.isArray(resourcesRes && resourcesRes.data) ? resourcesRes.data : [];
+      state.hdpeStock = Array.isArray(hdpeRes && hdpeRes.data) ? hdpeRes.data : [];
+      state.equipmentDeployments = Array.isArray(equipRes && equipRes.data) ? equipRes.data : [];
+      state.workforceRows = Array.isArray(workforceRes && workforceRes.data) ? workforceRes.data : [];
+
+      clearDashboardError();
       renderAll();
     } catch (err) {
       showError(err, "Failed to load resource dashboard data");
@@ -1221,7 +1342,7 @@
 
         closeResourceModal();
         clearDashboardError();
-        await loadResources();
+        await loadAllData();
       } catch (err) {
         showError(err, "Failed to " + (isEdit ? "update" : "create") + " resource");
       } finally {
@@ -1240,6 +1361,147 @@
     setTimeout(function () {
       const input = backdrop.querySelector("#resourceName");
       if (input) input.focus();
+    }, 0);
+  }
+
+  function reportFieldValue(record, field) {
+    if (!record) return "";
+    const v = record[field.key];
+    if (v === null || v === undefined) return "";
+    return v;
+  }
+
+  function buildReportFormFieldHTML(field, record) {
+    const value = reportFieldValue(record, field);
+    const idAttr = "reportField_" + field.key;
+    const fullClass = field.full ? "full" : "";
+
+    if (field.type === "textarea") {
+      return `
+        <div class="resource-form-field ${fullClass}">
+          <label for="${idAttr}">${escapeHTML(field.label)}</label>
+          <textarea id="${idAttr}" name="${field.key}" maxlength="500" ${field.required ? "required" : ""}>${escapeHTML(value)}</textarea>
+        </div>
+      `;
+    }
+
+    if (field.type === "number") {
+      return `
+        <div class="resource-form-field ${fullClass}">
+          <label for="${idAttr}">${escapeHTML(field.label)}</label>
+          <input id="${idAttr}" name="${field.key}" type="number" step="${field.step || "1"}" ${field.min !== undefined ? `min="${field.min}"` : ""} ${field.required ? "required" : ""} value="${escapeAttr(value)}" />
+        </div>
+      `;
+    }
+
+    return `
+      <div class="resource-form-field ${fullClass}">
+        <label for="${idAttr}">${escapeHTML(field.label)}</label>
+        <input id="${idAttr}" name="${field.key}" type="text" maxlength="200" ${field.required ? "required" : ""} value="${escapeAttr(value)}" />
+      </div>
+    `;
+  }
+
+  /** Generic Add/Edit modal for the 3 DB-backed report tables (HDPE Pipe
+   * Stock, Equipment Deployment, Workforce By Employer). Fields are driven
+   * entirely by REPORT_TYPES[reportType].fields so each table gets its own
+   * form shape while sharing the exact same modal UX as Resources. */
+  function openReportModal(reportType, record) {
+    const config = REPORT_TYPES[reportType];
+    if (!config) return;
+
+    const isEdit = Boolean(record && record.id);
+
+    closeResourceModal();
+
+    const backdrop = document.createElement("div");
+    backdrop.className = "resource-modal-backdrop";
+    backdrop.id = "resourceModalBackdrop";
+
+    backdrop.innerHTML = `
+      <div class="resource-modal" role="dialog" aria-modal="true" aria-labelledby="reportModalTitle">
+        <div class="resource-modal__header">
+          <h3 id="reportModalTitle">${isEdit ? "Edit" : "Add"} ${config.label}</h3>
+          <button type="button" class="icon-btn" data-resource-modal-close aria-label="Close">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <form id="reportForm">
+          <div class="resource-modal__body">
+            <div class="resource-form-grid">
+              ${config.fields.map(function (field) { return buildReportFormFieldHTML(field, record); }).join("")}
+            </div>
+          </div>
+
+          <div class="resource-modal__footer">
+            <button type="button" class="btn-ghost" data-resource-modal-close>Cancel</button>
+            <button type="submit" class="btn-primary-lite">
+              <i class="fa-solid fa-floppy-disk"></i> ${isEdit ? "Update" : "Save"}
+            </button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    document.body.appendChild(backdrop);
+
+    const form = backdrop.querySelector("#reportForm");
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+
+      const submitBtn = form.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+
+      const payload = {};
+
+      config.fields.forEach(function (field) {
+        const el = form.elements[field.key];
+        const raw = el ? el.value : "";
+
+        if (field.type === "number") {
+          if (raw === "" || raw === null) {
+            payload[field.key] = field.required ? 0 : null;
+          } else {
+            payload[field.key] = Number(raw);
+          }
+        } else {
+          const trimmed = (raw || "").trim();
+          payload[field.key] = trimmed === "" ? (field.required ? "" : null) : trimmed;
+        }
+      });
+
+      try {
+        if (isEdit) {
+          await api().request("PUT", config.itemPath(record.id), payload);
+          toast(config.label + " updated successfully");
+        } else {
+          await api().request("POST", config.createPath(state.projectId), payload);
+          toast(config.label + " added successfully");
+        }
+
+        closeResourceModal();
+        clearDashboardError();
+        await loadAllData();
+      } catch (err) {
+        showError(err, "Failed to " + (isEdit ? "update" : "create") + " record");
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    backdrop.querySelectorAll("[data-resource-modal-close]").forEach(function (btn) {
+      btn.addEventListener("click", closeResourceModal);
+    });
+
+    backdrop.addEventListener("click", function (event) {
+      if (event.target === backdrop) closeResourceModal();
+    });
+
+    setTimeout(function () {
+      const firstInput = backdrop.querySelector(".resource-form-field input, .resource-form-field textarea");
+      if (firstInput) firstInput.focus();
     }, 0);
   }
 
@@ -1262,9 +1524,32 @@
     try {
       await api().request("DELETE", "/resources/" + id);
       toast("Resource deleted successfully", "fa-trash");
-      await loadResources();
+      await loadAllData();
     } catch (err) {
       showError(err, "Failed to delete resource");
+    }
+  }
+
+  function getReportListForType(reportType) {
+    if (reportType === "hdpe") return state.hdpeStock;
+    if (reportType === "equipmentDeployment") return state.equipmentDeployments;
+    if (reportType === "workforce") return state.workforceRows;
+    return [];
+  }
+
+  async function deleteReportRecord(reportType, id) {
+    const config = REPORT_TYPES[reportType];
+    if (!config) return;
+
+    const confirmed = window.confirm("Delete this record? This action cannot be undone.");
+    if (!confirmed) return;
+
+    try {
+      await api().request("DELETE", config.itemPath(id));
+      toast("Record deleted successfully", "fa-trash");
+      await loadAllData();
+    } catch (err) {
+      showError(err, "Failed to delete record");
     }
   }
 
@@ -1295,6 +1580,36 @@
       if (deleteBtn) {
         const id = deleteBtn.getAttribute("data-resource-delete");
         deleteResource(id);
+        return;
+      }
+
+      const reportAddBtn = event.target.closest("[data-report-add]");
+
+      if (reportAddBtn) {
+        const reportType = reportAddBtn.getAttribute("data-report-add");
+        openReportModal(reportType);
+        return;
+      }
+
+      const reportEditBtn = event.target.closest("[data-report-edit]");
+
+      if (reportEditBtn) {
+        const reportType = reportEditBtn.getAttribute("data-report-type");
+        const id = reportEditBtn.getAttribute("data-report-edit");
+        const record = getReportListForType(reportType).find(function (item) {
+          return item.id === id;
+        });
+
+        if (record) openReportModal(reportType, record);
+        return;
+      }
+
+      const reportDeleteBtn = event.target.closest("[data-report-delete]");
+
+      if (reportDeleteBtn) {
+        const reportType = reportDeleteBtn.getAttribute("data-report-type");
+        const id = reportDeleteBtn.getAttribute("data-report-delete");
+        deleteReportRecord(reportType, id);
       }
     });
   }
@@ -1388,7 +1703,7 @@
       return;
     }
 
-    await loadResources();
+    await loadAllData();
   }
 
   document.addEventListener("wsdp:authready", function () {
