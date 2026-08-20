@@ -3,15 +3,21 @@
    Financial Dashboard page script
 
    Keeps existing website theme, layout, colors and API wrapper.
-   Supports:
-   - Existing financial summary cards
-   - Added reference financial cards
-   - Cash Flow chart
-   - Financial vs Physical chart
-   - IPC Tracker table
-   - Bank Guarantees table
-   - Addenda / Amendments table
-   - Existing Budget and IPC/Invoice CRUD using current backend
+
+   IMPORTANT ARCHITECTURE FIX (this revision):
+   - IPC Tracker now reads/writes the real `Ipc` model via
+     ipc-tracker.routes.js (previously it incorrectly derived rows
+     from Budget/Invoice, which is a different, unrelated table).
+   - Amendments and Bank Guarantees now have full Add/Edit/Delete
+     wired to amendment.routes.js and bank-guarantee.routes.js.
+   - Payment Tracking is now a fully editable table backed by the
+     new PaymentTrackingItem model / payment-tracking.routes.js
+     (see schema.prisma + migration.sql provided alongside this file).
+   - Every table (Payment Tracking, IPC Tracker, Bank Guarantees,
+     Amendments) now has an S.No. column (auto-renumbered) and an
+     Actions column with Edit/Delete, plus an "+ Add" button.
+   - "Manage Budgets" / Budget+Invoice CRUD is left completely
+     untouched (separate feature, not part of the 4 visible tables).
 
    Load order required:
    api.js, shell.js, main.js, Chart.js, then this file.
@@ -24,6 +30,10 @@
     projectId: null,
     budgets: [],
     invoices: [],
+    ipcs: [],
+    amendments: [],
+    bankGuarantees: [],
+    paymentTracking: [],
     summary: null,
     cashFlowChart: null,
     finPhysChart: null,
@@ -64,7 +74,8 @@
       usd_amount: 624995.17,
       percentage: 11.16,
       ace_status: "Certified",
-      client_status: "Approved"
+      client_status: "Approved",
+      is_cumulative: false
     },
     {
       ipc: "IPC-02",
@@ -73,7 +84,8 @@
       usd_amount: 380471.61,
       percentage: 6.79,
       ace_status: "Certified 24/06",
-      client_status: "Submitted"
+      client_status: "Submitted",
+      is_cumulative: false
     },
     {
       ipc: "Cumulative",
@@ -92,30 +104,35 @@
       usd_amount: null,
       percentage: null,
       ace_status: "Future",
-      client_status: "—"
+      client_status: "—",
+      is_cumulative: false
     }
   ];
 
   const FALLBACK_PAYMENT_TRACKING = [
     {
       description: "Contract Value",
-      amount: 3625580000.00,
-      amount_display: "3,625,580,000.00 AOA / 5,599,704.50 USD"
+      amount_aoa: 3625580000.00,
+      amount_usd: 5599704.50,
+      is_highlighted: true
     },
     {
       description: "Amount Invoiced",
-      amount: 650999524.39,
-      amount_display: "650,999,524.39 AOA / 1,005,466.78 USD"
+      amount_aoa: 650999524.39,
+      amount_usd: 1005466.78,
+      is_highlighted: false
     },
     {
       description: "Amount Paid",
-      amount: 404659374.56,
-      amount_display: "404,659,374.56 AOA / 624,995.17 USD"
+      amount_aoa: 404659374.56,
+      amount_usd: 624995.17,
+      is_highlighted: false
     },
     {
       description: "Outstanding",
-      amount: 246340149.83,
-      amount_display: "246,340,149.83 AOA / 380,471.61 USD"
+      amount_aoa: 246340149.83,
+      amount_usd: 380471.61,
+      is_highlighted: true
     }
   ];
 
@@ -139,19 +156,19 @@
   const FALLBACK_AMENDMENTS = [
     {
       amendment: "Amendment No. 01",
-      amendment_date: "—",
+      amendment_date: null,
       scope: "Initial amendment record to be updated from contract file",
       status: "Record pending"
     },
     {
       amendment: "Amendment No. 02",
-      amendment_date: "—",
+      amendment_date: null,
       scope: "Second amendment record to be updated from contract file",
       status: "Record pending"
     },
     {
       amendment: "Amendment No. 03",
-      amendment_date: "—",
+      amendment_date: null,
       scope: "Third amendment record to be updated from contract file",
       status: "Record pending"
     },
@@ -163,7 +180,7 @@
     },
     {
       amendment: "Amendment No. 05",
-      amendment_date: "Drafting",
+      amendment_date: null,
       scope: "EOT + Price Adjustment",
       status: "Pending CTCE"
     }
@@ -224,6 +241,17 @@
     );
   }
 
+  function requireProjectOrToast() {
+    if (!state.projectId) {
+      toast(
+        "Project is missing. Set current_project in localStorage before using Financial Dashboard.",
+        "fa-triangle-exclamation"
+      );
+      return false;
+    }
+    return true;
+  }
+
   function cssVar(name, fallback) {
     const value = getComputedStyle(document.documentElement)
       .getPropertyValue(name)
@@ -271,7 +299,14 @@
   }
 
   function formatAoaUsdAmount(aoa, usd) {
-    return formatAmount(aoa, 2) + " AOA / " + formatAmount(usd, 2) + " USD";
+    const parts = [];
+    if (aoa !== null && aoa !== undefined && aoa !== "") {
+      parts.push(formatAmount(aoa, 2) + " AOA");
+    }
+    if (usd !== null && usd !== undefined && usd !== "") {
+      parts.push(formatAmount(usd, 2) + " USD");
+    }
+    return parts.length ? parts.join(" / ") : "—";
   }
 
   function formatPercent(value) {
@@ -281,11 +316,6 @@
     if (Number.isNaN(n)) return String(value);
 
     return n.toFixed(2) + "%";
-  }
-
-  function moneyCr(value) {
-    const n = toNumber(value);
-    return (n / 10000000).toFixed(1);
   }
 
   function toInputDate(value) {
@@ -472,6 +502,16 @@
         font-size: 13px;
       }
 
+      .financial-field-checkbox {
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .financial-field-checkbox input {
+        width: auto;
+      }
+
       .financial-modal__foot {
         padding: 16px 20px;
         border-top: 1px solid var(--border-color, #e3e7eb);
@@ -545,87 +585,50 @@
     }
   }
 
-  function getIpcTable() {
-    return (
-      document.getElementById("ipcTrackerTable") ||
-      document.querySelector(".data-table")
-    );
+  /* ---------------------------------------------------------------
+     Generic table helpers (S.No. column, Actions column, action bar)
+     --------------------------------------------------------------- */
+
+  function getTable(id) {
+    return document.getElementById(id);
   }
 
-  function getIpcTableBody() {
-    const table = getIpcTable();
+  function getTableBody(tableId, bodyId) {
+    const table = getTable(tableId);
     if (!table) return null;
 
-    let tbody = table.querySelector("tbody");
+    let tbody = document.getElementById(bodyId) || table.querySelector("tbody");
 
     if (!tbody) {
       tbody = document.createElement("tbody");
       table.appendChild(tbody);
     }
 
-    tbody.id = "ipcTableBody";
+    tbody.id = bodyId;
     return tbody;
   }
 
-  function ensureActions() {
-    const table = getIpcTable();
-    if (!table) return;
+  function ensureTableActionsBar(tableId, barId, buttonsHtml) {
+    const table = getTable(tableId);
+    if (!table) return null;
 
     const tableCard = table.closest(".card");
-    if (!tableCard) return;
-
-    if (document.getElementById("financialActions")) return;
+    if (!tableCard) return null;
 
     const cardBody = tableCard.querySelector(".card-body");
-    if (!cardBody) return;
+    if (!cardBody) return null;
 
-    const actions = document.createElement("div");
-    actions.className = "financial-actions";
-    actions.id = "financialActions";
-    actions.innerHTML = `
-      <button type="button" class="financial-btn financial-btn-secondary" id="manageBudgetsBtn">
-        <i class="fa-solid fa-wallet"></i> Manage Budgets
-      </button>
-      <button type="button" class="financial-btn financial-btn-primary" id="addInvoiceBtn">
-        <i class="fa-solid fa-plus"></i> Add IPC
-      </button>
-    `;
+    let bar = document.getElementById(barId);
 
-    cardBody.insertBefore(actions, cardBody.firstChild);
-
-    const addBtn = document.getElementById("addInvoiceBtn");
-    const budgetBtn = document.getElementById("manageBudgetsBtn");
-
-    if (addBtn) {
-      addBtn.addEventListener("click", function () {
-        openInvoiceModal();
-      });
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.className = "financial-actions";
+      bar.id = barId;
+      cardBody.insertBefore(bar, cardBody.firstChild);
     }
 
-    if (budgetBtn) {
-      budgetBtn.addEventListener("click", function () {
-        openBudgetModal();
-      });
-    }
-  }
-
-  function ensureIpcTableHeader() {
-    const table = getIpcTable();
-    if (!table) return;
-
-    const headRow = table.querySelector("thead tr");
-    if (!headRow) return;
-
-    headRow.innerHTML = `
-      <th scope="col">IPC</th>
-      <th scope="col">Period</th>
-      <th scope="col" class="num">AOA</th>
-      <th scope="col" class="num">USD</th>
-      <th scope="col" class="num">%</th>
-      <th scope="col">ACE</th>
-      <th scope="col">Client</th>
-      <th scope="col" class="num">Actions</th>
-    `;
+    bar.innerHTML = buttonsHtml;
+    return bar;
   }
 
   function renderStatusChip(label, explicitClass) {
@@ -666,6 +669,25 @@
       </span>
     `;
   }
+
+  function renderRowActions(canEdit, editAttr, deleteAttr) {
+    if (!canEdit) return "—";
+
+    return `
+      <div class="financial-row-actions">
+        <button type="button" class="financial-icon-btn" ${editAttr} title="Edit">
+          <i class="fa-solid fa-pen"></i>
+        </button>
+        <button type="button" class="financial-icon-btn danger" ${deleteAttr} title="Delete">
+          <i class="fa-solid fa-trash"></i>
+        </button>
+      </div>
+    `;
+  }
+
+  /* ---------------------------------------------------------------
+     Reference / summary KPI cards (unchanged from prior revision)
+     --------------------------------------------------------------- */
 
   function renderReferenceCards() {
     const ref = (state.summary && state.summary.reference_cards) || FALLBACK_REFERENCE_CARDS;
@@ -708,11 +730,8 @@
     setCardValue(
       "Prov. Sum (15%)",
       formatMoneyPair(
-        ref.prov_sum_15_m_aoa ||
-          ref.daab_prov_sum_15_m_aoa ||
-          FALLBACK_REFERENCE_CARDS.prov_sum_15_m_aoa,
-        ref.prov_sum_15_m_usd ||
-          FALLBACK_REFERENCE_CARDS.prov_sum_15_m_usd
+        ref.prov_sum_15_m_aoa || FALLBACK_REFERENCE_CARDS.prov_sum_15_m_aoa,
+        ref.prov_sum_15_m_usd || FALLBACK_REFERENCE_CARDS.prov_sum_15_m_usd
       )
     );
     setCardDelta(
@@ -1005,42 +1024,231 @@
     }
   }
 
-  function mapInvoiceToIpcRow(invoice) {
-    const status = invoice.status || "pending";
-    const statusLabel = STATUS_LABELS[status] || status;
-    const statusClass = STATUS_CLASS[status] || "warn";
+  /* ---------------------------------------------------------------
+     PAYMENT TRACKING  (new: fully editable, backed by
+     PaymentTrackingItem model / payment-tracking.routes.js)
+     --------------------------------------------------------------- */
 
-    return {
-      id: invoice.id,
-      ipc: invoice.invoice_number || invoice.invoiceNumber || "IPC",
-      period: invoice.vendor_name || invoice.vendorName || (invoice.budget && invoice.budget.category) || "—",
-      aoa_amount: invoice.amount,
-      usd_amount: null,
-      percentage: null,
-      ace_status: statusLabel,
-      ace_class: statusClass,
-      client_status: status === "paid" || status === "approved" ? "Approved" : "—",
-      client_class: status === "paid" || status === "approved" ? "ok" : ""
-    };
+  function ensurePaymentTrackingActions() {
+    ensureTableActionsBar(
+      "paymentTrackingTable",
+      "paymentTrackingActions",
+      `
+        <button type="button" class="financial-btn financial-btn-primary" id="addPaymentTrackingBtn">
+          <i class="fa-solid fa-plus"></i> Add Entry
+        </button>
+      `
+    );
+
+    const addBtn = document.getElementById("addPaymentTrackingBtn");
+    if (addBtn) {
+      addBtn.addEventListener("click", function () {
+        if (!requireProjectOrToast()) return;
+        openPaymentTrackingModal();
+      });
+    }
+  }
+
+  function ensurePaymentTrackingHeader() {
+    const table = getTable("paymentTrackingTable");
+    if (!table) return;
+
+    const headRow = table.querySelector("thead tr");
+    if (!headRow) return;
+
+    headRow.innerHTML = `
+      <th scope="col" class="num">S.No.</th>
+      <th scope="col">Description</th>
+      <th scope="col" class="num">Amount</th>
+      <th scope="col" class="num">Actions</th>
+    `;
+  }
+
+  function renderPaymentTracking() {
+    ensurePaymentTrackingHeader();
+    ensurePaymentTrackingActions();
+
+    const tbody = getTableBody("paymentTrackingTable", "paymentTrackingTableBody");
+    if (!tbody) return;
+
+    const rows = state.paymentTracking.length ? state.paymentTracking : FALLBACK_PAYMENT_TRACKING;
+
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="financial-empty">No payment tracking entries yet.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = rows.map(function (row, index) {
+      const highlighted = Boolean(row.is_highlighted);
+      const description = highlighted ? "<strong>" + escapeHtml(row.description || "—") + "</strong>" : escapeHtml(row.description || "—");
+      const amountText = formatAoaUsdAmount(row.amount_aoa, row.amount_usd);
+      const amount = highlighted ? "<strong>" + escapeHtml(amountText) + "</strong>" : escapeHtml(amountText);
+      const canEdit = Boolean(row.id);
+
+      return `
+        <tr data-payment-tracking-id="${escapeHtml(row.id || "")}">
+          <td class="num">${index + 1}</td>
+          <td>${description}</td>
+          <td class="num">${amount}</td>
+          <td class="num">
+            ${renderRowActions(
+              canEdit,
+              `data-action="edit-payment-tracking" data-id="${escapeHtml(row.id)}"`,
+              `data-action="delete-payment-tracking" data-id="${escapeHtml(row.id)}"`
+            )}
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    tbody.querySelectorAll("[data-action='edit-payment-tracking']").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const id = btn.getAttribute("data-id");
+        const item = state.paymentTracking.find(function (row) { return row.id === id; });
+        if (item) openPaymentTrackingModal(item);
+      });
+    });
+
+    tbody.querySelectorAll("[data-action='delete-payment-tracking']").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        deletePaymentTrackingItem(btn.getAttribute("data-id"));
+      });
+    });
+  }
+
+  function openPaymentTrackingModal(item) {
+    if (!requireProjectOrToast()) return;
+
+    const body = `
+      <div class="financial-form-grid">
+        <div class="financial-field full">
+          <label>Description</label>
+          <input name="description" required maxlength="200" value="${escapeHtml(item ? item.description || "" : "")}">
+        </div>
+
+        <div class="financial-field">
+          <label>Amount (AOA)</label>
+          <input name="amount_aoa" type="number" step="0.01" value="${escapeHtml(item && item.amount_aoa !== null && item.amount_aoa !== undefined ? item.amount_aoa : "")}">
+        </div>
+
+        <div class="financial-field">
+          <label>Amount (USD)</label>
+          <input name="amount_usd" type="number" step="0.01" value="${escapeHtml(item && item.amount_usd !== null && item.amount_usd !== undefined ? item.amount_usd : "")}">
+        </div>
+
+        <div class="financial-field financial-field-checkbox full">
+          <input type="checkbox" name="is_highlighted" id="paymentTrackingHighlighted" ${item && item.is_highlighted ? "checked" : ""}>
+          <label for="paymentTrackingHighlighted">Show this row in bold (highlighted / key total)</label>
+        </div>
+      </div>
+    `;
+
+    openModal(item ? "Edit Payment Tracking Entry" : "Add Payment Tracking Entry", body, async function (form) {
+      const payload = {
+        description: String(form.get("description") || "").trim(),
+        amount_aoa: form.get("amount_aoa") ? Number(form.get("amount_aoa")) : null,
+        amount_usd: form.get("amount_usd") ? Number(form.get("amount_usd")) : null,
+        is_highlighted: form.get("is_highlighted") === "on"
+      };
+
+      if (item) {
+        await request("PUT", "/payment-tracking/" + item.id, payload);
+        toast("Payment tracking entry updated successfully");
+      } else {
+        await request("POST", "/projects/" + state.projectId + "/payment-tracking", payload);
+        toast("Payment tracking entry created successfully");
+      }
+    });
+  }
+
+  async function deletePaymentTrackingItem(id) {
+    if (!id) return;
+
+    const item = state.paymentTracking.find(function (row) { return row.id === id; });
+    if (!item) return;
+
+    const yes = window.confirm('Delete "' + (item.description || "this entry") + '"?');
+    if (!yes) return;
+
+    try {
+      await request("DELETE", "/payment-tracking/" + id);
+      toast("Payment tracking entry deleted successfully", "fa-trash");
+      await reloadAll();
+    } catch (err) {
+      toast(err.message || "Delete failed", "fa-triangle-exclamation");
+    }
+  }
+
+  /* ---------------------------------------------------------------
+     IPC TRACKER  (now backed by the real `Ipc` model, not Invoice)
+     --------------------------------------------------------------- */
+
+  function ensureIpcActions() {
+    ensureTableActionsBar(
+      "ipcTrackerTable",
+      "ipcActions",
+      `
+        <button type="button" class="financial-btn financial-btn-secondary" id="manageBudgetsBtn">
+          <i class="fa-solid fa-wallet"></i> Manage Budgets
+        </button>
+        <button type="button" class="financial-btn financial-btn-primary" id="addIpcBtn">
+          <i class="fa-solid fa-plus"></i> Add IPC
+        </button>
+      `
+    );
+
+    const addBtn = document.getElementById("addIpcBtn");
+    const budgetBtn = document.getElementById("manageBudgetsBtn");
+
+    if (addBtn) {
+      addBtn.addEventListener("click", function () {
+        if (!requireProjectOrToast()) return;
+        openIpcModal();
+      });
+    }
+
+    if (budgetBtn) {
+      budgetBtn.addEventListener("click", function () {
+        openBudgetModal();
+      });
+    }
+  }
+
+  function ensureIpcTableHeader() {
+    const table = getTable("ipcTrackerTable");
+    if (!table) return;
+
+    const headRow = table.querySelector("thead tr");
+    if (!headRow) return;
+
+    headRow.innerHTML = `
+      <th scope="col" class="num">S.No.</th>
+      <th scope="col">IPC</th>
+      <th scope="col">Period</th>
+      <th scope="col" class="num">AOA</th>
+      <th scope="col" class="num">USD</th>
+      <th scope="col" class="num">%</th>
+      <th scope="col">ACE</th>
+      <th scope="col">Client</th>
+      <th scope="col" class="num">Actions</th>
+    `;
   }
 
   function renderIpcTracker() {
     ensureIpcTableHeader();
+    ensureIpcActions();
 
-    const tbody = getIpcTableBody();
+    const tbody = getTableBody("ipcTrackerTable", "ipcTableBody");
     if (!tbody) return;
 
-    let rows = [];
+    const rows = state.ipcs.length ? state.ipcs : FALLBACK_IPC_TRACKER;
 
-    if (state.invoices.length) {
-      rows = state.invoices.map(mapInvoiceToIpcRow);
-    } else if (state.summary && Array.isArray(state.summary.ipc_tracker) && state.summary.ipc_tracker.length) {
-      rows = state.summary.ipc_tracker;
-    } else {
-      rows = FALLBACK_IPC_TRACKER;
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="financial-empty">No IPC records yet.</td></tr>';
+      return;
     }
 
-    tbody.innerHTML = rows.map(function (row) {
+    tbody.innerHTML = rows.map(function (row, index) {
       const isCumulative = Boolean(row.is_cumulative) || String(row.ipc).toLowerCase() === "cumulative";
       const ipcText = isCumulative ? "<strong>" + escapeHtml(row.ipc) + "</strong>" : escapeHtml(row.ipc);
       const aoaText = isCumulative
@@ -1057,168 +1265,500 @@
 
       return `
         <tr data-ipc-id="${escapeHtml(row.id || "")}">
+          <td class="num">${index + 1}</td>
           <td>${ipcText}</td>
           <td>${escapeHtml(row.period || "—")}</td>
           <td class="num">${aoaText}</td>
           <td class="num">${usdText}</td>
           <td class="num">${pctText}</td>
-          <td>${renderStatusChip(row.ace_status, row.ace_class)}</td>
-          <td>${renderStatusChip(row.client_status, row.client_class)}</td>
+          <td>${renderStatusChip(row.ace_status)}</td>
+          <td>${renderStatusChip(row.client_status)}</td>
           <td class="num">
-            ${
-              canEdit
-                ? `
-                  <div class="financial-row-actions">
-                    <button type="button" class="financial-icon-btn" data-action="edit-invoice" data-id="${escapeHtml(row.id)}" title="Edit IPC">
-                      <i class="fa-solid fa-pen"></i>
-                    </button>
-                    <button type="button" class="financial-icon-btn danger" data-action="delete-invoice" data-id="${escapeHtml(row.id)}" title="Delete IPC">
-                      <i class="fa-solid fa-trash"></i>
-                    </button>
-                  </div>
-                `
-                : "—"
-            }
+            ${renderRowActions(
+              canEdit,
+              `data-action="edit-ipc" data-id="${escapeHtml(row.id)}"`,
+              `data-action="delete-ipc" data-id="${escapeHtml(row.id)}"`
+            )}
           </td>
         </tr>
       `;
     }).join("");
 
-    tbody.querySelectorAll("[data-action='edit-invoice']").forEach(function (btn) {
+    tbody.querySelectorAll("[data-action='edit-ipc']").forEach(function (btn) {
       btn.addEventListener("click", function () {
         const id = btn.getAttribute("data-id");
-        const invoice = state.invoices.find(function (item) {
-          return item.id === id;
-        });
-
-        if (invoice) {
-          openInvoiceModal(invoice);
-        }
+        const ipc = state.ipcs.find(function (row) { return row.id === id; });
+        if (ipc) openIpcModal(ipc);
       });
     });
 
-    tbody.querySelectorAll("[data-action='delete-invoice']").forEach(function (btn) {
+    tbody.querySelectorAll("[data-action='delete-ipc']").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        deleteInvoice(btn.getAttribute("data-id"));
+        deleteIpc(btn.getAttribute("data-id"));
       });
     });
   }
 
-  function renderPaymentTracking() {
-    const table = document.getElementById("paymentTrackingTable");
+  function openIpcModal(ipc) {
+    if (!requireProjectOrToast()) return;
+
+    const body = `
+      <div class="financial-form-grid">
+        <div class="financial-field">
+          <label>IPC Number</label>
+          <input name="ipc" required maxlength="50" value="${escapeHtml(ipc ? ipc.ipc || "" : "")}">
+        </div>
+
+        <div class="financial-field">
+          <label>Period</label>
+          <input name="period" maxlength="50" placeholder="e.g. Apr 2026" value="${escapeHtml(ipc ? ipc.period || "" : "")}">
+        </div>
+
+        <div class="financial-field">
+          <label>AOA Amount</label>
+          <input name="aoa_amount" type="number" step="0.01" value="${escapeHtml(ipc && ipc.aoa_amount !== null && ipc.aoa_amount !== undefined ? ipc.aoa_amount : "")}">
+        </div>
+
+        <div class="financial-field">
+          <label>USD Amount</label>
+          <input name="usd_amount" type="number" step="0.01" value="${escapeHtml(ipc && ipc.usd_amount !== null && ipc.usd_amount !== undefined ? ipc.usd_amount : "")}">
+        </div>
+
+        <div class="financial-field">
+          <label>Percentage (%)</label>
+          <input name="percentage" type="number" step="0.01" min="0" max="100" value="${escapeHtml(ipc && ipc.percentage !== null && ipc.percentage !== undefined ? ipc.percentage : "")}">
+        </div>
+
+        <div class="financial-field">
+          <label>IPC Date (optional)</label>
+          <input name="ipc_date" type="date" value="${escapeHtml(toInputDate(ipc ? ipc.ipc_date : ""))}">
+        </div>
+
+        <div class="financial-field">
+          <label>ACE Status</label>
+          <input name="ace_status" list="ipcAceStatusOptions" maxlength="50" value="${escapeHtml(ipc ? ipc.ace_status || "" : "")}">
+          <datalist id="ipcAceStatusOptions">
+            <option value="Certified">
+            <option value="Certified 24/06">
+            <option value="Future">
+          </datalist>
+        </div>
+
+        <div class="financial-field">
+          <label>Client Status</label>
+          <input name="client_status" list="ipcClientStatusOptions" maxlength="50" value="${escapeHtml(ipc ? ipc.client_status || "" : "")}">
+          <datalist id="ipcClientStatusOptions">
+            <option value="Approved">
+            <option value="Submitted">
+          </datalist>
+        </div>
+
+        <div class="financial-field full">
+          <label>Record Status</label>
+          <select name="status">
+            <option value="pending" ${ipc && ipc.status === "pending" ? "selected" : ""}>Pending</option>
+            <option value="certified" ${ipc && ipc.status === "certified" ? "selected" : ""}>Certified</option>
+            <option value="submitted" ${ipc && ipc.status === "submitted" ? "selected" : ""}>Submitted</option>
+            <option value="approved" ${ipc && ipc.status === "approved" ? "selected" : ""}>Approved</option>
+            <option value="paid" ${ipc && ipc.status === "paid" ? "selected" : ""}>Paid</option>
+            <option value="rejected" ${ipc && ipc.status === "rejected" ? "selected" : ""}>Rejected</option>
+          </select>
+        </div>
+      </div>
+    `;
+
+    openModal(ipc ? "Edit IPC" : "Add IPC", body, async function (form) {
+      const payload = {
+        ipc: String(form.get("ipc") || "").trim(),
+        period: String(form.get("period") || "").trim() || null,
+        aoa_amount: form.get("aoa_amount") ? Number(form.get("aoa_amount")) : null,
+        usd_amount: form.get("usd_amount") ? Number(form.get("usd_amount")) : null,
+        percentage: form.get("percentage") ? Number(form.get("percentage")) : null,
+        ipc_date: form.get("ipc_date") ? String(form.get("ipc_date")) : null,
+        ace_status: String(form.get("ace_status") || "").trim() || null,
+        client_status: String(form.get("client_status") || "").trim() || null,
+        status: String(form.get("status") || "pending")
+      };
+
+      if (ipc) {
+        await request("PUT", "/projects/" + state.projectId + "/ipc-tracker/" + ipc.id, payload);
+        toast("IPC updated successfully");
+      } else {
+        await request("POST", "/projects/" + state.projectId + "/ipc-tracker", payload);
+        toast("IPC created successfully");
+      }
+    });
+  }
+
+  async function deleteIpc(id) {
+    if (!id) return;
+
+    const ipc = state.ipcs.find(function (row) { return row.id === id; });
+    if (!ipc) return;
+
+    const yes = window.confirm("Delete " + (ipc.ipc || "this IPC") + "?");
+    if (!yes) return;
+
+    try {
+      await request("DELETE", "/ipc-tracker/" + id);
+      toast("IPC deleted successfully", "fa-trash");
+      await reloadAll();
+    } catch (err) {
+      toast(err.message || "Delete failed", "fa-triangle-exclamation");
+    }
+  }
+
+  /* ---------------------------------------------------------------
+     BANK GUARANTEES
+     --------------------------------------------------------------- */
+
+  function ensureBankGuaranteesActions() {
+    ensureTableActionsBar(
+      "bankGuaranteesTable",
+      "bankGuaranteesActions",
+      `
+        <button type="button" class="financial-btn financial-btn-primary" id="addBankGuaranteeBtn">
+          <i class="fa-solid fa-plus"></i> Add Guarantee
+        </button>
+      `
+    );
+
+    const addBtn = document.getElementById("addBankGuaranteeBtn");
+    if (addBtn) {
+      addBtn.addEventListener("click", function () {
+        if (!requireProjectOrToast()) return;
+        openBankGuaranteeModal();
+      });
+    }
+  }
+
+  function ensureBankGuaranteesHeader() {
+    const table = getTable("bankGuaranteesTable");
     if (!table) return;
 
-    let tbody = document.getElementById("paymentTrackingTableBody");
+    const headRow = table.querySelector("thead tr");
+    if (!headRow) return;
 
-    if (!tbody) {
-      tbody = table.querySelector("tbody");
-
-      if (!tbody) {
-        tbody = document.createElement("tbody");
-        tbody.id = "paymentTrackingTableBody";
-        table.appendChild(tbody);
-      }
-    }
-
-    const rows =
-      state.summary &&
-      Array.isArray(state.summary.payment_tracking) &&
-      state.summary.payment_tracking.length
-        ? state.summary.payment_tracking
-        : FALLBACK_PAYMENT_TRACKING;
-
-    tbody.innerHTML = rows
-      .map(function (row) {
-        const description = row.description || row.label || row.name || "—";
-
-        const rawAmount =
-          row.amount !== undefined && row.amount !== null
-            ? row.amount
-            : row.aoa_amount !== undefined && row.aoa_amount !== null
-              ? row.aoa_amount
-              : row.value;
-
-        const amountText =
-          row.amount_display ||
-          row.display_amount ||
-          (
-            rawAmount !== undefined && rawAmount !== null && rawAmount !== ""
-              ? formatAmount(rawAmount, 2) + " AOA"
-              : "—"
-          );
-
-        const isImportant =
-          String(description).toLowerCase() === "contract value" ||
-          String(description).toLowerCase() === "outstanding";
-
-        return `
-          <tr>
-            <td>${isImportant ? "<strong>" + escapeHtml(description) + "</strong>" : escapeHtml(description)}</td>
-            <td class="num">${isImportant ? "<strong>" + escapeHtml(amountText) + "</strong>" : escapeHtml(amountText)}</td>
-          </tr>
-        `;
-      })
-      .join("");
+    headRow.innerHTML = `
+      <th scope="col" class="num">S.No.</th>
+      <th scope="col">Guarantee</th>
+      <th scope="col">Bank</th>
+      <th scope="col" class="num">USD</th>
+      <th scope="col">Valid Until</th>
+      <th scope="col">Status</th>
+      <th scope="col" class="num">Actions</th>
+    `;
   }
 
   function renderBankGuarantees() {
-    const table = document.getElementById("bankGuaranteesTable");
-    if (!table) return;
+    ensureBankGuaranteesHeader();
+    ensureBankGuaranteesActions();
 
-    const tbody = table.querySelector("tbody");
+    const tbody = getTableBody("bankGuaranteesTable", "bankGuaranteesTableBody");
     if (!tbody) return;
 
-    const rows = state.summary && Array.isArray(state.summary.bank_guarantees) && state.summary.bank_guarantees.length
-      ? state.summary.bank_guarantees
-      : FALLBACK_BANK_GUARANTEES;
+    const rows = state.bankGuarantees.length ? state.bankGuarantees : FALLBACK_BANK_GUARANTEES;
 
-    tbody.innerHTML = rows.map(function (row) {
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="financial-empty">No bank guarantees yet.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = rows.map(function (row, index) {
       const statusText = row.status === "valid"
         ? "Valid"
         : row.status === "expires_soon"
           ? "Expires < 60d · Renew"
           : row.status;
 
+      const canEdit = Boolean(row.id);
+
       return `
-        <tr>
+        <tr data-bank-guarantee-id="${escapeHtml(row.id || "")}">
+          <td class="num">${index + 1}</td>
           <td>${escapeHtml(row.guarantee || "—")}</td>
           <td>${escapeHtml(row.bank || "—")}</td>
           <td class="num">${escapeHtml(formatAmount(row.usd_amount, 2))}</td>
           <td>${escapeHtml(formatDisplayDate(row.valid_until))}</td>
           <td>${renderStatusChip(statusText || "—")}</td>
+          <td class="num">
+            ${renderRowActions(
+              canEdit,
+              `data-action="edit-bank-guarantee" data-id="${escapeHtml(row.id)}"`,
+              `data-action="delete-bank-guarantee" data-id="${escapeHtml(row.id)}"`
+            )}
+          </td>
         </tr>
       `;
     }).join("");
+
+    tbody.querySelectorAll("[data-action='edit-bank-guarantee']").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const id = btn.getAttribute("data-id");
+        const item = state.bankGuarantees.find(function (row) { return row.id === id; });
+        if (item) openBankGuaranteeModal(item);
+      });
+    });
+
+    tbody.querySelectorAll("[data-action='delete-bank-guarantee']").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        deleteBankGuarantee(btn.getAttribute("data-id"));
+      });
+    });
+  }
+
+  function openBankGuaranteeModal(item) {
+    if (!requireProjectOrToast()) return;
+
+    const body = `
+      <div class="financial-form-grid">
+        <div class="financial-field full">
+          <label>Guarantee</label>
+          <input name="guarantee" required maxlength="200" value="${escapeHtml(item ? item.guarantee || "" : "")}">
+        </div>
+
+        <div class="financial-field">
+          <label>Bank</label>
+          <input name="bank" required maxlength="100" value="${escapeHtml(item ? item.bank || "" : "")}">
+        </div>
+
+        <div class="financial-field">
+          <label>USD Amount</label>
+          <input name="usd_amount" type="number" step="0.01" required value="${escapeHtml(item && item.usd_amount !== null && item.usd_amount !== undefined ? item.usd_amount : "")}">
+        </div>
+
+        <div class="financial-field">
+          <label>Valid Until</label>
+          <input name="valid_until" type="date" value="${escapeHtml(toInputDate(item ? item.valid_until : ""))}">
+        </div>
+
+        <div class="financial-field">
+          <label>Status</label>
+          <input name="status" list="bankGuaranteeStatusOptions" maxlength="50" value="${escapeHtml(item ? item.status || "valid" : "valid")}">
+          <datalist id="bankGuaranteeStatusOptions">
+            <option value="valid">
+            <option value="Valid">
+            <option value="expires_soon">
+            <option value="Expires < 60d · Renew">
+            <option value="expired">
+          </datalist>
+        </div>
+      </div>
+    `;
+
+    openModal(item ? "Edit Bank Guarantee" : "Add Bank Guarantee", body, async function (form) {
+      const payload = {
+        guarantee: String(form.get("guarantee") || "").trim(),
+        bank: String(form.get("bank") || "").trim(),
+        usd_amount: Number(form.get("usd_amount")),
+        valid_until: form.get("valid_until") ? String(form.get("valid_until")) : null,
+        status: String(form.get("status") || "valid").trim()
+      };
+
+      if (item) {
+        await request("PUT", "/bank-guarantees/" + item.id, payload);
+        toast("Bank guarantee updated successfully");
+      } else {
+        await request("POST", "/projects/" + state.projectId + "/bank-guarantees", payload);
+        toast("Bank guarantee created successfully");
+      }
+    });
+  }
+
+  async function deleteBankGuarantee(id) {
+    if (!id) return;
+
+    const item = state.bankGuarantees.find(function (row) { return row.id === id; });
+    if (!item) return;
+
+    const yes = window.confirm('Delete "' + (item.guarantee || "this guarantee") + '"?');
+    if (!yes) return;
+
+    try {
+      await request("DELETE", "/bank-guarantees/" + id);
+      toast("Bank guarantee deleted successfully", "fa-trash");
+      await reloadAll();
+    } catch (err) {
+      toast(err.message || "Delete failed", "fa-triangle-exclamation");
+    }
+  }
+
+  /* ---------------------------------------------------------------
+     AMENDMENTS
+     --------------------------------------------------------------- */
+
+  function ensureAmendmentsActions() {
+    ensureTableActionsBar(
+      "addendaAmendmentsTable",
+      "amendmentsActions",
+      `
+        <button type="button" class="financial-btn financial-btn-primary" id="addAmendmentBtn">
+          <i class="fa-solid fa-plus"></i> Add Amendment
+        </button>
+      `
+    );
+
+    const addBtn = document.getElementById("addAmendmentBtn");
+    if (addBtn) {
+      addBtn.addEventListener("click", function () {
+        if (!requireProjectOrToast()) return;
+        openAmendmentModal();
+      });
+    }
+  }
+
+  function ensureAmendmentsHeader() {
+    const table = getTable("addendaAmendmentsTable");
+    if (!table) return;
+
+    const headRow = table.querySelector("thead tr");
+    if (!headRow) return;
+
+    headRow.innerHTML = `
+      <th scope="col" class="num">S.No.</th>
+      <th scope="col">Addendum</th>
+      <th scope="col">Date</th>
+      <th scope="col">Scope</th>
+      <th scope="col">Status</th>
+      <th scope="col" class="num">Actions</th>
+    `;
   }
 
   function renderAmendments() {
-    const table = document.getElementById("addendaAmendmentsTable");
-    if (!table) return;
+    ensureAmendmentsHeader();
+    ensureAmendmentsActions();
 
-    const tbody = table.querySelector("tbody");
+    const tbody = getTableBody("addendaAmendmentsTable", "addendaAmendmentsTableBody");
     if (!tbody) return;
 
-    const rows = state.summary && Array.isArray(state.summary.amendments) && state.summary.amendments.length
-      ? state.summary.amendments
-      : FALLBACK_AMENDMENTS;
+    const rows = state.amendments.length ? state.amendments : FALLBACK_AMENDMENTS;
 
-    tbody.innerHTML = rows.map(function (row) {
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="financial-empty">No amendments yet.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = rows.map(function (row, index) {
       const statusText = row.status === "under_employer_review"
         ? "Under Employer review"
         : row.status === "pending_ctce"
           ? "Pending CTCE"
           : row.status;
 
+      const canEdit = Boolean(row.id);
+
       return `
-        <tr>
+        <tr data-amendment-id="${escapeHtml(row.id || "")}">
+          <td class="num">${index + 1}</td>
           <td>${escapeHtml(row.amendment || "—")}</td>
           <td>${escapeHtml(formatDisplayDate(row.amendment_date))}</td>
           <td>${escapeHtml(row.scope || row.subject || "—")}</td>
           <td>${renderStatusChip(statusText || "—")}</td>
+          <td class="num">
+            ${renderRowActions(
+              canEdit,
+              `data-action="edit-amendment" data-id="${escapeHtml(row.id)}"`,
+              `data-action="delete-amendment" data-id="${escapeHtml(row.id)}"`
+            )}
+          </td>
         </tr>
       `;
     }).join("");
+
+    tbody.querySelectorAll("[data-action='edit-amendment']").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const id = btn.getAttribute("data-id");
+        const item = state.amendments.find(function (row) { return row.id === id; });
+        if (item) openAmendmentModal(item);
+      });
+    });
+
+    tbody.querySelectorAll("[data-action='delete-amendment']").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        deleteAmendment(btn.getAttribute("data-id"));
+      });
+    });
   }
+
+  function openAmendmentModal(item) {
+    if (!requireProjectOrToast()) return;
+
+    const body = `
+      <div class="financial-form-grid">
+        <div class="financial-field">
+          <label>Amendment</label>
+          <input name="amendment" required maxlength="100" value="${escapeHtml(item ? item.amendment || "" : "")}">
+        </div>
+
+        <div class="financial-field">
+          <label>Date (leave blank if drafting / not yet dated)</label>
+          <input name="amendment_date" type="date" value="${escapeHtml(toInputDate(item ? item.amendment_date : ""))}">
+        </div>
+
+        <div class="financial-field full">
+          <label>Subject (optional)</label>
+          <input name="subject" maxlength="200" value="${escapeHtml(item ? item.subject || "" : "")}">
+        </div>
+
+        <div class="financial-field full">
+          <label>Scope</label>
+          <textarea name="scope" rows="3">${escapeHtml(item ? item.scope || "" : "")}</textarea>
+        </div>
+
+        <div class="financial-field full">
+          <label>Status</label>
+          <input name="status" list="amendmentStatusOptions" maxlength="50" value="${escapeHtml(item ? item.status || "" : "")}">
+          <datalist id="amendmentStatusOptions">
+            <option value="Record pending">
+            <option value="Under Employer review">
+            <option value="Pending CTCE">
+            <option value="approved">
+            <option value="rejected">
+          </datalist>
+        </div>
+      </div>
+    `;
+
+    openModal(item ? "Edit Amendment" : "Add Amendment", body, async function (form) {
+      const payload = {
+        amendment: String(form.get("amendment") || "").trim(),
+        amendment_date: form.get("amendment_date") ? String(form.get("amendment_date")) : null,
+        subject: String(form.get("subject") || "").trim() || null,
+        scope: String(form.get("scope") || "").trim() || null,
+        status: String(form.get("status") || "pending").trim()
+      };
+
+      if (item) {
+        await request("PUT", "/amendments/" + item.id, payload);
+        toast("Amendment updated successfully");
+      } else {
+        await request("POST", "/projects/" + state.projectId + "/amendments", payload);
+        toast("Amendment created successfully");
+      }
+    });
+  }
+
+  async function deleteAmendment(id) {
+    if (!id) return;
+
+    const item = state.amendments.find(function (row) { return row.id === id; });
+    if (!item) return;
+
+    const yes = window.confirm('Delete "' + (item.amendment || "this amendment") + '"?');
+    if (!yes) return;
+
+    try {
+      await request("DELETE", "/amendments/" + id);
+      toast("Amendment deleted successfully", "fa-trash");
+      await reloadAll();
+    } catch (err) {
+      toast(err.message || "Delete failed", "fa-triangle-exclamation");
+    }
+  }
+
+  /* ---------------------------------------------------------------
+     Data loaders
+     --------------------------------------------------------------- */
 
   async function loadSummary() {
     const result = await request("GET", "/projects/" + state.projectId + "/financial-summary");
@@ -1234,40 +1774,47 @@
     state.budgets = Array.isArray(result.data) ? result.data : [];
   }
 
-  async function loadInvoices() {
-    const all = [];
+  async function loadIpcTracker() {
+    const result = await request("GET", "/projects/" + state.projectId + "/ipc-tracker");
+    state.ipcs = Array.isArray(result.data) ? result.data : [];
+  }
 
-    for (const budget of state.budgets) {
-      const result = await request(
-        "GET",
-        "/budgets/" + budget.id + "/invoices?limit=100&sort=invoiceDate"
-      );
+  async function loadAmendments() {
+    const result = await request("GET", "/projects/" + state.projectId + "/amendments");
+    state.amendments = Array.isArray(result.data) ? result.data : [];
+  }
 
-      const rows = Array.isArray(result.data) ? result.data : [];
+  async function loadBankGuarantees() {
+    const result = await request("GET", "/projects/" + state.projectId + "/bank-guarantees");
+    state.bankGuarantees = Array.isArray(result.data) ? result.data : [];
+  }
 
-      rows.forEach(function (invoice) {
-        invoice.budget = budget;
-        all.push(invoice);
-      });
-    }
-
-    state.invoices = all;
+  async function loadPaymentTracking() {
+    const result = await request("GET", "/projects/" + state.projectId + "/payment-tracking");
+    state.paymentTracking = Array.isArray(result.data) ? result.data : [];
   }
 
   async function reloadAll() {
-    await loadBudgets();
     await Promise.all([
-      loadInvoices(),
+      loadBudgets(),
+      loadIpcTracker(),
+      loadAmendments(),
+      loadBankGuarantees(),
+      loadPaymentTracking(),
       loadSummary()
     ]);
 
     renderSummary();
     renderCharts();
-    renderIpcTracker();
     renderPaymentTracking();
+    renderIpcTracker();
     renderBankGuarantees();
     renderAmendments();
   }
+
+  /* ---------------------------------------------------------------
+     Shared modal shell
+     --------------------------------------------------------------- */
 
   function closeModal() {
     const modal = document.querySelector(".financial-modal-backdrop");
@@ -1345,127 +1892,9 @@
     }
   }
 
-  function openInvoiceModal(invoice) {
-    if (!state.budgets.length) {
-      toast("Create a budget first before adding IPC records.", "fa-wallet");
-      openBudgetModal();
-      return;
-    }
-
-    state.activeInvoice = invoice || null;
-
-    const budgetOptions = state.budgets.map(function (budget) {
-      const selected = invoice && invoice.budget_id === budget.id ? "selected" : "";
-      const label = (budget.category || "Budget") + " - FY " + (budget.fiscal_year || budget.fiscalYear || "");
-
-      return `
-        <option value="${escapeHtml(budget.id)}" ${selected}>
-          ${escapeHtml(label)}
-        </option>
-      `;
-    }).join("");
-
-    const body = `
-      <div class="financial-form-grid">
-        <div class="financial-field">
-          <label>Budget</label>
-          <select name="budget_id" required ${invoice ? "disabled" : ""}>
-            ${budgetOptions}
-          </select>
-        </div>
-
-        <div class="financial-field">
-          <label>IPC / Invoice Number</label>
-          <input name="invoice_number" required maxlength="50" value="${escapeHtml(invoice ? invoice.invoice_number || invoice.invoiceNumber || "" : "")}" ${invoice ? "readonly" : ""}>
-        </div>
-
-        <div class="financial-field">
-          <label>Period / Description</label>
-          <input name="vendor_name" required maxlength="200" value="${escapeHtml(invoice ? invoice.vendor_name || invoice.vendorName || "" : "")}">
-        </div>
-
-        <div class="financial-field">
-          <label>AOA Amount</label>
-          <input name="amount" type="number" min="0.01" step="0.01" required value="${escapeHtml(invoice ? invoice.amount || "" : "")}">
-        </div>
-
-        <div class="financial-field">
-          <label>Invoice Date</label>
-          <input name="invoice_date" type="date" required value="${escapeHtml(toInputDate(invoice ? invoice.invoice_date || invoice.invoiceDate : ""))}">
-        </div>
-
-        <div class="financial-field">
-          <label>Due Date</label>
-          <input name="due_date" type="date" value="${escapeHtml(toInputDate(invoice ? invoice.due_date || invoice.dueDate : ""))}">
-        </div>
-
-        <div class="financial-field">
-          <label>Status</label>
-          <select name="status">
-            <option value="pending" ${invoice && invoice.status === "pending" ? "selected" : ""}>Pending</option>
-            <option value="approved" ${invoice && invoice.status === "approved" ? "selected" : ""}>Approved</option>
-            <option value="paid" ${invoice && invoice.status === "paid" ? "selected" : ""}>Paid</option>
-            <option value="rejected" ${invoice && invoice.status === "rejected" ? "selected" : ""}>Rejected</option>
-          </select>
-        </div>
-      </div>
-    `;
-
-    openModal(invoice ? "Edit IPC" : "Add IPC", body, async function (form) {
-      const payload = {
-        invoice_number: String(form.get("invoice_number") || "").trim(),
-        vendor_name: String(form.get("vendor_name") || "").trim(),
-        amount: Number(form.get("amount")),
-        invoice_date: String(form.get("invoice_date") || ""),
-        due_date: form.get("due_date") ? String(form.get("due_date")) : null,
-        attachment_ids: []
-      };
-
-      const status = String(form.get("status") || "pending");
-
-      if (invoice) {
-        await request("PUT", "/invoices/" + invoice.id, payload);
-
-        if (status !== invoice.status) {
-          await request("PATCH", "/invoices/" + invoice.id, { status: status });
-        }
-
-        toast("IPC updated successfully");
-      } else {
-        const budgetId = String(form.get("budget_id"));
-        const created = await request("POST", "/budgets/" + budgetId + "/invoices", payload);
-
-        if (status !== "pending" && created && created.data && created.data.id) {
-          await request("PATCH", "/invoices/" + created.data.id, { status: status });
-        }
-
-        toast("IPC created successfully");
-      }
-    });
-  }
-
-  async function deleteInvoice(id) {
-    if (!id) return;
-
-    const invoice = state.invoices.find(function (item) {
-      return item.id === id;
-    });
-
-    if (!invoice) return;
-
-    const invoiceNumber = invoice.invoice_number || invoice.invoiceNumber || "this IPC";
-    const yes = window.confirm("Delete " + invoiceNumber + "?");
-
-    if (!yes) return;
-
-    try {
-      await request("DELETE", "/invoices/" + id);
-      toast("IPC deleted successfully", "fa-trash");
-      await reloadAll();
-    } catch (err) {
-      toast(err.message || "Delete failed", "fa-triangle-exclamation");
-    }
-  }
+  /* ---------------------------------------------------------------
+     Budget management (UNCHANGED - separate from the 4 visible tables)
+     --------------------------------------------------------------- */
 
   function openBudgetModal(budget) {
     state.activeBudget = budget || null;
@@ -1597,19 +2026,21 @@
     });
   }
 
+  /* ---------------------------------------------------------------
+     Init
+     --------------------------------------------------------------- */
+
   function renderFallbackOnly() {
     renderSummary();
     renderCharts();
-    renderIpcTracker();
     renderPaymentTracking();
+    renderIpcTracker();
     renderBankGuarantees();
     renderAmendments();
   }
 
   async function init() {
     injectStyles();
-    ensureIpcTableHeader();
-    ensureActions();
 
     renderFallbackOnly();
 

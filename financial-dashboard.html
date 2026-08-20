@@ -159,26 +159,36 @@
           <table class="data-table" id="paymentTrackingTable">
             <thead>
               <tr>
+                <th scope="col" class="num">S.No.</th>
                 <th scope="col">Description</th>
                 <th scope="col" class="num">Amount</th>
+                <th scope="col" class="num">Actions</th>
               </tr>
             </thead>
             <tbody id="paymentTrackingTableBody">
               <tr>
-                <td>Contract Value</td>
-                <td class="num">3,625,580,000.00 AOA</td>
+                <td class="num">1</td>
+                <td><strong>Contract Value</strong></td>
+                <td class="num"><strong>3,625,580,000.00 AOA</strong></td>
+                <td class="num">—</td>
               </tr>
               <tr>
+                <td class="num">2</td>
                 <td>Amount Invoiced</td>
                 <td class="num">650,999,524.39 AOA</td>
+                <td class="num">—</td>
               </tr>
               <tr>
+                <td class="num">3</td>
                 <td>Amount Paid</td>
                 <td class="num">404,659,374.56 AOA</td>
+                <td class="num">—</td>
               </tr>
               <tr>
-                <td>Outstanding</td>
-                <td class="num">246,340,149.83 AOA</td>
+                <td class="num">4</td>
+                <td><strong>Outstanding</strong></td>
+                <td class="num"><strong>246,340,149.83 AOA</strong></td>
+                <td class="num">—</td>
               </tr>
             </tbody>
           </table>
@@ -193,6 +203,7 @@
           <table class="data-table" id="ipcTrackerTable">
             <thead>
               <tr>
+                <th scope="col" class="num">S.No.</th>
                 <th scope="col">IPC</th>
                 <th scope="col">Period</th>
                 <th scope="col" class="num">AOA</th>
@@ -200,10 +211,12 @@
                 <th scope="col" class="num">%</th>
                 <th scope="col">ACE</th>
                 <th scope="col">Client</th>
+                <th scope="col" class="num">Actions</th>
               </tr>
             </thead>
             <tbody id="ipcTableBody">
               <tr>
+                <td class="num">1</td>
                 <td>IPC-01</td>
                 <td>Feb 2026</td>
                 <td class="num">404,659,374.56</td>
@@ -211,8 +224,10 @@
                 <td class="num">11.16%</td>
                 <td><span class="status-chip ok"><i class="fa-solid fa-circle-check"></i> Certified</span></td>
                 <td><span class="status-chip ok"><i class="fa-solid fa-circle-check"></i> Approved</span></td>
+                <td class="num">—</td>
               </tr>
               <tr>
+                <td class="num">2</td>
                 <td>IPC-02</td>
                 <td>Apr 2026</td>
                 <td class="num">246,340,149.83</td>
@@ -220,8 +235,10 @@
                 <td class="num">6.79%</td>
                 <td><span class="status-chip ok"><i class="fa-solid fa-circle-check"></i> Certified 24/06</span></td>
                 <td><span class="status-chip warn"><i class="fa-solid fa-clock"></i> Submitted</span></td>
+                <td class="num">—</td>
               </tr>
               <tr>
+                <td class="num">3</td>
                 <td><strong>Cumulative</strong></td>
                 <td>—</td>
                 <td class="num"><strong>650,999,524.39</strong></td>
@@ -229,8 +246,10 @@
                 <td class="num"><strong>17.96%</strong></td>
                 <td>—</td>
                 <td>—</td>
+                <td class="num">—</td>
               </tr>
               <tr>
+                <td class="num">4</td>
                 <td>IPC-03</td>
                 <td>—</td>
                 <td class="num">—</td>
@@ -238,6 +257,7 @@
                 <td class="num">—</td>
                 <td><span class="status-chip warn"><i class="fa-solid fa-clock"></i> Future</span></td>
                 <td>—</td>
+                <td class="num">—</td>
               </tr>
             </tbody>
           </table>
@@ -247,32 +267,38 @@
         <h2>Bank Guarantees</h2>
         <span class="section-sub">Guarantee validity and renewal status</span>
       </div>
-      <div class="card">
+      <div class="card" id="bankGuaranteesCard">
         <div class="card-body table-scroll">
           <table class="data-table" id="bankGuaranteesTable">
             <thead>
               <tr>
+                <th scope="col" class="num">S.No.</th>
                 <th scope="col">Guarantee</th>
                 <th scope="col">Bank</th>
                 <th scope="col" class="num">USD</th>
                 <th scope="col">Valid Until</th>
                 <th scope="col">Status</th>
+                <th scope="col" class="num">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="bankGuaranteesTableBody">
               <tr>
+                <td class="num">1</td>
                 <td>Advance Payment Guarantees (APG)</td>
                 <td>Bank of China</td>
                 <td class="num">1,119,940.90</td>
                 <td>23 Aug 2026</td>
                 <td><span class="status-chip warn"><i class="fa-solid fa-triangle-exclamation"></i> Expires &lt; 60d · Renew</span></td>
+                <td class="num">—</td>
               </tr>
               <tr>
+                <td class="num">2</td>
                 <td>Performance Security (PG)</td>
                 <td>Bank of China</td>
                 <td class="num">559,970.45</td>
                 <td>31 Dec 2026</td>
                 <td><span class="status-chip ok"><i class="fa-solid fa-circle-check"></i> Valid</span></td>
+                <td class="num">—</td>
               </tr>
             </tbody>
           </table>
@@ -282,47 +308,59 @@
         <h2>Addenda / Amendments</h2>
         <span class="section-sub">Contract amendments and scope changes</span>
       </div>
-      <div class="card">
+      <div class="card" id="amendmentsCard">
         <div class="card-body table-scroll">
           <table class="data-table" id="addendaAmendmentsTable">
             <thead>
               <tr>
+                <th scope="col" class="num">S.No.</th>
                 <th scope="col">Addendum</th>
                 <th scope="col">Date</th>
                 <th scope="col">Scope</th>
                 <th scope="col">Status</th>
+                <th scope="col" class="num">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="addendaAmendmentsTableBody">
               <tr>
+                <td class="num">1</td>
                 <td>Amendment No. 01</td>
                 <td>—</td>
                 <td>Initial amendment record to be updated from contract file</td>
                 <td><span class="status-chip warn"><i class="fa-solid fa-clock"></i> Record pending</span></td>
+                <td class="num">—</td>
               </tr>
               <tr>
+                <td class="num">2</td>
                 <td>Amendment No. 02</td>
                 <td>—</td>
                 <td>Second amendment record to be updated from contract file</td>
                 <td><span class="status-chip warn"><i class="fa-solid fa-clock"></i> Record pending</span></td>
+                <td class="num">—</td>
               </tr>
               <tr>
+                <td class="num">3</td>
                 <td>Amendment No. 03</td>
                 <td>—</td>
                 <td>Third amendment record to be updated from contract file</td>
                 <td><span class="status-chip warn"><i class="fa-solid fa-clock"></i> Record pending</span></td>
+                <td class="num">—</td>
               </tr>
               <tr>
+                <td class="num">4</td>
                 <td>Amendment No. 04</td>
                 <td>07 May 2026</td>
                 <td>Revised DDR scope: 92.677 km / 5,303 HSC (USD 6,044,736.58)</td>
                 <td><span class="status-chip warn"><i class="fa-solid fa-clock"></i> Under Employer review</span></td>
+                <td class="num">—</td>
               </tr>
               <tr>
+                <td class="num">5</td>
                 <td>Amendment No. 05</td>
                 <td>Drafting</td>
                 <td>EOT + Price Adjustment</td>
                 <td><span class="status-chip warn"><i class="fa-solid fa-triangle-exclamation"></i> Pending CTCE</span></td>
+                <td class="num">—</td>
               </tr>
             </tbody>
           </table>
