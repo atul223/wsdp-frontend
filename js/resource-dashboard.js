@@ -4,13 +4,27 @@
    - Materials            (Resource, type=material)
    - Equipment            (Resource, type=equipment)
    - Manpower             (Resource, type=manpower)
-   - HDPE Pipe Stock       (HdpePipeStock)   <- now DB-backed, full CRUD
-   - Equipment Deployment  (EquipmentDeployment) <- now DB-backed, full CRUD
-   - Workforce By Employer (WorkforceEmployer)   <- now DB-backed, full CRUD
+   - HDPE Pipe Stock       (HdpePipeStock)   <- DB-backed, full CRUD
+   - Equipment Deployment  (EquipmentDeployment) <- DB-backed, full CRUD
+   - Workforce By Employer (WorkforceEmployer)   <- DB-backed, full CRUD
 
-   All data tables in this module now include an "S.No." column and
-   full Add / Edit / Delete / Update support, consistent with the rest
-   of the site.
+   All data tables in this module include an "S.No." column and full
+   Add / Edit / Delete / Update support.
+
+   IMPORTANT — Computed / read-only fields:
+   Several columns are DERIVED, not raw input, and are intentionally
+   NOT submitted to the backend as editable values:
+     - Materials/Equipment/Manpower: "Allocated" and "Remaining" are
+       computed server-side from active Allocation records against a
+       Resource (Remaining = Total Capacity - Allocated). They cannot
+       be typed in directly.
+     - HDPE Pipe Stock: "Stock (m)" = Received (m) - Used (m), and
+       "Cover" (OK/Watch/Re-order) is derived from Stock vs Received.
+     - Equipment Deployment: "Variance" = Planned - Deployed.
+   These are shown in the Add/Edit modal as DISABLED, auto-calculating
+   fields (updated live as you type the source values) so the numbers
+   are visible and understandable, without allowing an inconsistent
+   manual override that would desync from the underlying data.
 
    Requires:
    - js/api.js
@@ -46,6 +60,8 @@
   // Field definitions for the 3 DB-backed report tables. Driving the
   // Add/Edit modal generically from this config keeps the CRUD pattern
   // identical for all 3 tables while matching each table's own columns.
+  // Fields marked `computed: true` are DISPLAYED (disabled, auto-
+  // calculated) but never submitted in the payload.
   const REPORT_TYPES = {
     hdpe: {
       label: "HDPE Pipe Stock Entry",
@@ -55,7 +71,9 @@
       fields: [
         { key: "diameter", label: "Diameter", type: "text", required: true, full: true },
         { key: "received_m", label: "Received (m)", type: "number", step: "0.01", min: "0", required: true },
-        { key: "used_m", label: "Used (m)", type: "number", step: "0.01", min: "0", required: true }
+        { key: "used_m", label: "Used (m)", type: "number", step: "0.01", min: "0", required: true },
+        { key: "stock_m", label: "Stock (m)", type: "number", computed: true, hint: "Auto-calculated: Received − Used" },
+        { key: "cover", label: "Cover", type: "text", computed: true, hint: "Auto-calculated from Stock vs Received" }
       ]
     },
     equipmentDeployment: {
@@ -67,6 +85,7 @@
         { key: "category", label: "Category", type: "text", required: true, full: true },
         { key: "planned", label: "Planned", type: "number", step: "0.01", min: "0", required: false },
         { key: "deployed", label: "Deployed", type: "number", step: "0.01", min: "0", required: true },
+        { key: "variance", label: "Variance", type: "number", computed: true, hint: "Auto-calculated: Planned − Deployed" },
         { key: "remarks", label: "Remarks", type: "textarea", required: false, full: true }
       ]
     },
@@ -80,6 +99,37 @@
         { key: "category", label: "Category", type: "text", required: false },
         { key: "headcount", label: "Headcount", type: "number", step: "1", min: "0", required: true }
       ]
+    }
+  };
+
+  // Computes the live value of each `computed: true` field for a report
+  // type, given the current raw form values. Mirrors the backend's
+  // derivation logic exactly (see hdpePipeStock.service.js / 
+  // equipmentDeployment.service.js toApiShape()) so the number shown
+  // here always matches what the server will calculate and store.
+  const COMPUTED_VALUE_FNS = {
+    hdpe: {
+      stock_m: function (values) {
+        const received = Number(values.received_m || 0);
+        const used = Number(values.used_m || 0);
+        return (received - used).toFixed(2);
+      },
+      cover: function (values) {
+        const received = Number(values.received_m || 0);
+        const used = Number(values.used_m || 0);
+        const stock = received - used;
+        if (stock <= 0) return "Re-order";
+        if (stock <= received * 0.25) return "Watch";
+        return "OK";
+      }
+    },
+    equipmentDeployment: {
+      variance: function (values) {
+        if (values.planned === "" || values.planned === null || values.planned === undefined) return "";
+        const planned = Number(values.planned || 0);
+        const deployed = Number(values.deployed || 0);
+        return (planned - deployed).toFixed(2);
+      }
     }
   };
 
@@ -284,6 +334,9 @@
         box-shadow: 0 20px 60px rgba(15, 23, 42, 0.22);
         border: 1px solid var(--border-color, #E3E7EB);
         overflow: hidden;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
       }
 
       .resource-modal__header {
@@ -301,6 +354,7 @@
 
       .resource-modal__body {
         padding: 20px;
+        overflow-y: auto;
       }
 
       .resource-form-grid {
@@ -325,6 +379,14 @@
         color: var(--text-muted, #6B7280);
       }
 
+      .resource-form-field .field-hint {
+        font-size: 11px;
+        font-weight: 400;
+        font-style: italic;
+        color: var(--text-muted, #9AA5B1);
+        margin-top: -2px;
+      }
+
       .resource-form-field input,
       .resource-form-field select,
       .resource-form-field textarea {
@@ -335,6 +397,13 @@
         background: var(--card-bg, #fff);
         color: var(--text-primary, #16232F);
         font-family: inherit;
+      }
+
+      .resource-form-field input:disabled,
+      .resource-form-field textarea:disabled {
+        background: rgba(120, 130, 145, 0.10);
+        color: var(--text-muted, #6B7280);
+        cursor: not-allowed;
       }
 
       .resource-form-field textarea {
@@ -1250,9 +1319,23 @@
     if (box) box.remove();
   }
 
+  // ----------------------------------------------------------------------
+  // Materials / Equipment / Manpower (Resource) Add/Edit modal.
+  // "Allocated Quantity" and "Remaining Capacity" are shown as DISABLED,
+  // auto-calculating fields — they are derived server-side from active
+  // Allocation records against this resource and cannot be typed in
+  // directly. Remaining live-updates as you edit Total Capacity, using
+  // the currently-known Allocated Quantity (unaffected by this form).
+  // ----------------------------------------------------------------------
   function openResourceModal(type, resource) {
     const isEdit = Boolean(resource);
     const config = RESOURCE_TYPES[type] || RESOURCE_TYPES.material;
+
+    const allocatedQty = Number((resource && resource.allocated_quantity) || 0);
+    const initialTotal = resource && resource.total_capacity ? Number(resource.total_capacity) : "";
+    const initialRemaining = resource && resource.remaining_capacity !== undefined && resource.remaining_capacity !== null
+      ? Number(resource.remaining_capacity)
+      : (initialTotal !== "" ? initialTotal - allocatedQty : "");
 
     closeResourceModal();
 
@@ -1293,7 +1376,19 @@
 
               <div class="resource-form-field">
                 <label for="resourceCapacity">Total Capacity / Quantity</label>
-                <input id="resourceCapacity" name="total_capacity" type="number" step="0.01" min="0.01" required value="${escapeAttr(resource && resource.total_capacity ? resource.total_capacity : "")}" />
+                <input id="resourceCapacity" name="total_capacity" type="number" step="0.01" min="0.01" required value="${escapeAttr(initialTotal)}" />
+              </div>
+
+              <div class="resource-form-field">
+                <label for="resourceAllocated">Allocated Quantity</label>
+                <span class="field-hint">Auto-calculated from active allocations</span>
+                <input id="resourceAllocated" type="number" step="0.01" value="${escapeAttr(allocatedQty)}" disabled />
+              </div>
+
+              <div class="resource-form-field">
+                <label for="resourceRemaining">Remaining Capacity</label>
+                <span class="field-hint">Auto-calculated: Total Capacity − Allocated</span>
+                <input id="resourceRemaining" type="number" step="0.01" value="${escapeAttr(initialRemaining)}" disabled />
               </div>
 
               <div class="resource-form-field full">
@@ -1316,6 +1411,15 @@
     document.body.appendChild(backdrop);
 
     const form = backdrop.querySelector("#resourceForm");
+    const capacityInput = backdrop.querySelector("#resourceCapacity");
+    const remainingInput = backdrop.querySelector("#resourceRemaining");
+
+    // Live-update Remaining Capacity as Total Capacity changes, using the
+    // currently known Allocated Quantity (this form never changes that).
+    capacityInput.addEventListener("input", function () {
+      const total = Number(capacityInput.value || 0);
+      remainingInput.value = (total - allocatedQty).toFixed(2);
+    });
 
     form.addEventListener("submit", async function (event) {
       event.preventDefault();
@@ -1375,12 +1479,15 @@
     const value = reportFieldValue(record, field);
     const idAttr = "reportField_" + field.key;
     const fullClass = field.full ? "full" : "";
+    const disabledAttr = field.computed ? "disabled" : "";
+    const hintHTML = field.hint ? `<span class="field-hint">${escapeHTML(field.hint)}</span>` : "";
 
     if (field.type === "textarea") {
       return `
         <div class="resource-form-field ${fullClass}">
           <label for="${idAttr}">${escapeHTML(field.label)}</label>
-          <textarea id="${idAttr}" name="${field.key}" maxlength="500" ${field.required ? "required" : ""}>${escapeHTML(value)}</textarea>
+          ${hintHTML}
+          <textarea id="${idAttr}" name="${field.key}" maxlength="500" ${field.required ? "required" : ""} ${disabledAttr}>${escapeHTML(value)}</textarea>
         </div>
       `;
     }
@@ -1389,7 +1496,8 @@
       return `
         <div class="resource-form-field ${fullClass}">
           <label for="${idAttr}">${escapeHTML(field.label)}</label>
-          <input id="${idAttr}" name="${field.key}" type="number" step="${field.step || "1"}" ${field.min !== undefined ? `min="${field.min}"` : ""} ${field.required ? "required" : ""} value="${escapeAttr(value)}" />
+          ${hintHTML}
+          <input id="${idAttr}" name="${field.key}" type="number" step="${field.step || "1"}" ${field.min !== undefined ? `min="${field.min}"` : ""} ${field.required ? "required" : ""} value="${escapeAttr(value)}" ${disabledAttr} />
         </div>
       `;
     }
@@ -1397,15 +1505,44 @@
     return `
       <div class="resource-form-field ${fullClass}">
         <label for="${idAttr}">${escapeHTML(field.label)}</label>
-        <input id="${idAttr}" name="${field.key}" type="text" maxlength="200" ${field.required ? "required" : ""} value="${escapeAttr(value)}" />
+        ${hintHTML}
+        <input id="${idAttr}" name="${field.key}" type="text" maxlength="200" ${field.required ? "required" : ""} value="${escapeAttr(value)}" ${disabledAttr} />
       </div>
     `;
+  }
+
+  // Wires up live-recalculation for any `computed: true` fields in a
+  // report modal (e.g. Stock/Cover for HDPE, Variance for Equipment
+  // Deployment), so the displayed value always updates immediately as
+  // the user edits the source fields it depends on, and matches exactly
+  // what the backend will compute and persist.
+  function attachComputedFieldListeners(form, reportType) {
+    const computedFns = COMPUTED_VALUE_FNS[reportType];
+    if (!computedFns) return;
+
+    function recompute() {
+      const values = {};
+      Array.from(form.elements).forEach(function (el) {
+        if (el.name) values[el.name] = el.value;
+      });
+
+      Object.keys(computedFns).forEach(function (key) {
+        const el = form.elements["reportField_" + key] || form.querySelector(`[name="${key}"]`);
+        const target = document.getElementById("reportField_" + key);
+        if (target) target.value = computedFns[key](values);
+      });
+    }
+
+    form.addEventListener("input", recompute);
+    recompute();
   }
 
   /** Generic Add/Edit modal for the 3 DB-backed report tables (HDPE Pipe
    * Stock, Equipment Deployment, Workforce By Employer). Fields are driven
    * entirely by REPORT_TYPES[reportType].fields so each table gets its own
-   * form shape while sharing the exact same modal UX as Resources. */
+   * form shape while sharing the exact same modal UX as Resources.
+   * Fields marked `computed: true` are rendered disabled and are excluded
+   * from the submitted payload — the backend always derives them itself. */
   function openReportModal(reportType, record) {
     const config = REPORT_TYPES[reportType];
     if (!config) return;
@@ -1448,6 +1585,8 @@
 
     const form = backdrop.querySelector("#reportForm");
 
+    attachComputedFieldListeners(form, reportType);
+
     form.addEventListener("submit", async function (event) {
       event.preventDefault();
 
@@ -1457,6 +1596,10 @@
       const payload = {};
 
       config.fields.forEach(function (field) {
+        // Computed fields are display-only; the backend always derives
+        // them itself, so we never send them in the payload.
+        if (field.computed) return;
+
         const el = form.elements[field.key];
         const raw = el ? el.value : "";
 
@@ -1500,7 +1643,7 @@
     });
 
     setTimeout(function () {
-      const firstInput = backdrop.querySelector(".resource-form-field input, .resource-form-field textarea");
+      const firstInput = backdrop.querySelector(".resource-form-field input:not(:disabled), .resource-form-field textarea:not(:disabled)");
       if (firstInput) firstInput.focus();
     }, 0);
   }
