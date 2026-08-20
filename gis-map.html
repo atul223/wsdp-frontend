@@ -164,9 +164,8 @@
   }
 
   .gis-north-box {
-    display: grid;
-    grid-template-columns: 72px 1fr;
-    gap: 10px;
+    display: flex;
+    justify-content: center;
     align-items: center;
   }
 
@@ -324,41 +323,6 @@
     font-size: 12px;
   }
 
-  /* On-page match diagnostics - visible without opening DevTools */
-  .gis-diagnostics-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .gis-diagnostics-list li {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    font-size: 12px;
-  }
-
-  .gis-diag-dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 999px;
-    flex: 0 0 auto;
-    margin-top: 3px;
-  }
-
-  .gis-diag-dot.ok { background: #2e7d32; }
-  .gis-diag-dot.warn { background: #f59e0b; }
-  .gis-diag-dot.fail { background: #c62828; }
-
-  .gis-diagnostics-note {
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-top: 8px;
-    line-height: 1.4;
-  }
 </style>
 </head>
 
@@ -383,7 +347,6 @@
 
       <div class="section-heading">
         <h2>GIS Map - Lubango Distribution Network Intervention Areas</h2>
-        <span class="section-sub">KMZ-driven project GIS viewer with satellite, street and topographic map layers</span>
       </div>
 
       <div class="gis-layout">
@@ -400,21 +363,9 @@
               </label>
 
               <label class="filter-chip">
-                <input type="checkbox" class="gis-filter-status" data-status="planned" checked>
-                <span class="legend-square" style="background:#e53935;"></span>
-                Planned Area
-              </label>
-
-              <label class="filter-chip">
                 <input type="checkbox" class="gis-filter-status" data-status="progress" checked>
                 <span class="legend-square" style="background:var(--color-warning);"></span>
                 In Progress
-              </label>
-
-              <label class="filter-chip">
-                <input type="checkbox" class="gis-filter-status" data-status="mobilising" checked>
-                <span class="legend-square" style="background:#F58232;"></span>
-                Mobilising
               </label>
 
               <label class="filter-chip">
@@ -495,10 +446,6 @@
                 <div>
                   <div class="north-symbol"></div>
                   <div class="north-scale">Dynamic scale</div>
-                </div>
-                <div class="gis-project-copy">
-                  <strong>GIS Mode</strong><br>
-                  Satellite, street and topographic base layers are available from the layer switcher.
                 </div>
               </div>
             </div>
@@ -581,16 +528,7 @@
               <h4>Project Information</h4>
               <div class="gis-project-copy">
                 <strong>Project:</strong> Design and Construction of Network and Home Connections for Peri-Urban Areas in the City of Lubango<br><br>
-                <strong>Contract:</strong> 44W3/LUBANGO/DNA18<br><br>
-                <strong>GIS Asset:</strong> lubango_Project.kmz
-              </div>
-            </div>
-
-            <div class="gis-panel-section" id="gisDiagnosticsSection" style="display:none;">
-              <h4>Data Match Diagnostics</h4>
-              <ul class="gis-diagnostics-list" id="gisDiagnosticsList"></ul>
-              <div class="gis-diagnostics-note">
-                Green = boundary polygon matched and highlight/tick fully working. Amber = area name matched a feature, but no fillable boundary polygon was found for it. Red = no KMZ feature matched this area name at all.
+                <strong>Contract:</strong> 44W3/LUBANGO/DNA18
               </div>
             </div>
 
@@ -620,8 +558,6 @@
     var mapElement = document.getElementById("gisMap");
     var fitKmzBtn = document.getElementById("fitKmzBtn");
     var resetFiltersBtn = document.getElementById("resetFiltersBtn");
-    var diagnosticsSection = document.getElementById("gisDiagnosticsSection");
-    var diagnosticsList = document.getElementById("gisDiagnosticsList");
 
     if (!mapElement || typeof L === "undefined") {
       return;
@@ -684,16 +620,8 @@
         keywords: ["complete", "completed", "concluido", "concluído", "executed", "done", "june"]
       },
       {
-        status: "planned",
-        keywords: ["planned", "plan", "july", "programmed", "programado"]
-      },
-      {
         status: "progress",
         keywords: ["progress", "in progress", "ongoing", "under construction"]
-      },
-      {
-        status: "mobilising",
-        keywords: ["mobilising", "mobilizing", "mobilisation", "mobilization"]
       },
       {
         status: "notStarted",
@@ -715,13 +643,11 @@
     // shown in the "Construction Stage" legend/filter list.
     var STATUS_STYLES = {
       complete: { color: "#00a651", fillColor: "#00a651", fillOpacity: 0.24 },
-      planned: { color: "#e53935", fillColor: "#e53935", fillOpacity: 0.22 },
       progress: {
         color: getCssVarColor("--color-warning", "#f59e0b"),
         fillColor: getCssVarColor("--color-warning", "#f59e0b"),
         fillOpacity: 0.24
       },
-      mobilising: { color: "#F58232", fillColor: "#F58232", fillOpacity: 0.24 },
       notStarted: {
         color: getCssVarColor("--color-critical", "#c62828"),
         fillColor: getCssVarColor("--color-critical", "#c62828"),
@@ -1069,11 +995,7 @@
       }
 
       if (geometryType.indexOf("Polygon") !== -1) {
-        if (searchText.indexOf("planned") !== -1 || searchText.indexOf("july") !== -1) {
-          style.color = "#e53935";
-          style.fillColor = "#e53935";
-          style.fillOpacity = 0.20;
-        } else if (searchText.indexOf("complete") !== -1 || searchText.indexOf("june") !== -1) {
+        if (searchText.indexOf("complete") !== -1 || searchText.indexOf("june") !== -1) {
           style.color = "#00a651";
           style.fillColor = "#00a651";
           style.fillOpacity = 0.22;
@@ -1199,59 +1121,6 @@
       }
 
       return zip.file(kmlFileName).async("text");
-    }
-
-    // Renders the on-page (no DevTools required) match diagnostics panel.
-    function renderDiagnostics(rows) {
-      if (!diagnosticsSection || !diagnosticsList) {
-        return;
-      }
-
-      diagnosticsList.innerHTML = "";
-
-      AREA_NAMES.forEach(function (areaName) {
-        var polygonMatches = rows.filter(function (row) {
-          return row.matchedArea === areaName && (row.geometryType === "Polygon" || row.geometryType === "MultiPolygon");
-        });
-        var anyMatch = rows.some(function (row) {
-          return row.matchedArea === areaName;
-        });
-
-        var li = document.createElement("li");
-        var dot = document.createElement("span");
-        var status;
-
-        if (polygonMatches.length) {
-          status = "ok";
-        } else if (anyMatch) {
-          status = "warn";
-        } else {
-          status = "fail";
-        }
-
-        dot.className = "gis-diag-dot " + status;
-
-        var label = document.createElement("span");
-        var text;
-
-        if (polygonMatches.length > 1) {
-          text = areaName + " - " + polygonMatches.length + " boundary shapes matched (highlight + tick working; single label shown on the largest shape)";
-        } else if (polygonMatches.length === 1) {
-          text = areaName + " - boundary polygon matched (highlight + label + tick working)";
-        } else if (anyMatch) {
-          text = areaName + " - name matched a non-polygon feature only; no fillable boundary found";
-        } else {
-          text = areaName + " - NOT matched to any KMZ feature";
-        }
-
-        label.textContent = text;
-
-        li.appendChild(dot);
-        li.appendChild(label);
-        diagnosticsList.appendChild(li);
-      });
-
-      diagnosticsSection.style.display = "";
     }
 
     async function loadKmzFromServer() {
@@ -1416,7 +1285,6 @@
         }
 
         applyFilters();
-        renderDiagnostics(diagnosticRows);
 
         console.log("GIS Map: KMZ feature matching diagnostics", diagnosticRows);
         AREA_NAMES.forEach(function (areaName) {
@@ -1429,19 +1297,6 @@
         });
       } catch (error) {
         console.error("KMZ Load Error:", error);
-
-        if (diagnosticsSection && diagnosticsList) {
-          diagnosticsList.innerHTML = "";
-          var li = document.createElement("li");
-          var dot = document.createElement("span");
-          dot.className = "gis-diag-dot fail";
-          var label = document.createElement("span");
-          label.textContent = "KMZ failed to load/parse: " + (error && error.message ? error.message : String(error));
-          li.appendChild(dot);
-          li.appendChild(label);
-          diagnosticsList.appendChild(li);
-          diagnosticsSection.style.display = "";
-        }
       }
     }
 
