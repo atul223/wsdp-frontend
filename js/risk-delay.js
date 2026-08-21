@@ -1,7 +1,9 @@
-
 /* ============================================================
    risk-delay.js — Delay Analysis & Risk Register CRUD
    Requires: js/api.js, js/shell.js, js/main.js
+   Also uses (loaded via CDN in risk-delay.html):
+     - html2canvas + jsPDF  -> Export button
+     - SheetJS (XLSX)       -> Import button
    ============================================================ */
 
 (function () {
@@ -11,8 +13,13 @@
     projectId: null,
     delays: [],
     risks: [],
+    ncrs: [],
+    correctiveActions: [],
+    summary: null, // { projected_slippage_days, open_delay_items, mitigated_this_quarter, on_critical_path } | null
     editingDelayId: null,
     editingRiskId: null,
+    editingNcrId: null,
+    editingActionId: null,
   };
 
   const delayCategoryOptions = [
@@ -56,6 +63,19 @@
     ["closed", "Closed"],
   ];
 
+  const ncrStatusOptions = [
+    ["open", "Open"],
+    ["action_plan_requested", "Action Plan Requested"],
+    ["pending", "Pending"],
+    ["closed", "Closed"],
+  ];
+
+  const actionStatusOptions = [
+    ["pending", "Pending"],
+    ["in_progress", "In Progress"],
+    ["completed", "Completed"],
+  ];
+
   function toast(message, icon) {
     if (window.WSDP_TOAST) {
       window.WSDP_TOAST(message, { icon: icon || "fa-circle-check" });
@@ -96,7 +116,7 @@
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
+      .replace(/'/g, "&#39;");
   }
 
   function optionHtml(options, selected) {
@@ -153,25 +173,16 @@
     return null;
   }
 
-  function resolveProjectId() {
-    const stored = readProjectIdFromStorage();
-    if (stored) return stored;
-
-    const payload = getTokenPayload();
-
-    if (payload?.project_ids?.length) {
-      return payload.project_ids[0];
-    }
-
-    return null;
-  }
-
   function ensureUiEnhancements() {
     const delaySection = document.getElementById("delay-analysis");
     const riskSection = document.getElementById("risk-register");
+    const ncrSection = document.getElementById("ncr-register");
+    const actionSection = document.getElementById("corrective-actions");
 
     const delayHeading = delaySection?.querySelector(".section-heading");
     const riskHeading = riskSection?.querySelector(".section-heading");
+    const ncrHeading = ncrSection?.querySelector(".section-heading");
+    const actionHeading = actionSection?.querySelector(".section-heading");
 
     if (delayHeading && !document.getElementById("addDelayBtn")) {
       const btn = document.createElement("button");
@@ -182,6 +193,18 @@
       delayHeading.appendChild(btn);
       btn.addEventListener("click", function () {
         openDelayForm();
+      });
+    }
+
+    if (delayHeading && !document.getElementById("editSummaryBtn")) {
+      const btn = document.createElement("button");
+      btn.className = "btn-ghost";
+      btn.id = "editSummaryBtn";
+      btn.type = "button";
+      btn.innerHTML = `<i class="fa-solid fa-gauge-high"></i> Update Summary Cards`;
+      delayHeading.appendChild(btn);
+      btn.addEventListener("click", function () {
+        openSummaryForm();
       });
     }
 
@@ -197,25 +220,47 @@
       });
     }
 
+    if (ncrHeading && !document.getElementById("addNcrBtn")) {
+      const btn = document.createElement("button");
+      btn.className = "btn-primary";
+      btn.id = "addNcrBtn";
+      btn.type = "button";
+      btn.innerHTML = `<i class="fa-solid fa-plus"></i> Add NCR`;
+      ncrHeading.appendChild(btn);
+      btn.addEventListener("click", function () {
+        openNcrForm();
+      });
+    }
+
+    if (actionHeading && !document.getElementById("addActionBtn")) {
+      const btn = document.createElement("button");
+      btn.className = "btn-primary";
+      btn.id = "addActionBtn";
+      btn.type = "button";
+      btn.innerHTML = `<i class="fa-solid fa-plus"></i> Add Action`;
+      actionHeading.appendChild(btn);
+      btn.addEventListener("click", function () {
+        openActionForm();
+      });
+    }
+
     const delayTable = delaySection?.querySelector(".data-table");
-    const riskTable = riskSection?.querySelector(".col-span-7 .data-table");
+    const riskTable = riskSection?.querySelector(".data-table");
+    const ncrTable = ncrSection?.querySelector(".data-table");
+    const actionTable = actionSection?.querySelector(".data-table");
 
-    if (delayTable && !delayTable.querySelector("thead th.actions-col")) {
-      delayTable.querySelector("thead tr").insertAdjacentHTML(
-        "beforeend",
-        `<th scope="col" class="actions-col">Actions</th>`
-      );
-    }
-
-    if (riskTable && !riskTable.querySelector("thead th.actions-col")) {
-      riskTable.querySelector("thead tr").insertAdjacentHTML(
-        "beforeend",
-        `<th scope="col" class="actions-col">Actions</th>`
-      );
-    }
+    [delayTable, riskTable, ncrTable, actionTable].forEach(function (table) {
+      if (table && !table.querySelector("thead th.actions-col")) {
+        table.querySelector("thead tr").insertAdjacentHTML(
+          "beforeend",
+          `<th scope="col" class="actions-col">Actions</th>`
+        );
+      }
+    });
 
     injectRiskDelayStyles();
     createModalShell();
+    wireExportImportButtons();
   }
 
   function injectRiskDelayStyles() {
@@ -224,6 +269,7 @@
     const style = document.createElement("style");
     style.id = "riskDelayCrudStyles";
     style.textContent = `
+      .sno-col { width: 60px; text-align: center; }
       .actions-col { width: 120px; text-align: right; }
       .row-actions { display: flex; justify-content: flex-end; gap: 6px; }
       .btn-icon-sm {
@@ -234,6 +280,7 @@
       }
       .btn-icon-sm:hover { background: rgba(0,0,0,0.04); }
       .btn-icon-sm.danger { color: var(--color-critical, #C0392B); }
+      .section-heading { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
       .risk-delay-modal-backdrop {
         position: fixed; inset: 0; z-index: 100;
         background: rgba(16, 30, 54, 0.45);
@@ -283,6 +330,7 @@
         color: var(--text-primary, #16232F);
       }
       .risk-delay-field textarea { min-height: 90px; resize: vertical; }
+      .risk-delay-field small.hint { color: var(--text-muted, #6E7C87); font-weight: 400; }
       .risk-delay-modal__footer {
         padding: 16px 20px;
         display: flex;
@@ -295,6 +343,15 @@
         padding: 28px !important;
         color: var(--text-muted, #6E7C87);
       }
+      .import-target-list {
+        display: flex; flex-direction: column; gap: 8px; margin-top: 4px;
+      }
+      .import-target-list label {
+        display: flex; align-items: center; gap: 8px;
+        border: 1px solid var(--border-color, #D8E0E8);
+        border-radius: 10px; padding: 10px 12px; cursor: pointer;
+      }
+      .import-target-list input { width: auto; }
       @media (max-width: 720px) {
         .risk-delay-form-grid { grid-template-columns: 1fr; }
       }
@@ -342,6 +399,8 @@
     document.getElementById("riskDelayModalBody").innerHTML = "";
     state.editingDelayId = null;
     state.editingRiskId = null;
+    state.editingNcrId = null;
+    state.editingActionId = null;
   }
 
   async function loadAll() {
@@ -355,16 +414,27 @@
     }
 
     try {
-      const [delayResult, riskResult] = await Promise.all([
+      const [delayResult, riskResult, ncrResult, actionResult, summaryResult] = await Promise.all([
         window.WSDP_API.request("GET", `/projects/${state.projectId}/delays?limit=100`),
         window.WSDP_API.request("GET", `/projects/${state.projectId}/risks?limit=100`),
+        window.WSDP_API.request("GET", `/projects/${state.projectId}/non-conformities?limit=100`),
+        window.WSDP_API.request("GET", `/projects/${state.projectId}/corrective-actions?limit=100`),
+        window.WSDP_API.request("GET", `/projects/${state.projectId}/risk-delay-summary`).catch(function () {
+          return null;
+        }),
       ]);
 
       state.delays = normalizeResponse(delayResult) || [];
       state.risks = normalizeResponse(riskResult) || [];
+      state.ncrs = normalizeResponse(ncrResult) || [];
+      state.correctiveActions = normalizeResponse(actionResult) || [];
+      state.summary = normalizeResponse(summaryResult) || null;
+      if (Array.isArray(state.summary)) state.summary = state.summary[0] || null;
 
       renderDelays();
       renderRisks();
+      renderNcrs();
+      renderActions();
       renderKpis();
 
       toast("Risk-delay data loaded", "fa-database");
@@ -378,27 +448,29 @@
   function renderProjectMissing() {
     const message = `
       <tr>
-        <td colspan="6" class="risk-delay-empty-cell">
+        <td colspan="7" class="risk-delay-empty-cell">
           No project id found. Login again or ensure the seeded project is assigned to your user.
         </td>
       </tr>
     `;
 
-    getDelayTbody().innerHTML = message;
-    getRiskTbody().innerHTML = message;
+    [getDelayTbody(), getRiskTbody(), getNcrTbody(), getActionTbody()].forEach(function (tbody) {
+      if (tbody) tbody.innerHTML = message;
+    });
   }
 
   function renderLoadError(err) {
     const message = `
       <tr>
-        <td colspan="6" class="risk-delay-empty-cell">
+        <td colspan="7" class="risk-delay-empty-cell">
           ${escapeHtml(err.message || "Failed to load data")}
         </td>
       </tr>
     `;
 
-    getDelayTbody().innerHTML = message;
-    getRiskTbody().innerHTML = message;
+    [getDelayTbody(), getRiskTbody(), getNcrTbody(), getActionTbody()].forEach(function (tbody) {
+      if (tbody) tbody.innerHTML = message;
+    });
   }
 
   function getDelayTbody() {
@@ -406,14 +478,22 @@
   }
 
   function getRiskTbody() {
-    return document.querySelector("#risk-register .col-span-7 .data-table tbody");
+    return document.querySelector("#risk-register .data-table tbody");
+  }
+
+  function getNcrTbody() {
+    return document.querySelector("#ncr-register .data-table tbody");
+  }
+
+  function getActionTbody() {
+    return document.querySelector("#corrective-actions .data-table tbody");
   }
 
   function chipClass(value) {
     const normalized = String(value || "").toLowerCase();
 
     if (["high", "open"].includes(normalized)) return "crit";
-    if (["medium", "in_progress", "mitigated"].includes(normalized)) return "warn";
+    if (["medium", "in_progress", "mitigated", "pending", "action_plan_requested"].includes(normalized)) return "warn";
     return "ok";
   }
 
@@ -421,7 +501,7 @@
     const normalized = String(value || "").toLowerCase();
 
     if (["high", "open"].includes(normalized)) return "fa-circle-exclamation";
-    if (["medium", "in_progress", "mitigated"].includes(normalized)) return "fa-triangle-exclamation";
+    if (["medium", "in_progress", "mitigated", "pending", "action_plan_requested"].includes(normalized)) return "fa-triangle-exclamation";
     return "fa-circle-check";
   }
 
@@ -433,7 +513,7 @@
     if (!state.delays.length) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="6" class="risk-delay-empty-cell">
+          <td colspan="7" class="risk-delay-empty-cell">
             No delay records found. Click <strong>Add Delay</strong> to create one.
           </td>
         </tr>
@@ -442,9 +522,10 @@
     }
 
     tbody.innerHTML = state.delays
-      .map(function (delay) {
+      .map(function (delay, index) {
         return `
           <tr>
+            <td>${index + 1}</td>
             <td>${escapeHtml(delay.reason)}</td>
             <td>${escapeHtml(titleCase(delay.category))}</td>
             <td class="num">${escapeHtml(delay.days_delayed)}</td>
@@ -492,7 +573,7 @@
     if (!state.risks.length) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="5" class="risk-delay-empty-cell">
+          <td colspan="6" class="risk-delay-empty-cell">
             No risks found. Click <strong>Add Risk</strong> to create one.
           </td>
         </tr>
@@ -501,9 +582,10 @@
     }
 
     tbody.innerHTML = state.risks
-      .map(function (risk) {
+      .map(function (risk, index) {
         return `
           <tr>
+            <td>${index + 1}</td>
             <td>${escapeHtml(risk.description)}</td>
             <td>${escapeHtml(titleCase(risk.category))}</td>
             <td>
@@ -542,56 +624,123 @@
     });
   }
 
-  function renderRiskMatrix() {
-    const grid = document.getElementById("riskMatrix");
+  function renderNcrs() {
+    const tbody = getNcrTbody();
 
-    if (!grid) return;
+    if (!tbody) return;
 
-    grid.innerHTML = "";
+    if (!state.ncrs.length) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" class="risk-delay-empty-cell">
+            No non-conformity records found. Click <strong>Add NCR</strong> to create one.
+          </td>
+        </tr>
+      `;
+      return;
+    }
 
-    const levelScore = {
-      low: 1,
-      medium: 3,
-      high: 5,
-    };
+    tbody.innerHTML = state.ncrs
+      .map(function (ncr, index) {
+        return `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHtml(ncr.description)}</td>
+            <td>${escapeHtml(ncr.owner || "—")}</td>
+            <td>
+              <span class="status-chip ${chipClass(ncr.status)}">
+                <i class="fa-solid ${chipIcon(ncr.status)}"></i>
+                ${escapeHtml(titleCase(ncr.status))}
+              </span>
+            </td>
+            <td>
+              <div class="row-actions">
+                <button class="btn-icon-sm" type="button" data-edit-ncr="${ncr.id}" title="Edit NCR">
+                  <i class="fa-solid fa-pen"></i>
+                </button>
+                <button class="btn-icon-sm danger" type="button" data-delete-ncr="${ncr.id}" title="Delete NCR">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      })
+      .join("");
 
-    const counts = new Map();
-
-    state.risks.forEach(function (risk) {
-      const impact = levelScore[risk.impact] || 1;
-      const probability = levelScore[risk.probability] || 1;
-      const key = `${impact}:${probability}`;
-      counts.set(key, (counts.get(key) || 0) + 1);
+    tbody.querySelectorAll("[data-edit-ncr]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const item = state.ncrs.find((n) => n.id === btn.dataset.editNcr);
+        openNcrForm(item);
+      });
     });
 
-    function colorFor(row, col) {
-      const score = row + col;
-
-      if (score <= 2) return "var(--color-success)";
-      if (score <= 5) return "var(--color-warning)";
-      return "var(--color-critical)";
-    }
-
-    for (let r = 4; r >= 0; r--) {
-      for (let c = 0; c < 5; c++) {
-        const impact = r + 1;
-        const probability = c + 1;
-        const key = `${impact}:${probability}`;
-
-        const cell = document.createElement("div");
-        cell.className = "risk-cell";
-        cell.style.background = colorFor(r, c);
-        cell.textContent = counts.get(key) || impact * probability;
-        grid.appendChild(cell);
-      }
-    }
+    tbody.querySelectorAll("[data-delete-ncr]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        deleteNcr(btn.dataset.deleteNcr);
+      });
+    });
   }
 
-  function renderKpis() {
-    const kpiValues = document.querySelectorAll("#delay-analysis .kpi-card__value");
+  function renderActions() {
+    const tbody = getActionTbody();
 
-    if (kpiValues.length < 4) return;
+    if (!tbody) return;
 
+    if (!state.correctiveActions.length) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="4" class="risk-delay-empty-cell">
+            No corrective actions found. Click <strong>Add Action</strong> to create one.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = state.correctiveActions
+      .map(function (action, index) {
+        return `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHtml(action.action)}</td>
+            <td>${escapeHtml(action.owner || "—")}</td>
+            <td>
+              <span class="status-chip ${chipClass(action.status)}">
+                <i class="fa-solid ${chipIcon(action.status)}"></i>
+                ${escapeHtml(titleCase(action.status))}
+              </span>
+            </td>
+            <td>
+              <div class="row-actions">
+                <button class="btn-icon-sm" type="button" data-edit-action="${action.id}" title="Edit action">
+                  <i class="fa-solid fa-pen"></i>
+                </button>
+                <button class="btn-icon-sm danger" type="button" data-delete-action="${action.id}" title="Delete action">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    tbody.querySelectorAll("[data-edit-action]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const item = state.correctiveActions.find((a) => a.id === btn.dataset.editAction);
+        openActionForm(item);
+      });
+    });
+
+    tbody.querySelectorAll("[data-delete-action]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        deleteAction(btn.dataset.deleteAction);
+      });
+    });
+  }
+
+  function computeKpis() {
     const totalSlip = state.delays.reduce(function (sum, delay) {
       return sum + Number(delay.days_delayed || 0);
     }, 0);
@@ -608,10 +757,30 @@
       return Number(delay.days_delayed || 0) >= 10 && delay.status !== "closed";
     }).length;
 
-    kpiValues[0].textContent = `${totalSlip} days`;
-    kpiValues[1].textContent = String(openDelayCount);
-    kpiValues[2].textContent = String(mitigatedCount);
-    kpiValues[3].textContent = String(criticalPathCount);
+    return {
+      projected_slippage_days: totalSlip,
+      open_delay_items: openDelayCount,
+      mitigated_this_quarter: mitigatedCount,
+      on_critical_path: criticalPathCount,
+    };
+  }
+
+  function renderKpis() {
+    const grid = document.getElementById("delayKpiGrid");
+    if (!grid) return;
+
+    const computed = computeKpis();
+    const override = state.summary || {};
+
+    const slippage = override.projected_slippage_days ?? computed.projected_slippage_days;
+    const open = override.open_delay_items ?? computed.open_delay_items;
+    const mitigated = override.mitigated_this_quarter ?? computed.mitigated_this_quarter;
+    const critical = override.on_critical_path ?? computed.on_critical_path;
+
+    grid.querySelector('[data-kpi="slippage"] .kpi-card__value').textContent = `${slippage} days`;
+    grid.querySelector('[data-kpi="open"] .kpi-card__value').textContent = String(open);
+    grid.querySelector('[data-kpi="mitigated"] .kpi-card__value').textContent = String(mitigated);
+    grid.querySelector('[data-kpi="critical"] .kpi-card__value').textContent = String(critical);
   }
 
   function openDelayForm(delay) {
@@ -845,6 +1014,507 @@
     }
   }
 
+  function openNcrForm(ncr) {
+    state.editingNcrId = ncr?.id || null;
+
+    setModal(
+      ncr ? "Edit NCR" : "Add NCR",
+      `
+      <form id="ncrForm">
+        <div class="risk-delay-form-grid">
+          <div class="risk-delay-field full">
+            <label for="ncrDescription">Description</label>
+            <textarea id="ncrDescription" name="description" required minlength="5">${escapeHtml(ncr?.description || "")}</textarea>
+          </div>
+
+          <div class="risk-delay-field">
+            <label for="ncrOwner">Owner</label>
+            <input id="ncrOwner" name="owner" required value="${escapeHtml(ncr?.owner || "")}" />
+          </div>
+
+          <div class="risk-delay-field">
+            <label for="ncrStatus">Status</label>
+            <select id="ncrStatus" name="status">
+              ${optionHtml(ncrStatusOptions, ncr?.status || "open")}
+            </select>
+          </div>
+        </div>
+
+        <div class="risk-delay-modal__footer">
+          <button class="btn-ghost" type="button" id="cancelNcrForm">Cancel</button>
+          <button class="btn-primary" type="submit">
+            <i class="fa-solid fa-floppy-disk"></i> Save NCR
+          </button>
+        </div>
+      </form>
+      `
+    );
+
+    document.getElementById("cancelNcrForm").addEventListener("click", closeModal);
+    document.getElementById("ncrForm").addEventListener("submit", submitNcrForm);
+  }
+
+  async function submitNcrForm(event) {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+
+    const payload = {
+      description: formData.get("description").trim(),
+      owner: formData.get("owner").trim(),
+      status: formData.get("status"),
+    };
+
+    try {
+      if (state.editingNcrId) {
+        await window.WSDP_API.request("PATCH", `/non-conformities/${state.editingNcrId}`, payload);
+        toast("NCR updated successfully");
+      } else {
+        await window.WSDP_API.request("POST", `/projects/${state.projectId}/non-conformities`, payload);
+        toast("NCR created successfully");
+      }
+
+      closeModal();
+      await loadAll();
+    } catch (err) {
+      console.error(err);
+      toast(err.message || "Failed to save NCR", "fa-triangle-exclamation");
+    }
+  }
+
+  async function deleteNcr(id) {
+    const ok = confirm("Delete this non-conformity record?");
+
+    if (!ok) return;
+
+    try {
+      await window.WSDP_API.request("DELETE", `/non-conformities/${id}`);
+      toast("NCR deleted successfully", "fa-trash");
+      await loadAll();
+    } catch (err) {
+      console.error(err);
+      toast(err.message || "Failed to delete NCR", "fa-triangle-exclamation");
+    }
+  }
+
+  function openActionForm(action) {
+    state.editingActionId = action?.id || null;
+
+    setModal(
+      action ? "Edit Corrective Action" : "Add Corrective Action",
+      `
+      <form id="actionForm">
+        <div class="risk-delay-form-grid">
+          <div class="risk-delay-field full">
+            <label for="actionText">Action</label>
+            <textarea id="actionText" name="action" required minlength="5">${escapeHtml(action?.action || "")}</textarea>
+          </div>
+
+          <div class="risk-delay-field">
+            <label for="actionOwner">Owner</label>
+            <input id="actionOwner" name="owner" required value="${escapeHtml(action?.owner || "")}" />
+          </div>
+
+          <div class="risk-delay-field">
+            <label for="actionStatus">Status</label>
+            <select id="actionStatus" name="status">
+              ${optionHtml(actionStatusOptions, action?.status || "pending")}
+            </select>
+          </div>
+        </div>
+
+        <div class="risk-delay-modal__footer">
+          <button class="btn-ghost" type="button" id="cancelActionForm">Cancel</button>
+          <button class="btn-primary" type="submit">
+            <i class="fa-solid fa-floppy-disk"></i> Save Action
+          </button>
+        </div>
+      </form>
+      `
+    );
+
+    document.getElementById("cancelActionForm").addEventListener("click", closeModal);
+    document.getElementById("actionForm").addEventListener("submit", submitActionForm);
+  }
+
+  async function submitActionForm(event) {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+
+    const payload = {
+      action: formData.get("action").trim(),
+      owner: formData.get("owner").trim(),
+      status: formData.get("status"),
+    };
+
+    try {
+      if (state.editingActionId) {
+        await window.WSDP_API.request("PATCH", `/corrective-actions/${state.editingActionId}`, payload);
+        toast("Corrective action updated successfully");
+      } else {
+        await window.WSDP_API.request("POST", `/projects/${state.projectId}/corrective-actions`, payload);
+        toast("Corrective action created successfully");
+      }
+
+      closeModal();
+      await loadAll();
+    } catch (err) {
+      console.error(err);
+      toast(err.message || "Failed to save corrective action", "fa-triangle-exclamation");
+    }
+  }
+
+  async function deleteAction(id) {
+    const ok = confirm("Delete this corrective action?");
+
+    if (!ok) return;
+
+    try {
+      await window.WSDP_API.request("DELETE", `/corrective-actions/${id}`);
+      toast("Corrective action deleted successfully", "fa-trash");
+      await loadAll();
+    } catch (err) {
+      console.error(err);
+      toast(err.message || "Failed to delete corrective action", "fa-triangle-exclamation");
+    }
+  }
+
+  function openSummaryForm() {
+    const computed = computeKpis();
+    const override = state.summary || {};
+
+    setModal(
+      "Update Summary Cards",
+      `
+      <form id="summaryForm">
+        <p class="risk-delay-field full" style="margin:0 0 4px;">
+          <small class="hint">Leave a field blank to auto-calculate it from delay records instead of a fixed value.</small>
+        </p>
+        <div class="risk-delay-form-grid">
+          <div class="risk-delay-field">
+            <label for="summarySlippage">Projected Slippage (days)</label>
+            <input id="summarySlippage" name="projected_slippage_days" type="number" min="0"
+              placeholder="Auto: ${computed.projected_slippage_days}"
+              value="${override.projected_slippage_days ?? ""}" />
+          </div>
+          <div class="risk-delay-field">
+            <label for="summaryOpen">Open Delay Items</label>
+            <input id="summaryOpen" name="open_delay_items" type="number" min="0"
+              placeholder="Auto: ${computed.open_delay_items}"
+              value="${override.open_delay_items ?? ""}" />
+          </div>
+          <div class="risk-delay-field">
+            <label for="summaryMitigated">Mitigated This Quarter</label>
+            <input id="summaryMitigated" name="mitigated_this_quarter" type="number" min="0"
+              placeholder="Auto: ${computed.mitigated_this_quarter}"
+              value="${override.mitigated_this_quarter ?? ""}" />
+          </div>
+          <div class="risk-delay-field">
+            <label for="summaryCritical">On Critical Path</label>
+            <input id="summaryCritical" name="on_critical_path" type="number" min="0"
+              placeholder="Auto: ${computed.on_critical_path}"
+              value="${override.on_critical_path ?? ""}" />
+          </div>
+        </div>
+
+        <div class="risk-delay-modal__footer">
+          <button class="btn-ghost" type="button" id="resetSummaryForm">Reset to Auto-Calculated</button>
+          <button class="btn-primary" type="submit">
+            <i class="fa-solid fa-floppy-disk"></i> Save
+          </button>
+        </div>
+      </form>
+      `
+    );
+
+    document.getElementById("summaryForm").addEventListener("submit", submitSummaryForm);
+    document.getElementById("resetSummaryForm").addEventListener("click", async function () {
+      await saveSummary({
+        projected_slippage_days: null,
+        open_delay_items: null,
+        mitigated_this_quarter: null,
+        on_critical_path: null,
+      });
+    });
+  }
+
+  async function submitSummaryForm(event) {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+
+    function parseOrNull(name) {
+      const raw = formData.get(name);
+      if (raw === null || String(raw).trim() === "") return null;
+      return Number(raw);
+    }
+
+    await saveSummary({
+      projected_slippage_days: parseOrNull("projected_slippage_days"),
+      open_delay_items: parseOrNull("open_delay_items"),
+      mitigated_this_quarter: parseOrNull("mitigated_this_quarter"),
+      on_critical_path: parseOrNull("on_critical_path"),
+    });
+  }
+
+  async function saveSummary(payload) {
+    try {
+      await window.WSDP_API.request(
+        "PUT",
+        `/projects/${state.projectId}/risk-delay-summary`,
+        payload
+      );
+      toast("Summary cards updated successfully");
+      closeModal();
+      await loadAll();
+    } catch (err) {
+      console.error(err);
+      toast(err.message || "Failed to update summary cards", "fa-triangle-exclamation");
+    }
+  }
+
+  /* ---------------------------------------------------------------
+     EXPORT — snapshots the module's current tables/cards into a PDF
+     using html2canvas + jsPDF (loaded via CDN in risk-delay.html).
+     --------------------------------------------------------------- */
+
+  function wireExportImportButtons() {
+    const exportBtn = document.getElementById("exportRiskDelayBtn");
+    const importBtn = document.getElementById("importRiskDelayBtn");
+    const importInput = document.getElementById("riskDelayImportFile");
+
+    if (exportBtn && !exportBtn.dataset.wired) {
+      exportBtn.dataset.wired = "true";
+      exportBtn.addEventListener("click", exportRiskDelayPdf);
+    }
+
+    if (importBtn && importInput && !importBtn.dataset.wired) {
+      importBtn.dataset.wired = "true";
+      importBtn.addEventListener("click", function () {
+        importInput.value = "";
+        importInput.click();
+      });
+      importInput.addEventListener("change", function (event) {
+        const file = event.target.files?.[0];
+        if (file) openImportForm(file);
+      });
+    }
+  }
+
+  async function exportRiskDelayPdf() {
+    if (!window.html2canvas || !window.jspdf) {
+      toast("Export libraries failed to load. Check your internet connection.", "fa-triangle-exclamation");
+      return;
+    }
+
+    const target = document.querySelector("main.main-content");
+    if (!target) return;
+
+    toast("Preparing PDF export…", "fa-file-pdf");
+
+    try {
+      const canvas = await window.html2canvas(target, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF("p", "pt", "a4");
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+      const imgData = canvas.toDataURL("image/png");
+
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+      pdf.save(`Delay-Analysis-Risk-Register-${dateStr}.pdf`);
+
+      toast("Export complete", "fa-circle-check");
+    } catch (err) {
+      console.error(err);
+      toast("Failed to export PDF", "fa-triangle-exclamation");
+    }
+  }
+
+  /* ---------------------------------------------------------------
+     IMPORT — parses an uploaded .csv/.xlsx file with SheetJS and
+     bulk-creates records in the table the user selects.
+     --------------------------------------------------------------- */
+
+  const importTargets = {
+    delay: {
+      label: "Delay Analysis",
+      endpoint: () => `/projects/${state.projectId}/delays`,
+      columns: "reason, category, days_delayed, root_cause, mitigation_plan, status",
+      mapRow: (row) => ({
+        reason: String(row.reason || row["Delay Item"] || "").trim(),
+        category: String(row.category || row.Category || "general").toLowerCase(),
+        days_delayed: Number(row.days_delayed || row["Impact (days)"] || 0),
+        root_cause: row.root_cause || row["Root Cause"] || undefined,
+        mitigation_plan: row.mitigation_plan || row["Mitigation Plan"] || undefined,
+        status: String(row.status || row.Status || "open").toLowerCase(),
+      }),
+    },
+    risk: {
+      label: "Risk Register",
+      endpoint: () => `/projects/${state.projectId}/risks`,
+      columns: "description, category, probability, impact, status, owner_name, identified_date",
+      mapRow: (row) => ({
+        description: String(row.description || row.Risk || "").trim(),
+        category: String(row.category || row.Category || "general").toLowerCase(),
+        probability: String(row.probability || "medium").toLowerCase(),
+        impact: String(row.impact || row.Rating || "medium").toLowerCase(),
+        status: String(row.status || "open").toLowerCase(),
+        owner_name: row.owner_name || row.Owner || undefined,
+        identified_date:
+          row.identified_date || new Date().toISOString().slice(0, 10),
+      }),
+    },
+    ncr: {
+      label: "Non-Conformity Register",
+      endpoint: () => `/projects/${state.projectId}/non-conformities`,
+      columns: "description, owner, status",
+      mapRow: (row) => ({
+        description: String(row.description || row.Description || "").trim(),
+        owner: String(row.owner || row.Owner || "").trim(),
+        status: String(row.status || row.Status || "open").toLowerCase().replace(/\s+/g, "_"),
+      }),
+    },
+    action: {
+      label: "Corrective Actions Tracker",
+      endpoint: () => `/projects/${state.projectId}/corrective-actions`,
+      columns: "action, owner, status",
+      mapRow: (row) => ({
+        action: String(row.action || row.Action || "").trim(),
+        owner: String(row.owner || row.Owner || "").trim(),
+        status: String(row.status || row.Status || "pending").toLowerCase().replace(/\s+/g, "_"),
+      }),
+    },
+  };
+
+  function openImportForm(file) {
+    if (!window.XLSX) {
+      toast("Import library failed to load. Check your internet connection.", "fa-triangle-exclamation");
+      return;
+    }
+
+    setModal(
+      "Import Data",
+      `
+      <form id="importForm">
+        <p class="risk-delay-field full" style="margin:0 0 10px;">
+          File: <strong>${escapeHtml(file.name)}</strong>
+        </p>
+        <div class="risk-delay-field full">
+          <label>Import into</label>
+          <div class="import-target-list">
+            <label><input type="radio" name="importTarget" value="delay" checked /> Delay Analysis <small class="hint">(${importTargets.delay.columns})</small></label>
+            <label><input type="radio" name="importTarget" value="risk" /> Risk Register <small class="hint">(${importTargets.risk.columns})</small></label>
+            <label><input type="radio" name="importTarget" value="ncr" /> Non-Conformity Register <small class="hint">(${importTargets.ncr.columns})</small></label>
+            <label><input type="radio" name="importTarget" value="action" /> Corrective Actions Tracker <small class="hint">(${importTargets.action.columns})</small></label>
+          </div>
+        </div>
+        <p class="risk-delay-field full">
+          <small class="hint">The first row of the sheet must contain column headers matching the field names above (Sno / # columns are ignored).</small>
+        </p>
+        <div class="risk-delay-modal__footer">
+          <button class="btn-ghost" type="button" id="cancelImportForm">Cancel</button>
+          <button class="btn-primary" type="submit">
+            <i class="fa-solid fa-upload"></i> Import
+          </button>
+        </div>
+      </form>
+      `
+    );
+
+    document.getElementById("cancelImportForm").addEventListener("click", closeModal);
+    document.getElementById("importForm").addEventListener("submit", function (event) {
+      event.preventDefault();
+      const targetKey = new FormData(event.currentTarget).get("importTarget");
+      runImport(file, targetKey);
+    });
+  }
+
+  function readWorkbookRows(file) {
+    return new Promise(function (resolve, reject) {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = window.XLSX.read(data, { type: "array" });
+          const firstSheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[firstSheetName];
+          const rows = window.XLSX.utils.sheet_to_json(sheet, { defval: "" });
+          resolve(rows);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  async function runImport(file, targetKey) {
+    const target = importTargets[targetKey];
+    if (!target) return;
+
+    try {
+      const rows = await readWorkbookRows(file);
+
+      if (!rows.length) {
+        toast("No rows found in the uploaded file", "fa-triangle-exclamation");
+        return;
+      }
+
+      closeModal();
+      toast(`Importing ${rows.length} row(s) into ${target.label}…`, "fa-upload");
+
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const row of rows) {
+        try {
+          const payload = target.mapRow(row);
+          await window.WSDP_API.request("POST", target.endpoint(), payload);
+          successCount++;
+        } catch (err) {
+          console.error("Import row failed", row, err);
+          failCount++;
+        }
+      }
+
+      toast(
+        `Import finished: ${successCount} succeeded, ${failCount} failed`,
+        failCount ? "fa-triangle-exclamation" : "fa-circle-check"
+      );
+
+      await loadAll();
+    } catch (err) {
+      console.error(err);
+      toast(err.message || "Failed to parse the import file", "fa-triangle-exclamation");
+    }
+  }
+
   function boot() {
     if (!window.WSDP_API) {
       console.error("WSDP_API is not available. Load js/api.js before js/risk-delay.js.");
@@ -867,3 +1537,16 @@
 
   document.addEventListener("DOMContentLoaded", boot);
 })();
+
+  function resolveProjectId() {
+    const stored = readProjectIdFromStorage();
+    if (stored) return stored;
+
+    const payload = getTokenPayload();
+
+    if (payload?.project_ids?.length) {
+      return payload.project_ids[0];
+    }
+
+    return null;
+  }
