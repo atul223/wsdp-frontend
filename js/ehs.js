@@ -3,16 +3,42 @@
    Load AFTER api.js, i18n.js, shell.js, main.js, charts.js and
    the jsPDF / html2canvas CDN scripts, BEFORE </body>.
 
-   *** CONFIG: confirm/adjust PROJECT_ID resolution to match how
-   the rest of your app already stores/exposes the active
-   project id (e.g. if you have a global like window.WSDP_PROJECT
-   or a project switcher, wire that in here instead). ***
+   ------------------------------------------------------------
+   v2 fixes:
+   1. resolveProjectId() now reads the SAME source every other
+      module already uses: localStorage.current_project (a JSON
+      string with an `id` field) — confirmed via console dump.
+   2. Backend routing fix: all EHS routers are mounted at
+      '/api/v1/ehs' in app.js. Endpoints come in two shapes:
+        - project-nested   -> /ehs/projects/:projectId/<resource>
+                               (list + create)
+        - id-addressed      -> /ehs/<resource>/:id
+                               (get one / update / delete)
+      p()  builds the first shape.
+      pid() builds the second shape.
+      Mixing these up (as v1 did for the by-id calls) causes
+      404s on every Edit/Delete/Save action.
    ============================================================ */
 (function () {
   "use strict";
 
   function resolveProjectId() {
+    // 1) Explicit global, if some page sets it directly.
     if (window.WSDP_PROJECT_ID) return window.WSDP_PROJECT_ID;
+
+    // 2) The convention actually used across this app:
+    //    localStorage.current_project = '{"id":"...","name":"...",...}'
+    try {
+      const raw = localStorage.getItem("current_project");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.id) return parsed.id;
+      }
+    } catch (e) {
+      /* ignore malformed JSON */
+    }
+
+    // 3) Fallbacks kept for safety / future-proofing.
     try {
       const stored = sessionStorage.getItem("wsdp_project_id");
       if (stored) return stored;
@@ -28,8 +54,22 @@
   const PROJECT_ID = resolveProjectId();
   const api = window.WSDP_API;
 
+  // All EHS routers are mounted at '/api/v1/ehs' in app.js (same prefix
+  // as the pre-existing ehsIncidentRoutes / ehsInspectionRoutes) — see
+  // note at top of file.
+  const EHS_BASE = "/ehs";
+
+  /** Project-nested endpoints: list + create.
+   *  e.g. p("/ehs-incident-summary") -> /ehs/projects/:projectId/ehs-incident-summary */
   function p(path) {
-    return `/projects/${PROJECT_ID}${path}`;
+    return `${EHS_BASE}/projects/${PROJECT_ID}${path}`;
+  }
+
+  /** Id-addressed endpoints: get one / update / delete (NOT nested under
+   *  /projects/:projectId/).
+   *  e.g. pid("/ehs-incident-summary/abc123") -> /ehs/ehs-incident-summary/abc123 */
+  function pid(path) {
+    return `${EHS_BASE}${path}`;
   }
 
   // ------------------------------------------------------------------
@@ -381,9 +421,11 @@
       ],
       onSave: async (values) => {
         if (existing) {
-          await api.request("PATCH", p(`${cfg.byIdPath}/${existing.id}`), values);
+          // id-addressed endpoint -> pid(), NOT nested under /projects/:id/
+          await api.request("PATCH", pid(`${cfg.byIdPath}/${existing.id}`), values);
           toast(`${cfg.label} updated.`);
         } else {
+          // list/create endpoint -> project-nested -> p()
           await api.request("POST", p(cfg.path), values);
           toast(`${cfg.label} added.`);
         }
@@ -391,7 +433,7 @@
       },
       onDelete: existing
         ? async () => {
-            await api.request("DELETE", p(`${cfg.byIdPath}/${existing.id}`));
+            await api.request("DELETE", pid(`${cfg.byIdPath}/${existing.id}`));
             toast(`${cfg.label} deleted.`);
             await loadSummaryTable(kind);
           }
@@ -490,9 +532,11 @@
       ],
       onSave: async (values) => {
         if (existing) {
-          await api.request("PATCH", p(`/ehs-resource-consumption/${existing.id}`), values);
+          // id-addressed endpoint -> pid()
+          await api.request("PATCH", pid(`/ehs-resource-consumption/${existing.id}`), values);
           toast("Resource consumption row updated.");
         } else {
+          // list/create endpoint -> project-nested -> p()
           await api.request("POST", p("/ehs-resource-consumption"), values);
           toast("Resource consumption row added.");
         }
@@ -500,7 +544,7 @@
       },
       onDelete: existing
         ? async () => {
-            await api.request("DELETE", p(`/ehs-resource-consumption/${existing.id}`));
+            await api.request("DELETE", pid(`/ehs-resource-consumption/${existing.id}`));
             toast("Row deleted.");
             await loadResourceConsumption();
           }
@@ -645,16 +689,11 @@
       const action = btn.dataset.action;
       const id = btn.dataset.id;
 
-      if (action === "edit") {
+      if (action === "edit" || action === "delete") {
         const kind = btn.dataset.kind;
         const rows = kind === "incident_summary" ? state.incidentSummary : state.nonConformitySummary;
         const existing = rows.find((r) => r.id === id);
-        openSummaryItemModal(kind, existing);
-      } else if (action === "delete") {
-        const kind = btn.dataset.kind;
-        const rows = kind === "incident_summary" ? state.incidentSummary : state.nonConformitySummary;
-        const existing = rows.find((r) => r.id === id);
-        openSummaryItemModal(kind, existing); // opens with delete button available
+        openSummaryItemModal(kind, existing); // modal includes Delete button when `existing` is passed
       } else if (action === "edit-resource" || action === "delete-resource") {
         const existing = state.resourceConsumption.find((r) => r.id === id);
         openResourceModal(existing);
@@ -683,8 +722,13 @@
   // Init
   // ------------------------------------------------------------------
   async function init() {
+    // Buttons (Add/Export/Import) work independently of data having
+    // loaded, so wire them up FIRST — a failed/blocked data load should
+    // never leave the whole UI inert.
+    wireRowActions();
+
     if (!PROJECT_ID) {
-      console.error("EHS: no project id resolved — check resolveProjectId() CONFIG at the top of js/ehs.js");
+      console.error("EHS: no project id resolved — check resolveProjectId() at the top of js/ehs.js");
       toast("Could not determine the active project. EHS data will not load.", true);
       return;
     }
@@ -692,8 +736,6 @@
       console.error("EHS: window.WSDP_API is not available — make sure js/api.js loads before js/ehs.js");
       return;
     }
-
-    wireRowActions();
 
     try {
       await Promise.all([
