@@ -4,6 +4,17 @@
    Also uses (loaded via CDN in risk-delay.html):
      - html2canvas + jsPDF  -> Export button
      - SheetJS (XLSX)       -> Import button
+
+   v2 fixes (see chat for full explanation):
+     - resolveProjectId() is now async and defensively wrapped so a
+       resolution failure never throws uncaught and never leaves
+       state.projectId as null/undefined when a fallback exists.
+     - Added a fallback: if no project id is found in localStorage /
+       JWT, it calls GET /projects and uses the first project the
+       user has access to, then caches it for next time.
+     - Add/Update buttons are now inserted directly above their
+       respective tables (inside the same card), not in the outer
+       section heading.
    ============================================================ */
 
 (function () {
@@ -173,73 +184,154 @@
     return null;
   }
 
+  function cacheProjectId(id) {
+    try {
+      if (id) localStorage.setItem("current_project_id", id);
+    } catch (e) {
+      /* localStorage unavailable — non-fatal, just skip caching */
+    }
+  }
+
+  /**
+   * Resolves the current project id, in order of preference:
+   *   1. localStorage (common keys used across other WSDP modules)
+   *   2. the JWT access token payload (project_ids[0])
+   *   3. GET /projects — first project the logged-in user can access
+   * Never throws — always resolves to a string id or null so callers
+   * can safely check `if (!projectId)` instead of needing try/catch.
+   */
+  async function resolveProjectId() {
+    try {
+      const stored = readProjectIdFromStorage();
+      if (stored) return stored;
+    } catch (e) {
+      console.warn("readProjectIdFromStorage failed, continuing to fallback", e);
+    }
+
+    try {
+      const payload = getTokenPayload();
+      if (payload?.project_ids?.length) {
+        cacheProjectId(payload.project_ids[0]);
+        return payload.project_ids[0];
+      }
+    } catch (e) {
+      console.warn("Reading project id from token failed, continuing to fallback", e);
+    }
+
+    try {
+      const result = await window.WSDP_API.request("GET", "/projects?limit=1");
+      const projects = normalizeResponse(result) || [];
+      const first = projects[0];
+      const id = first?.id || first?.project_id || null;
+      if (id) {
+        cacheProjectId(id);
+        return id;
+      }
+    } catch (e) {
+      console.warn("Fallback GET /projects lookup failed", e);
+    }
+
+    return null;
+  }
+
+  /**
+   * Inserts a small flex toolbar as the FIRST child of `cardEl` (i.e.
+   * directly above the table inside that same card) containing the
+   * given buttons. Reuses an existing `.card-header` if the card
+   * already has one (e.g. Risk Register's "Top Risks" card) instead
+   * of creating a duplicate header bar.
+   */
+  function mountToolbar(cardEl, toolbarId, buttonsHtml) {
+    if (!cardEl || document.getElementById(toolbarId)) return null;
+
+    const existingHeader = Array.from(cardEl.children).find(
+      (child) => child.classList && child.classList.contains("card-header")
+    );
+
+    if (existingHeader) {
+      const wrap = document.createElement("div");
+      wrap.id = toolbarId;
+      wrap.className = "table-toolbar-inline";
+      wrap.innerHTML = buttonsHtml;
+      existingHeader.appendChild(wrap);
+      return wrap;
+    }
+
+    const toolbar = document.createElement("div");
+    toolbar.id = toolbarId;
+    toolbar.className = "card-header table-toolbar";
+    toolbar.innerHTML = buttonsHtml;
+    cardEl.insertBefore(toolbar, cardEl.firstChild);
+    return toolbar;
+  }
+
   function ensureUiEnhancements() {
     const delaySection = document.getElementById("delay-analysis");
     const riskSection = document.getElementById("risk-register");
     const ncrSection = document.getElementById("ncr-register");
     const actionSection = document.getElementById("corrective-actions");
 
-    const delayHeading = delaySection?.querySelector(".section-heading");
-    const riskHeading = riskSection?.querySelector(".section-heading");
-    const ncrHeading = ncrSection?.querySelector(".section-heading");
-    const actionHeading = actionSection?.querySelector(".section-heading");
-
-    if (delayHeading && !document.getElementById("addDelayBtn")) {
-      const btn = document.createElement("button");
-      btn.className = "btn-primary";
-      btn.id = "addDelayBtn";
-      btn.type = "button";
-      btn.innerHTML = `<i class="fa-solid fa-plus"></i> Add Delay`;
-      delayHeading.appendChild(btn);
-      btn.addEventListener("click", function () {
-        openDelayForm();
-      });
+    // The delay table's wrapping card is the one that directly
+    // contains a .data-table (there can be more than one .card in
+    // the section because of the KPI cards grid, so scope carefully).
+    // NOTE: intentionally avoiding the CSS `:has()` selector here —
+    // it throws a SyntaxError (not just "no match") in browsers that
+    // don't support it yet, which would break this whole function.
+    function findCardWithTable(section) {
+      if (!section) return null;
+      const cards = Array.from(section.querySelectorAll(".card"));
+      return cards.find((c) => c.querySelector(".data-table")) || null;
     }
 
-    if (delayHeading && !document.getElementById("editSummaryBtn")) {
-      const btn = document.createElement("button");
-      btn.className = "btn-ghost";
-      btn.id = "editSummaryBtn";
-      btn.type = "button";
-      btn.innerHTML = `<i class="fa-solid fa-gauge-high"></i> Update Summary Cards`;
-      delayHeading.appendChild(btn);
-      btn.addEventListener("click", function () {
+    const delayCard = findCardWithTable(delaySection);
+    const riskCard = findCardWithTable(riskSection);
+    const ncrCard = ncrSection?.querySelector(".card");
+    const actionCard = actionSection?.querySelector(".card");
+
+    if (delayCard && !document.getElementById("delayTableToolbar")) {
+      mountToolbar(
+        delayCard,
+        "delayTableToolbar",
+        `<button class="btn-ghost" type="button" id="editSummaryBtn"><i class="fa-solid fa-gauge-high"></i> Update Summary Cards</button>
+         <button class="btn-primary" type="button" id="addDelayBtn"><i class="fa-solid fa-plus"></i> Add Delay</button>`
+      );
+      document.getElementById("addDelayBtn").addEventListener("click", function () {
+        openDelayForm();
+      });
+      document.getElementById("editSummaryBtn").addEventListener("click", function () {
         openSummaryForm();
       });
     }
 
-    if (riskHeading && !document.getElementById("addRiskBtn")) {
-      const btn = document.createElement("button");
-      btn.className = "btn-primary";
-      btn.id = "addRiskBtn";
-      btn.type = "button";
-      btn.innerHTML = `<i class="fa-solid fa-plus"></i> Add Risk`;
-      riskHeading.appendChild(btn);
-      btn.addEventListener("click", function () {
+    if (riskCard && !document.getElementById("addRiskBtn")) {
+      mountToolbar(
+        riskCard,
+        "riskTableToolbar",
+        `<button class="btn-primary" type="button" id="addRiskBtn"><i class="fa-solid fa-plus"></i> Add Risk</button>`
+      );
+      document.getElementById("addRiskBtn").addEventListener("click", function () {
         openRiskForm();
       });
     }
 
-    if (ncrHeading && !document.getElementById("addNcrBtn")) {
-      const btn = document.createElement("button");
-      btn.className = "btn-primary";
-      btn.id = "addNcrBtn";
-      btn.type = "button";
-      btn.innerHTML = `<i class="fa-solid fa-plus"></i> Add NCR`;
-      ncrHeading.appendChild(btn);
-      btn.addEventListener("click", function () {
+    if (ncrCard && !document.getElementById("addNcrBtn")) {
+      mountToolbar(
+        ncrCard,
+        "ncrTableToolbar",
+        `<button class="btn-primary" type="button" id="addNcrBtn"><i class="fa-solid fa-plus"></i> Add NCR</button>`
+      );
+      document.getElementById("addNcrBtn").addEventListener("click", function () {
         openNcrForm();
       });
     }
 
-    if (actionHeading && !document.getElementById("addActionBtn")) {
-      const btn = document.createElement("button");
-      btn.className = "btn-primary";
-      btn.id = "addActionBtn";
-      btn.type = "button";
-      btn.innerHTML = `<i class="fa-solid fa-plus"></i> Add Action`;
-      actionHeading.appendChild(btn);
-      btn.addEventListener("click", function () {
+    if (actionCard && !document.getElementById("addActionBtn")) {
+      mountToolbar(
+        actionCard,
+        "actionTableToolbar",
+        `<button class="btn-primary" type="button" id="addActionBtn"><i class="fa-solid fa-plus"></i> Add Action</button>`
+      );
+      document.getElementById("addActionBtn").addEventListener("click", function () {
         openActionForm();
       });
     }
@@ -280,7 +372,22 @@
       }
       .btn-icon-sm:hover { background: rgba(0,0,0,0.04); }
       .btn-icon-sm.danger { color: var(--color-critical, #C0392B); }
-      .section-heading { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+      .table-toolbar {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border-color, #E3E7EB);
+        flex-wrap: wrap;
+      }
+      .table-toolbar-inline {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-left: auto;
+        flex-wrap: wrap;
+      }
       .risk-delay-modal-backdrop {
         position: fixed; inset: 0; z-index: 100;
         background: rgba(16, 30, 54, 0.45);
@@ -354,6 +461,8 @@
       .import-target-list input { width: auto; }
       @media (max-width: 720px) {
         .risk-delay-form-grid { grid-template-columns: 1fr; }
+        .table-toolbar { justify-content: stretch; }
+        .table-toolbar button { flex: 1; }
       }
     `;
 
@@ -406,10 +515,19 @@
   async function loadAll() {
     ensureUiEnhancements();
 
-    state.projectId = resolveProjectId();
+    try {
+      state.projectId = await resolveProjectId();
+    } catch (err) {
+      // resolveProjectId() is designed to never throw, but guard
+      // anyway so a future change there can't take down the whole
+      // module again the way the earlier bug did.
+      console.error("Unexpected error resolving project id", err);
+      state.projectId = null;
+    }
 
     if (!state.projectId) {
       renderProjectMissing();
+      toast("Could not determine your current project. Please re-login.", "fa-triangle-exclamation");
       return;
     }
 
@@ -1537,16 +1655,3 @@
 
   document.addEventListener("DOMContentLoaded", boot);
 })();
-
-  function resolveProjectId() {
-    const stored = readProjectIdFromStorage();
-    if (stored) return stored;
-
-    const payload = getTokenPayload();
-
-    if (payload?.project_ids?.length) {
-      return payload.project_ids[0];
-    }
-
-    return null;
-  }

@@ -256,6 +256,12 @@
 <script src="js/i18n.js"></script>
 <script src="js/shell.js"></script>
 <script src="js/main.js"></script>
-<script src="js/risk-delay.js"></script>
+<!--
+  Cache-busting query param: bump this (v=3, v=4, ...) every time you
+  redeploy risk-delay.js. Cloudflare/browsers can otherwise keep
+  serving a stale cached copy of this file after a deploy, which can
+  reintroduce fixed bugs without any code actually being wrong.
+-->
+<script src="js/risk-delay.js?v=2"></script>
 </body>
 </html>
