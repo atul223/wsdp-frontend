@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -137,6 +136,11 @@
     color: var(--color-critical);
   }
 
+  .table-action-btn.confirm:hover {
+    border-color: #2e7d32;
+    color: #2e7d32;
+  }
+
   .status-chip {
     display: inline-flex;
     align-items: center;
@@ -169,6 +173,33 @@
     color: var(--text-muted);
     padding: 22px;
     font-size: 13px;
+  }
+
+  .table-sno-col {
+    width: 56px;
+    white-space: nowrap;
+  }
+
+  .inline-edit-input,
+  .inline-edit-select {
+    width: 100%;
+    min-width: 120px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font: inherit;
+    font-size: 12px;
+  }
+
+  .library-section-heading {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
   }
 
   @media (max-width: 900px) {
@@ -355,6 +386,7 @@
           <table class="data-table">
             <thead>
               <tr>
+                <th scope="col" class="table-sno-col">S.No</th>
                 <th scope="col">Report</th>
                 <th scope="col">Period</th>
                 <th scope="col">Module</th>
@@ -366,7 +398,7 @@
 
             <tbody id="reportsTableBody">
               <tr>
-                <td colspan="6" class="table-empty-message">Loading reports…</td>
+                <td colspan="7" class="table-empty-message">Loading reports…</td>
               </tr>
             </tbody>
           </table>
@@ -374,9 +406,15 @@
       </div>
 
       <div class="reports-library-section">
-        <div class="section-heading">
-          <h2>Periodic Reports</h2>
-          <span class="section-sub">Formal periodic deliverables linked with the project</span>
+        <div class="library-section-heading">
+          <div class="section-heading" style="margin-bottom:0;">
+            <h2>Periodic Reports</h2>
+            <span class="section-sub">Formal periodic deliverables linked with the project</span>
+          </div>
+
+          <button class="reports-action-btn" type="button" id="addPeriodicReportBtn">
+            <i class="fa-solid fa-plus"></i> Add Periodic Report
+          </button>
         </div>
 
         <div class="card">
@@ -384,15 +422,17 @@
             <table class="data-table">
               <thead>
                 <tr>
+                  <th scope="col" class="table-sno-col">S.No</th>
                   <th scope="col">Document</th>
                   <th scope="col">Latest Issue</th>
                   <th scope="col">Status</th>
+                  <th scope="col" style="text-align:right;">Actions</th>
                 </tr>
               </thead>
 
               <tbody id="periodicReportsTableBody">
                 <tr>
-                  <td colspan="3" class="table-empty-message">Loading periodic reports...</td>
+                  <td colspan="5" class="table-empty-message">Loading periodic reports...</td>
                 </tr>
               </tbody>
             </table>
@@ -401,36 +441,15 @@
       </div>
 
       <div class="reports-library-section">
-        <div class="section-heading">
-          <h2>IPCs</h2>
-          <span class="section-sub">Interim payment certificates and submission status</span>
-        </div>
-
-        <div class="card">
-          <div class="card-body table-scroll">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th scope="col">IPC</th>
-                  <th scope="col">Date</th>
-                  <th scope="col">Status</th>
-                </tr>
-              </thead>
-
-              <tbody id="ipcsTableBody">
-                <tr>
-                  <td colspan="3" class="table-empty-message">Loading IPCs...</td>
-                </tr>
-              </tbody>
-            </table>
+        <div class="library-section-heading">
+          <div class="section-heading" style="margin-bottom:0;">
+            <h2>Method Statements</h2>
+            <span class="section-sub">Approved and pending method statements for construction activities</span>
           </div>
-        </div>
-      </div>
 
-      <div class="reports-library-section">
-        <div class="section-heading">
-          <h2>Amendments</h2>
-          <span class="section-sub">Contract amendments and related technical notes</span>
+          <button class="reports-action-btn" type="button" id="addMethodStatementBtn">
+            <i class="fa-solid fa-plus"></i> Add Method Statement
+          </button>
         </div>
 
         <div class="card">
@@ -438,42 +457,17 @@
             <table class="data-table">
               <thead>
                 <tr>
-                  <th scope="col">Amendment</th>
-                  <th scope="col">Subject</th>
-                  <th scope="col">Status</th>
-                </tr>
-              </thead>
-
-              <tbody id="amendmentsTableBody">
-                <tr>
-                  <td colspan="3" class="table-empty-message">Loading amendments...</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div class="reports-library-section">
-        <div class="section-heading">
-          <h2>Method Statements</h2>
-          <span class="section-sub">Approved and pending method statements for construction activities</span>
-        </div>
-
-        <div class="card">
-          <div class="card-body table-scroll">
-            <table class="data-table">
-              <thead>
-                <tr>
+                  <th scope="col" class="table-sno-col">S.No</th>
                   <th scope="col">Method Statement</th>
                   <th scope="col">Date</th>
                   <th scope="col">Status</th>
+                  <th scope="col" style="text-align:right;">Actions</th>
                 </tr>
               </thead>
 
               <tbody id="methodStatementsTableBody">
                 <tr>
-                  <td colspan="3" class="table-empty-message">Loading method statements...</td>
+                  <td colspan="5" class="table-empty-message">Loading method statements...</td>
                 </tr>
               </tbody>
             </table>

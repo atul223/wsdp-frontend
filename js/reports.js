@@ -14,13 +14,22 @@
   let reports = [];
 
   let periodicReports = [];
-  let ipcs = [];
-  let amendments = [];
   let methodStatements = [];
+
+  // "new" => an empty add-row is being shown at the top of the table.
+  // any other string => the id of the row currently being edited in place.
+  // null => no row is being added/edited.
+  let periodicEditingId = null;
+  let methodEditingId = null;
+
+  let periodicSaving = false;
+  let methodSaving = false;
 
   let initialized = false;
   let importInProgress = false;
 
+  const PERIODIC_STATUS_OPTIONS = ["draft", "pending", "issued", "approved", "archived"];
+  const METHOD_STATUS_OPTIONS = ["pending", "approved", "archived"];
 
   const els = {};
 
@@ -29,9 +38,10 @@
     els.tableBody = document.getElementById("reportsTableBody");
 
     els.periodicReportsTableBody = document.getElementById("periodicReportsTableBody");
-    els.ipcsTableBody = document.getElementById("ipcsTableBody");
-    els.amendmentsTableBody = document.getElementById("amendmentsTableBody");
     els.methodStatementsTableBody = document.getElementById("methodStatementsTableBody");
+
+    els.addPeriodicReportBtn = document.getElementById("addPeriodicReportBtn");
+    els.addMethodStatementBtn = document.getElementById("addMethodStatementBtn");
 
     els.form = document.getElementById("reportForm");
     els.reportId = document.getElementById("reportId");
@@ -96,6 +106,12 @@
     });
   }
 
+  function toInputDate(value) {
+    if (!value) return "";
+    const stringValue = String(value);
+    return stringValue.includes("T") ? stringValue.split("T")[0] : stringValue;
+  }
+
   function prettyModule(value) {
     const map = {
       overall: "Overall",
@@ -116,7 +132,7 @@
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
+      .replaceAll("'", "&#39;");
   }
 
   function statusClass(value) {
@@ -144,7 +160,7 @@
 
     els.tableBody.innerHTML = `
       <tr>
-        <td colspan="6" class="table-empty-message">${escapeHtml(message)}</td>
+        <td colspan="7" class="table-empty-message">${escapeHtml(message)}</td>
       </tr>
     `;
   }
@@ -164,6 +180,12 @@
     return `<span class="status-chip ${escapeHtml(statusClass(safeStatus))}">${escapeHtml(safeStatus)}</span>`;
   }
 
+  function statusOptionsHtml(options, selected) {
+    return options
+      .map((opt) => `<option value="${escapeHtml(opt)}" ${opt === selected ? "selected" : ""}>${escapeHtml(opt)}</option>`)
+      .join("");
+  }
+
   function renderReports() {
     if (!els.tableBody) return;
 
@@ -173,7 +195,7 @@
     }
 
     els.tableBody.innerHTML = reports
-      .map((report) => {
+      .map((report, index) => {
         const id = report.id;
         const title = report.title || "-";
         const period = report.period || "-";
@@ -183,6 +205,7 @@
 
         return `
           <tr data-id="${escapeHtml(id)}">
+            <td>${index + 1}</td>
             <td>
               <strong>${escapeHtml(title)}</strong>
               ${
@@ -218,96 +241,503 @@
       .join("");
   }
 
+  /* ------------------------------------------------------------------
+     Periodic Reports — full CRUD (inline add / inline edit)
+     ------------------------------------------------------------------ */
+
+  function periodicNewRowHtml() {
+    return `
+      <tr data-id="new">
+        <td>-</td>
+        <td><input class="inline-edit-input" type="text" data-field="document" placeholder="Document name" /></td>
+        <td><input class="inline-edit-input" type="text" data-field="latest_issue" placeholder="e.g. Rev 03 / Aug 2026" /></td>
+        <td>
+          <select class="inline-edit-select" data-field="status">
+            ${statusOptionsHtml(PERIODIC_STATUS_OPTIONS, "pending")}
+          </select>
+        </td>
+        <td style="text-align:right; white-space:nowrap;">
+          <button class="table-action-btn confirm" type="button" data-action="save-new" ${periodicSaving ? "disabled" : ""}>
+            <i class="fa-solid ${periodicSaving ? "fa-spinner fa-spin" : "fa-check"}"></i>
+          </button>
+          <button class="table-action-btn" type="button" data-action="cancel-new" ${periodicSaving ? "disabled" : ""}>
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  }
+
+  function periodicRowHtml(item, index) {
+    const id = item.id;
+
+    if (periodicEditingId === id) {
+      return `
+        <tr data-id="${escapeHtml(id)}">
+          <td>${index + 1}</td>
+          <td><input class="inline-edit-input" type="text" data-field="document" value="${escapeHtml(item.document || "")}" /></td>
+          <td><input class="inline-edit-input" type="text" data-field="latest_issue" value="${escapeHtml(item.latest_issue || "")}" /></td>
+          <td>
+            <select class="inline-edit-select" data-field="status">
+              ${statusOptionsHtml(PERIODIC_STATUS_OPTIONS, item.status || "pending")}
+            </select>
+          </td>
+          <td style="text-align:right; white-space:nowrap;">
+            <button class="table-action-btn confirm" type="button" data-action="save-edit" data-id="${escapeHtml(id)}" ${periodicSaving ? "disabled" : ""}>
+              <i class="fa-solid ${periodicSaving ? "fa-spinner fa-spin" : "fa-check"}"></i>
+            </button>
+            <button class="table-action-btn" type="button" data-action="cancel-edit" data-id="${escapeHtml(id)}" ${periodicSaving ? "disabled" : ""}>
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </td>
+        </tr>
+      `;
+    }
+
+    return `
+      <tr data-id="${escapeHtml(id)}">
+        <td>${index + 1}</td>
+        <td>${escapeHtml(item.document || "-")}</td>
+        <td>${escapeHtml(item.latest_issue || "-")}</td>
+        <td>${renderStatusChip(item.status)}</td>
+        <td style="text-align:right; white-space:nowrap;">
+          <button class="table-action-btn" type="button" data-action="edit" data-id="${escapeHtml(id)}">
+            <i class="fa-solid fa-pen"></i>
+          </button>
+          <button class="table-action-btn danger" type="button" data-action="delete" data-id="${escapeHtml(id)}">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  }
+
   function renderPeriodicReports() {
     if (!els.periodicReportsTableBody) return;
 
-    if (!periodicReports.length) {
-      renderLibraryEmpty(els.periodicReportsTableBody, 3, "No periodic reports found.");
+    const rowsHtml = periodicReports.map((item, index) => periodicRowHtml(item, index)).join("");
+    const newRowHtml = periodicEditingId === "new" ? periodicNewRowHtml() : "";
+
+    if (!rowsHtml && !newRowHtml) {
+      renderLibraryEmpty(els.periodicReportsTableBody, 5, "No periodic reports found.");
       return;
     }
 
-    els.periodicReportsTableBody.innerHTML = periodicReports
-      .map((item) => {
-        return `
-          <tr>
-            <td>${escapeHtml(item.document || item.title || "-")}</td>
-            <td>${escapeHtml(item.latest_issue || item.latestIssue || "-")}</td>
-            <td>${renderStatusChip(item.status)}</td>
-          </tr>
-        `;
-      })
-      .join("");
+    els.periodicReportsTableBody.innerHTML = newRowHtml + rowsHtml;
   }
 
-  function renderIpcs() {
-    if (!els.ipcsTableBody) return;
-
-    if (!ipcs.length) {
-      renderLibraryEmpty(els.ipcsTableBody, 3, "No IPCs found.");
-      return;
-    }
-
-    els.ipcsTableBody.innerHTML = ipcs
-      .map((item) => {
-        return `
-          <tr>
-            <td>${escapeHtml(item.ipc || item.name || "-")}</td>
-            <td>${formatDate(item.date || item.ipc_date || item.ipcDate)}</td>
-            <td>${renderStatusChip(item.status)}</td>
-          </tr>
-        `;
-      })
-      .join("");
+  function methodNewRowHtml() {
+    return `
+      <tr data-id="new">
+        <td>-</td>
+        <td><input class="inline-edit-input" type="text" data-field="method_statement" placeholder="Method statement title" /></td>
+        <td><input class="inline-edit-input" type="date" data-field="date" /></td>
+        <td>
+          <select class="inline-edit-select" data-field="status">
+            ${statusOptionsHtml(METHOD_STATUS_OPTIONS, "pending")}
+          </select>
+        </td>
+        <td style="text-align:right; white-space:nowrap;">
+          <button class="table-action-btn confirm" type="button" data-action="save-new" ${methodSaving ? "disabled" : ""}>
+            <i class="fa-solid ${methodSaving ? "fa-spinner fa-spin" : "fa-check"}"></i>
+          </button>
+          <button class="table-action-btn" type="button" data-action="cancel-new" ${methodSaving ? "disabled" : ""}>
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </td>
+      </tr>
+    `;
   }
 
-  function renderAmendments() {
-    if (!els.amendmentsTableBody) return;
+  function methodRowHtml(item, index) {
+    const id = item.id;
 
-    if (!amendments.length) {
-      renderLibraryEmpty(els.amendmentsTableBody, 3, "No amendments found.");
-      return;
+    if (methodEditingId === id) {
+      return `
+        <tr data-id="${escapeHtml(id)}">
+          <td>${index + 1}</td>
+          <td><input class="inline-edit-input" type="text" data-field="method_statement" value="${escapeHtml(item.method_statement || "")}" /></td>
+          <td><input class="inline-edit-input" type="date" data-field="date" value="${escapeHtml(toInputDate(item.date))}" /></td>
+          <td>
+            <select class="inline-edit-select" data-field="status">
+              ${statusOptionsHtml(METHOD_STATUS_OPTIONS, item.status || "pending")}
+            </select>
+          </td>
+          <td style="text-align:right; white-space:nowrap;">
+            <button class="table-action-btn confirm" type="button" data-action="save-edit" data-id="${escapeHtml(id)}" ${methodSaving ? "disabled" : ""}>
+              <i class="fa-solid ${methodSaving ? "fa-spinner fa-spin" : "fa-check"}"></i>
+            </button>
+            <button class="table-action-btn" type="button" data-action="cancel-edit" data-id="${escapeHtml(id)}" ${methodSaving ? "disabled" : ""}>
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </td>
+        </tr>
+      `;
     }
 
-    els.amendmentsTableBody.innerHTML = amendments
-      .map((item) => {
-        return `
-          <tr>
-            <td>${escapeHtml(item.amendment || item.name || "-")}</td>
-            <td>${escapeHtml(item.subject || "-")}</td>
-            <td>${renderStatusChip(item.status)}</td>
-          </tr>
-        `;
-      })
-      .join("");
+    return `
+      <tr data-id="${escapeHtml(id)}">
+        <td>${index + 1}</td>
+        <td>${escapeHtml(item.method_statement || "-")}</td>
+        <td>${formatDate(item.date)}</td>
+        <td>${renderStatusChip(item.status)}</td>
+        <td style="text-align:right; white-space:nowrap;">
+          <button class="table-action-btn" type="button" data-action="edit" data-id="${escapeHtml(id)}">
+            <i class="fa-solid fa-pen"></i>
+          </button>
+          <button class="table-action-btn danger" type="button" data-action="delete" data-id="${escapeHtml(id)}">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </td>
+      </tr>
+    `;
   }
 
   function renderMethodStatements() {
     if (!els.methodStatementsTableBody) return;
 
-    if (!methodStatements.length) {
-      renderLibraryEmpty(els.methodStatementsTableBody, 3, "No method statements found.");
+    const rowsHtml = methodStatements.map((item, index) => methodRowHtml(item, index)).join("");
+    const newRowHtml = methodEditingId === "new" ? methodNewRowHtml() : "";
+
+    if (!rowsHtml && !newRowHtml) {
+      renderLibraryEmpty(els.methodStatementsTableBody, 5, "No method statements found.");
       return;
     }
 
-    els.methodStatementsTableBody.innerHTML = methodStatements
-      .map((item) => {
-        return `
-          <tr>
-            <td>${escapeHtml(item.method_statement || item.methodStatement || item.title || "-")}</td>
-            <td>${formatDate(item.date || item.statement_date || item.statementDate)}</td>
-            <td>${renderStatusChip(item.status)}</td>
-          </tr>
-        `;
-      })
-      .join("");
+    els.methodStatementsTableBody.innerHTML = newRowHtml + rowsHtml;
   }
 
   function renderReportLibrary() {
     renderPeriodicReports();
-    renderIpcs();
-    renderAmendments();
     renderMethodStatements();
   }
+
+  function readRowInputs(rowEl) {
+    const data = {};
+    rowEl.querySelectorAll("[data-field]").forEach((input) => {
+      data[input.getAttribute("data-field")] = input.value;
+    });
+    return data;
+  }
+
+  /* ---------------------------- Periodic Reports API ---------------------------- */
+
+  async function loadReportLibrary() {
+    if (!projectId) return;
+
+    renderLibraryEmpty(els.periodicReportsTableBody, 5, "Loading periodic reports...");
+    renderLibraryEmpty(els.methodStatementsTableBody, 5, "Loading method statements...");
+
+    try {
+      const result = await window.WSDP_API.request(
+        "GET",
+        `/projects/${projectId}/reports/library`
+      );
+
+      const data = result.data || {};
+
+      periodicReports = Array.isArray(data.periodic_reports)
+        ? data.periodic_reports
+        : [];
+
+      methodStatements = Array.isArray(data.method_statements)
+        ? data.method_statements
+        : [];
+
+      renderReportLibrary();
+    } catch (err) {
+      console.error("Failed to load report library:", err);
+
+      renderLibraryEmpty(els.periodicReportsTableBody, 5, "Failed to load periodic reports.");
+      renderLibraryEmpty(els.methodStatementsTableBody, 5, "Failed to load method statements.");
+
+      toast(err.message || "Failed to load reports library.", "fa-triangle-exclamation");
+    }
+  }
+
+  function startAddPeriodicReport() {
+    periodicEditingId = "new";
+    renderPeriodicReports();
+
+    const input = els.periodicReportsTableBody.querySelector('[data-field="document"]');
+    if (input) input.focus();
+  }
+
+  function cancelPeriodicEdit() {
+    periodicEditingId = null;
+    renderPeriodicReports();
+  }
+
+  function startEditPeriodicReport(id) {
+    const item = periodicReports.find((row) => row.id === id);
+    if (!item) return;
+
+    periodicEditingId = id;
+    renderPeriodicReports();
+  }
+
+  async function savePeriodicNew(rowEl) {
+    const values = readRowInputs(rowEl);
+
+    if (!values.document || !values.document.trim()) {
+      toast("Document name is required.", "fa-triangle-exclamation");
+      return;
+    }
+
+    const payload = {
+      document: values.document.trim(),
+      latest_issue: values.latest_issue ? values.latest_issue.trim() : null,
+      status: values.status || "pending",
+    };
+
+    periodicSaving = true;
+    renderPeriodicReports();
+
+    try {
+      await window.WSDP_API.request("POST", `/projects/${projectId}/reports/periodic`, payload);
+      toast("Periodic report added successfully.", "fa-file-circle-plus");
+      periodicEditingId = null;
+      await loadReportLibrary();
+    } catch (err) {
+      console.error(err);
+      toast(err.message || "Failed to add periodic report.", "fa-triangle-exclamation");
+    } finally {
+      periodicSaving = false;
+      renderPeriodicReports();
+    }
+  }
+
+  async function savePeriodicEdit(id, rowEl) {
+    const values = readRowInputs(rowEl);
+
+    if (!values.document || !values.document.trim()) {
+      toast("Document name is required.", "fa-triangle-exclamation");
+      return;
+    }
+
+    const payload = {
+      document: values.document.trim(),
+      latest_issue: values.latest_issue ? values.latest_issue.trim() : null,
+      status: values.status || "pending",
+    };
+
+    periodicSaving = true;
+    renderPeriodicReports();
+
+    try {
+      await window.WSDP_API.request("PUT", `/reports/periodic/${id}`, payload);
+      toast("Periodic report updated successfully.", "fa-pen");
+      periodicEditingId = null;
+      await loadReportLibrary();
+    } catch (err) {
+      console.error(err);
+      toast(err.message || "Failed to update periodic report.", "fa-triangle-exclamation");
+    } finally {
+      periodicSaving = false;
+      renderPeriodicReports();
+    }
+  }
+
+  async function deletePeriodicReport(id) {
+    const item = periodicReports.find((row) => row.id === id);
+    const name = item ? item.document : "this periodic report";
+
+    const ok = confirm(`Delete "${name}"? This cannot be undone.`);
+    if (!ok) return;
+
+    try {
+      await window.WSDP_API.request("DELETE", `/reports/periodic/${id}`);
+      toast("Periodic report deleted successfully.", "fa-trash");
+      if (periodicEditingId === id) periodicEditingId = null;
+      await loadReportLibrary();
+    } catch (err) {
+      console.error(err);
+      toast(err.message || "Failed to delete periodic report.", "fa-triangle-exclamation");
+    }
+  }
+
+  /* ---------------------------- Method Statements API ---------------------------- */
+
+  function startAddMethodStatement() {
+    methodEditingId = "new";
+    renderMethodStatements();
+
+    const input = els.methodStatementsTableBody.querySelector('[data-field="method_statement"]');
+    if (input) input.focus();
+  }
+
+  function cancelMethodEdit() {
+    methodEditingId = null;
+    renderMethodStatements();
+  }
+
+  function startEditMethodStatement(id) {
+    const item = methodStatements.find((row) => row.id === id);
+    if (!item) return;
+
+    methodEditingId = id;
+    renderMethodStatements();
+  }
+
+  async function saveMethodNew(rowEl) {
+    const values = readRowInputs(rowEl);
+
+    if (!values.method_statement || !values.method_statement.trim()) {
+      toast("Method statement title is required.", "fa-triangle-exclamation");
+      return;
+    }
+
+    const payload = {
+      method_statement: values.method_statement.trim(),
+      date: values.date || null,
+      status: values.status || "pending",
+    };
+
+    methodSaving = true;
+    renderMethodStatements();
+
+    try {
+      await window.WSDP_API.request("POST", `/projects/${projectId}/reports/method-statements`, payload);
+      toast("Method statement added successfully.", "fa-file-circle-plus");
+      methodEditingId = null;
+      await loadReportLibrary();
+    } catch (err) {
+      console.error(err);
+      toast(err.message || "Failed to add method statement.", "fa-triangle-exclamation");
+    } finally {
+      methodSaving = false;
+      renderMethodStatements();
+    }
+  }
+
+  async function saveMethodEdit(id, rowEl) {
+    const values = readRowInputs(rowEl);
+
+    if (!values.method_statement || !values.method_statement.trim()) {
+      toast("Method statement title is required.", "fa-triangle-exclamation");
+      return;
+    }
+
+    const payload = {
+      method_statement: values.method_statement.trim(),
+      date: values.date || null,
+      status: values.status || "pending",
+    };
+
+    methodSaving = true;
+    renderMethodStatements();
+
+    try {
+      await window.WSDP_API.request("PUT", `/reports/method-statements/${id}`, payload);
+      toast("Method statement updated successfully.", "fa-pen");
+      methodEditingId = null;
+      await loadReportLibrary();
+    } catch (err) {
+      console.error(err);
+      toast(err.message || "Failed to update method statement.", "fa-triangle-exclamation");
+    } finally {
+      methodSaving = false;
+      renderMethodStatements();
+    }
+  }
+
+  async function deleteMethodStatement(id) {
+    const item = methodStatements.find((row) => row.id === id);
+    const name = item ? item.method_statement : "this method statement";
+
+    const ok = confirm(`Delete "${name}"? This cannot be undone.`);
+    if (!ok) return;
+
+    try {
+      await window.WSDP_API.request("DELETE", `/reports/method-statements/${id}`);
+      toast("Method statement deleted successfully.", "fa-trash");
+      if (methodEditingId === id) methodEditingId = null;
+      await loadReportLibrary();
+    } catch (err) {
+      console.error(err);
+      toast(err.message || "Failed to delete method statement.", "fa-triangle-exclamation");
+    }
+  }
+
+  function handlePeriodicTableClick(e) {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+
+    const action = btn.getAttribute("data-action");
+    const rowEl = btn.closest("tr");
+    const id = btn.getAttribute("data-id");
+
+    if (action === "save-new") {
+      savePeriodicNew(rowEl);
+      return;
+    }
+
+    if (action === "cancel-new") {
+      cancelPeriodicEdit();
+      return;
+    }
+
+    if (action === "edit" && id) {
+      startEditPeriodicReport(id);
+      return;
+    }
+
+    if (action === "save-edit" && id) {
+      savePeriodicEdit(id, rowEl);
+      return;
+    }
+
+    if (action === "cancel-edit") {
+      cancelPeriodicEdit();
+      return;
+    }
+
+    if (action === "delete" && id) {
+      deletePeriodicReport(id);
+    }
+  }
+
+  function handleMethodTableClick(e) {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+
+    const action = btn.getAttribute("data-action");
+    const rowEl = btn.closest("tr");
+    const id = btn.getAttribute("data-id");
+
+    if (action === "save-new") {
+      saveMethodNew(rowEl);
+      return;
+    }
+
+    if (action === "cancel-new") {
+      cancelMethodEdit();
+      return;
+    }
+
+    if (action === "edit" && id) {
+      startEditMethodStatement(id);
+      return;
+    }
+
+    if (action === "save-edit" && id) {
+      saveMethodEdit(id, rowEl);
+      return;
+    }
+
+    if (action === "cancel-edit") {
+      cancelMethodEdit();
+      return;
+    }
+
+    if (action === "delete" && id) {
+      deleteMethodStatement(id);
+    }
+  }
+
+  /* ------------------------------------------------------------------
+     Monthly Progress Reports (existing full CRUD, unchanged behaviour)
+     ------------------------------------------------------------------ */
 
   function getPayload() {
     return {
@@ -399,51 +829,6 @@
 
     reports = Array.isArray(result.data) ? result.data : [];
     renderReports();
-  }
-
-  async function loadReportLibrary() {
-    if (!projectId) return;
-
-    renderLibraryEmpty(els.periodicReportsTableBody, 3, "Loading periodic reports...");
-    renderLibraryEmpty(els.ipcsTableBody, 3, "Loading IPCs...");
-    renderLibraryEmpty(els.amendmentsTableBody, 3, "Loading amendments...");
-    renderLibraryEmpty(els.methodStatementsTableBody, 3, "Loading method statements...");
-
-    try {
-      const result = await window.WSDP_API.request(
-        "GET",
-        `/projects/${projectId}/reports/library`
-      );
-
-      const data = result.data || {};
-
-      periodicReports = Array.isArray(data.periodic_reports)
-        ? data.periodic_reports
-        : [];
-
-      ipcs = Array.isArray(data.ipcs)
-        ? data.ipcs
-        : [];
-
-      amendments = Array.isArray(data.amendments)
-        ? data.amendments
-        : [];
-
-      methodStatements = Array.isArray(data.method_statements)
-        ? data.method_statements
-        : [];
-
-      renderReportLibrary();
-    } catch (err) {
-      console.error("Failed to load report library:", err);
-
-      renderLibraryEmpty(els.periodicReportsTableBody, 3, "Failed to load periodic reports.");
-      renderLibraryEmpty(els.ipcsTableBody, 3, "Failed to load IPCs.");
-      renderLibraryEmpty(els.amendmentsTableBody, 3, "Failed to load amendments.");
-      renderLibraryEmpty(els.methodStatementsTableBody, 3, "Failed to load method statements.");
-
-      toast(err.message || "Failed to load reports library.", "fa-triangle-exclamation");
-    }
   }
 
   async function saveReport(e) {
@@ -581,6 +966,7 @@
     }
 
     const headers = [
+      "S.No",
       "Report Title",
       "Period",
       "Module",
@@ -591,8 +977,9 @@
       "Summary",
     ];
 
-    const rows = reports.map((report) => {
+    const rows = reports.map((report, index) => {
       return [
+        index + 1,
         report.title || "",
         report.period || "",
         report.module || "overall",
@@ -935,6 +1322,12 @@
     els.importFile?.addEventListener("change", handleImportFileChange);
 
     els.exportBtn?.addEventListener("click", exportReportsAsCsv);
+
+    els.addPeriodicReportBtn?.addEventListener("click", startAddPeriodicReport);
+    els.periodicReportsTableBody?.addEventListener("click", handlePeriodicTableClick);
+
+    els.addMethodStatementBtn?.addEventListener("click", startAddMethodStatement);
+    els.methodStatementsTableBody?.addEventListener("click", handleMethodTableClick);
   }
 
   async function ensureAuthReady() {
@@ -982,10 +1375,8 @@
       renderProjectLabel();
       renderEmpty(err.message || "Failed to load reports.");
 
-      renderLibraryEmpty(els.periodicReportsTableBody, 3, "Failed to load periodic reports.");
-      renderLibraryEmpty(els.ipcsTableBody, 3, "Failed to load IPCs.");
-      renderLibraryEmpty(els.amendmentsTableBody, 3, "Failed to load amendments.");
-      renderLibraryEmpty(els.methodStatementsTableBody, 3, "Failed to load method statements.");
+      renderLibraryEmpty(els.periodicReportsTableBody, 5, "Failed to load periodic reports.");
+      renderLibraryEmpty(els.methodStatementsTableBody, 5, "Failed to load method statements.");
 
       toast(err.message || "Failed to load reports.", "fa-triangle-exclamation");
     }
