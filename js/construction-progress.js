@@ -19,12 +19,12 @@
      REPORT-BASED FALLBACK DATA
      Source: 50CS3_LUBANGO_UCP-P_ENG_MR_Technical_July 2026 report
 
-     Used ONLY as an offline safety net if the very first dashboard
-     fetch fails entirely (network/CORS/500), so the page is never left
-     blank. Once the initial load succeeds, all further Add/Edit/Delete
-     actions patch dashboardData directly from the server's save
-     response (see the CRUD handlers below) — they never re-fetch the
-     whole dashboard, so a slow or failing GET can no longer make an
+     Used ONLY as a last-resort offline safety net if the dashboard GET
+     fails even after retries (see loadDashboard below), so the page is
+     never left blank. Once the initial load succeeds, all further
+     Add/Edit/Delete actions patch dashboardData directly from the
+     server's save response — they never re-fetch the whole dashboard,
+     so a slow or failing GET elsewhere can no longer make an
      already-saved edit appear to "revert".
      ========================================================= */
 
@@ -140,10 +140,6 @@
     return Array.isArray(fallback) ? fallback : [];
   }
 
-  // Ensures dashboardData and the named array field both exist, so local
-  // patch helpers never throw against a null/undefined dashboardData (e.g.
-  // if the very first fetch failed and the page is still showing fallback
-  // data when the user performs their first Add).
   function ensureDashboardArray(field) {
     if (!dashboardData) {
       dashboardData = {};
@@ -248,6 +244,10 @@
     return "warn";
   }
 
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   async function ensureSessionAndProject() {
     let user = WSDP_API.getCurrentUser();
 
@@ -286,13 +286,16 @@
     return true;
   }
 
-  // Full dashboard fetch. Called ONCE on page load (via wsdp:authready).
-  // Deliberately NOT called after individual Add/Edit/Delete actions —
-  // those patch dashboardData directly from the save response instead
-  // (see applyXxx helpers below), which is both faster (no 10-table
-  // re-fetch per click) and immune to a slow/failing GET making a
-  // just-saved edit look like it "reverted".
-  async function loadDashboard() {
+  // Full dashboard fetch. Called ONCE on page load. Retries a couple of
+  // times with a short backoff before giving up — this protects against
+  // exactly the kind of transient blip (Render cold start, brief pooler
+  // hiccup) that can otherwise make a single failed GET wrongly display
+  // the static fallback numbers in place of real, already-saved data.
+  // Individual Add/Edit/Delete actions never call this — they patch
+  // dashboardData directly from their own save response instead.
+  async function loadDashboard(attempt = 1) {
+    const MAX_ATTEMPTS = 3;
+
     try {
       if (!PROJECT_ID) {
         const ready = await ensureSessionAndProject();
@@ -308,7 +311,16 @@
 
       renderAll();
     } catch (error) {
-      console.error("[construction-progress] dashboard fetch failed, showing report fallback data:", error);
+      if (attempt < MAX_ATTEMPTS) {
+        console.warn(
+          `[construction-progress] dashboard fetch failed (attempt ${attempt}/${MAX_ATTEMPTS}), retrying...`,
+          error
+        );
+        await sleep(attempt * 700);
+        return loadDashboard(attempt + 1);
+      }
+
+      console.error("[construction-progress] dashboard fetch failed after retries, showing report fallback data:", error);
       toast(
         error.message || "Live data unavailable — showing latest report figures",
         "fa-circle-exclamation"
@@ -506,6 +518,9 @@
         }
 
         const saved = unwrap(response);
+        if (!saved?.id) {
+          throw new Error("Server did not confirm the save. Please try again.");
+        }
         const list = ensureDashboardArray("area_progress");
         upsertById(list, saved);
         renderAreaProgressTable();
@@ -607,6 +622,9 @@
         }
 
         const saved = unwrap(response);
+        if (!saved?.id) {
+          throw new Error("Server did not confirm the save. Please try again.");
+        }
         const list = ensureDashboardArray("pipe_diameter_progress");
         upsertById(list, saved);
         renderPipeDiameterTable();
@@ -711,6 +729,9 @@
         }
 
         const saved = unwrap(response);
+        if (!saved?.id) {
+          throw new Error("Server did not confirm the save. Please try again.");
+        }
         const list = ensureDashboardArray("activity_progress");
         upsertById(list, saved);
         renderActivityProgressTable();
@@ -921,6 +942,9 @@
         }
 
         const saved = unwrap(response);
+        if (!saved?.id) {
+          throw new Error("Server did not confirm the save. Please try again.");
+        }
         const list = ensureDashboardArray("testing");
         upsertById(list, saved);
         renderTestingTable();
@@ -1085,6 +1109,9 @@
         }
 
         const saved = unwrap(response);
+        if (!saved?.id) {
+          throw new Error("Server did not confirm the save. Please try again.");
+        }
         const list = ensureDashboardArray("crossings");
         upsertById(list, saved);
         renderBridgeCrossingsTable();
