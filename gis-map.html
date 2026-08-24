@@ -446,16 +446,6 @@
               <h4>Legend</h4>
 
               <div class="legend-row">
-                <div class="legend-line dashed" style="border-top-color:#cfcfcf;"></div>
-                <div>Neighborhoods (bairros)</div>
-              </div>
-
-              <div class="legend-row">
-                <div class="legend-dot" style="background:#fff600;border-color:#d9c900;"></div>
-                <div>Sector connection point</div>
-              </div>
-
-              <div class="legend-row">
                 <div class="legend-line" style="border-top-color:#ff0000;"></div>
                 <div>Water distribution pipeline /63mm HDPE</div>
               </div>
@@ -488,6 +478,11 @@
               <div class="legend-row">
                 <div class="legend-line" style="border-top-color:#fff000;"></div>
                 <div>Water distribution pipeline /250mm HDPE</div>
+              </div>
+
+              <div class="legend-row">
+                <div class="legend-line dashed" style="border-top-color:#e53935;"></div>
+                <div>Water distribution pipeline /315mm HDPE</div>
               </div>
             </div>
 
@@ -594,6 +589,23 @@
         status: "notStarted",
         keywords: ["not started", "not-started", "pending", "to start"]
       }
+    ];
+
+    // Feature-exclusion keywords: any KMZ feature whose normalized search
+    // text (name / description / folder / styleUrl) contains one of these
+    // terms is dropped entirely before it ever becomes a Leaflet layer -
+    // i.e. removed from the map itself, not just hidden from the legend.
+    var EXCLUDED_FEATURE_KEYWORDS = [
+      // Neighborhoods (bairros)
+      "bairro",
+      "bairros",
+      "neighborhood",
+      "neighborhoods",
+      // Sector connection point
+      "sector connection point",
+      "ponto de ligacao ao setor",
+      "ponto de ligacao do setor",
+      "conexao setor"
     ];
 
     function getCssVarColor(varName, fallback) {
@@ -811,6 +823,22 @@
       return feature && feature.geometry ? feature.geometry.type : "";
     }
 
+    // Returns true when a feature's name/description/folder/styleUrl text
+    // matches one of the EXCLUDED_FEATURE_KEYWORDS terms - used to drop
+    // "Neighborhoods (bairros)" and "Sector connection point" features
+    // from the map completely (not just from the legend).
+    function isExcludedFeature(feature) {
+      var normalized = normalizeText(getFeatureSearchText(feature));
+
+      for (var i = 0; i < EXCLUDED_FEATURE_KEYWORDS.length; i += 1) {
+        if (normalized.indexOf(normalizeText(EXCLUDED_FEATURE_KEYWORDS[i])) !== -1) {
+          return true;
+        }
+      }
+
+      return false;
+    }
+
     // --- Spatial (geometry-based) area matching -----------------------
     // Some KMZ exports only attach a region's name to a small anchor
     // Point placemark (used to position a label), while the boundary
@@ -956,7 +984,11 @@
         style.color = "#00a651";
       } else if (searchText.indexOf("de250") !== -1 || searchText.indexOf("250mm") !== -1) {
         style.color = "#f5e400";
-      } else if (searchText.indexOf("de315") !== -1 || searchText.indexOf("315mm") !== -1) {
+      } else if (
+        searchText.indexOf("de315") !== -1 ||
+        searchText.indexOf("315mm") !== -1 ||
+        searchText.indexOf("315 mm") !== -1
+      ) {
         style.color = "#e53935";
         style.dashArray = "8 6";
       }
@@ -1126,6 +1158,15 @@
           }
         });
 
+        // Drop "Neighborhoods (bairros)" and "Sector connection point"
+        // features completely, BEFORE resolving areas/statuses and
+        // BEFORE any Leaflet layer is created for them. This removes
+        // them from the map itself (not just the legend), from bounds
+        // calculations, filtering, and diagnostics.
+        geojson.features = geojson.features.filter(function (feature) {
+          return !isExcludedFeature(feature);
+        });
+
         // Resolve area/status for every feature up front (text pass, then
         // spatial fallback pass for unnamed boundary polygons).
         resolveFeatureAreasWithSpatialFallback(geojson.features);
@@ -1166,21 +1207,28 @@
 
             var matchedStatus = "";
 
+            var geometryType = getGeometryType(feature);
+            var isBoundaryShape = geometryType === "Polygon" || geometryType === "MultiPolygon";
+
             if (matchedArea) {
               matchedStatus = props.__resolvedStatus || AREA_STATUS_MAP[matchedArea] || "notStarted";
               layer._status = matchedStatus;
 
-              var statusStyle = STATUS_STYLES[matchedStatus] || STATUS_STYLES.notStarted;
+              // Only apply the construction-stage highlight color to
+              // boundary shapes (Polygon/MultiPolygon). LineStrings such
+              // as pipelines must keep their diameter-based color/dash
+              // pattern from getDefaultStyle() and must not be
+              // overwritten here.
+              if (isBoundaryShape && typeof layer.setStyle === "function") {
+                var statusStyle = STATUS_STYLES[matchedStatus] || STATUS_STYLES.notStarted;
 
-              layer.setStyle({
-                color: statusStyle.color,
-                weight: 2,
-                fillColor: statusStyle.fillColor,
-                fillOpacity: statusStyle.fillOpacity
-              });
-
-              var geometryType = getGeometryType(feature);
-              var isBoundaryShape = geometryType === "Polygon" || geometryType === "MultiPolygon";
+                layer.setStyle({
+                  color: statusStyle.color,
+                  weight: 2,
+                  fillColor: statusStyle.fillColor,
+                  fillOpacity: statusStyle.fillOpacity
+                });
+              }
 
               if (isBoundaryShape && typeof layer.getBounds === "function") {
                 if (!boundaryCandidatesByArea[matchedArea]) {
