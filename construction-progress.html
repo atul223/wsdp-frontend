@@ -9,6 +9,44 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="css/styles.css">
 <!-- subnav / data-table / status-chip are now defined once in css/styles.css -->
+<style>
+  /* Page-scoped additions only — does not touch css/styles.css so no other
+     module/page is affected. Covers the nested "Total (m)" header for the
+     Pipe Diameter Wise Progress table and the section-heading layout used
+     by the new Add/Update buttons across this module. */
+  .section-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .card-header--flex {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  table.pipe-diameter-table th,
+  table.pipe-diameter-table td {
+    text-align: center;
+  }
+  table.pipe-diameter-table td:nth-child(2),
+  table.pipe-diameter-table th:nth-child(2) {
+    text-align: left;
+  }
+  table.pipe-diameter-table thead th {
+    vertical-align: middle;
+  }
+  table.pipe-diameter-table thead .group-header {
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+  }
+  table.data-table td.sno-col,
+  table.data-table th.sno-col {
+    width: 56px;
+    text-align: center;
+  }
+</style>
 </head>
 <body data-page="construction">
 
@@ -85,7 +123,7 @@
         <a href="#pipeline">Pipeline Progress</a>
         <a href="#progress-summaries">Progress Summaries</a>
         <a href="#house-connections">House Connections</a>
-        <a href="#testing">Testing &amp; Commissioning</a>
+        <a href="#testing">Pressure Testing</a>
         <a href="#valve-chambers">Valve Chambers</a>
         <a href="#bridge-crossings">Bridge Crossings</a>
       </div>
@@ -93,11 +131,16 @@
       <!-- ============ PIPELINE ============ -->
       <section id="pipeline">
         <div class="section-heading">
-        <div>
-          <h2>Pipeline Progress</h2>
-          <span class="section-sub">92.677 km total alignment</span>
+          <div>
+            <h2>Pipeline Progress</h2>
+            <span class="section-sub" id="pipelineTotalLabel">92.677 km total alignment</span>
+          </div>
+
+          <button id="editPipelineSummaryBtn" class="btn-ghost" type="button">
+            <i class="fa-solid fa-pen"></i>
+            Update Progress
+          </button>
         </div>
-      </div>
         <div class="grid grid-12">
           <div class="card card-accent card-accent--success col-span-4"><div class="card-body">
             <div class="kpi-card__label">Laid</div>
@@ -129,18 +172,25 @@
 
             <!-- AREA WISE PROGRESS -->
             <div class="card" style="margin-top:20px;">
-              <div class="card-header">
+              <div class="card-header card-header--flex">
                 <h3>Area-wise Progress</h3>
+                <button id="addAreaProgressBtn" class="btn-ghost" type="button">
+                  <i class="fa-solid fa-plus"></i>
+                  Add Area
+                </button>
               </div>
 
               <div class="card-body table-scroll">
                 <table class="data-table">
                   <thead>
                     <tr>
+                      <th class="sno-col">S.no</th>
                       <th>Area</th>
-                      <th class="num">Planned (km)</th>
-                      <th class="num">Actual (km)</th>
-                      <th class="num">Variance (km)</th>
+                      <th class="num">As per Detailed Design Report (m)</th>
+                      <th class="num">Contract (m)</th>
+                      <th class="num">Executed (m)</th>
+                      <th class="num">Balance (m)</th>
+                      <th class="actions-col">Actions</th>
                     </tr>
                   </thead>
 
@@ -150,19 +200,29 @@
               </div>
             </div>
 
-            <!-- PIPE DIAMETER MATRIX -->
+            <!-- PIPE DIAMETER WISE PROGRESS -->
             <div class="card" style="margin-top:20px;">
-              <div class="card-header">
-                <h3>Pipe Diameter Progress Matrix</h3>
+              <div class="card-header card-header--flex">
+                <h3>Pipe Diameter Wise Progress</h3>
+                <button id="addPipeDiameterBtn" class="btn-ghost" type="button">
+                  <i class="fa-solid fa-plus"></i>
+                  Add Diameter
+                </button>
               </div>
 
               <div class="card-body table-scroll">
-                <table class="data-table">
+                <table class="data-table pipe-diameter-table">
                   <thead>
                     <tr>
-                      <th>Diameter</th>
-                      <th class="num">Planned (km)</th>
-                      <th class="num">Installed (km)</th>
+                      <th class="sno-col" rowspan="2">Sno.</th>
+                      <th rowspan="2">Pipe Diameter</th>
+                      <th colspan="3" class="num group-header">Total (m)</th>
+                      <th class="actions-col" rowspan="2">Actions</th>
+                    </tr>
+                    <tr>
+                      <th class="num">Proposed Length</th>
+                      <th class="num">Executed</th>
+                      <th class="num">Balance (m)</th>
                     </tr>
                   </thead>
 
@@ -172,24 +232,31 @@
               </div>
             </div>
 
-            <!-- MONTHLY PROGRESS -->
+            <!-- ACTIVITY WISE PROGRESS -->
             <div class="card" style="margin-top:20px;">
-              <div class="card-header">
-                <h3>Monthly Progress Summary</h3>
+              <div class="card-header card-header--flex">
+                <h3>Activity Wise Progress</h3>
+                <button id="addActivityProgressBtn" class="btn-ghost" type="button">
+                  <i class="fa-solid fa-plus"></i>
+                  Add Activity
+                </button>
               </div>
 
               <div class="card-body table-scroll">
                 <table class="data-table">
                   <thead>
                     <tr>
+                      <th class="sno-col">Sno.</th>
                       <th>Activity</th>
                       <th class="num">Previous Month</th>
                       <th class="num">Current Month</th>
                       <th class="num">Cumulative</th>
+                      <th class="num">Total (%)</th>
+                      <th class="actions-col">Actions</th>
                     </tr>
                   </thead>
 
-                  <tbody id="monthlyProgressTableBody"></tbody>
+                  <tbody id="activityProgressTableBody"></tbody>
 
                 </table>
               </div>
@@ -208,6 +275,11 @@
               Village cluster-wise connection progress
             </span>
           </div>
+
+          <button id="editHouseSummaryBtn" class="btn-ghost" type="button">
+            <i class="fa-solid fa-pen"></i>
+            Update Summary
+          </button>
         </div>
         <div class="grid grid-12">
           <div class="card card-accent card-accent--success col-span-4">
@@ -234,24 +306,27 @@
         </div>
       </section>
 
-      <!-- ============ TESTING & COMMISSIONING ============ -->
+      <!-- ============ PRESSURE TESTING STATUS ============ -->
       <section id="testing">
         <div class="section-heading">
+          <div>
+            <h2>Pressure Testing Status</h2>
+            <span class="section-sub">
+              Hydro-testing, disinfection & handover readiness
+            </span>
+          </div>
+
           <button id="addTestingActivityBtn" class="btn-ghost" type="button">
             <i class="fa-solid fa-plus"></i>
             Add Activity
           </button>
-
-          <h2>Hydro-testing </h2>
-          <span class="section-sub">
-            Hydro-testing, disinfection & handover readiness
-          </span>
         </div>
         <div class="card">
           <div class="card-body table-scroll">
             <table class="data-table">
               <thead>
                 <tr>
+                  <th scope="col" class="sno-col">S.no</th>
                   <th scope="col">Activity</th>
                   <th scope="col" class="num">Planned</th>
                   <th scope="col" class="num">Actual</th>
@@ -265,11 +340,11 @@
         </div>
       </section>
 
-      <!-- ============ VALVE CHAMBERS ============ -->
+      <!-- ============ VALVE CHAMBER CONSTRUCTION PROGRESS ============ -->
       <section id="valve-chambers">
         <div class="section-heading">
           <div>
-            <h2>Valve Chambers</h2>
+            <h2>Valve Chamber Construction Progress</h2>
             <span class="section-sub">
               Air valves, scour valves & sluice chambers
             </span>
@@ -308,11 +383,11 @@
         </div>
       </section>
 
-      <!-- ============ BRIDGE CROSSINGS ============ -->
+      <!-- ============ BRIDGE-CROSSING STRUCTURE PROGRESS ============ -->
       <section id="bridge-crossings">
         <div class="section-heading">
           <div>
-            <h2>Bridge Crossings</h2>
+            <h2>Bridge-Crossing Structure Progress</h2>
             <span class="section-sub">
               River/Stream crossing structures
             </span>
@@ -328,6 +403,7 @@
             <table class="data-table">
               <thead>
                 <tr>
+                  <th scope="col" class="sno-col">S.no</th>
                   <th scope="col">Area</th>
                   <th scope="col">Type</th>
                   <th scope="col" class="num">Span</th>
@@ -362,6 +438,8 @@
       background:#fff;
       padding:20px;
       box-shadow:0 10px 40px rgba(0,0,0,.25);
+      max-height:85vh;
+      overflow-y:auto;
   ">
 
       <h3 id="crudModalTitle">Construction Progress</h3>

@@ -18,6 +18,9 @@
   /* =========================================================
      REPORT-BASED DATA
      Source: 50CS3_LUBANGO_UCP-P_ENG_MR_Technical_July 2026 report
+     Used only until live data exists in the backend for each table —
+     once a row is added/edited on the module it is persisted via the
+     API and this fallback is no longer shown for that table.
      ========================================================= */
 
   const REPORT_PIPELINE_SUMMARY = {
@@ -40,161 +43,39 @@
     notStarted: 11,
   };
 
-  // Area-wise Progress (Section 3.2 Planning Control, monthly Planned/Executed per area)
+  // Area-wise Progress (Section 3.2 Planning Control). Values converted to
+  // metres to match the "(m)" columns: Design Report / Contract / Executed.
   const FALLBACK_AREA_PROGRESS = [
-    {
-      area: "Casa Verde",
-      planned: 0.180,
-      actual: 0.204,
-      variance: 0.024,
-      unit: "km",
-    },
-    {
-      area: "Escola Portuguesa",
-      planned: 0.800,
-      actual: 0.324,
-      variance: -0.476,
-      unit: "km",
-    },
-    {
-      area: "Cowboy I",
-      planned: 0.000,
-      actual: 0.000,
-      variance: 0.000,
-      unit: "km",
-    },
-    {
-      area: "Sofrio",
-      planned: 2.108,
-      actual: 0.798,
-      variance: -1.310,
-      unit: "km",
-    },
-    {
-      area: "João de Almeida",
-      planned: 2.500,
-      actual: 0.000,
-      variance: -2.500,
-      unit: "km",
-    },
-    {
-      area: "Caixote ou Socombar",
-      planned: 0.500,
-      actual: 0.342,
-      variance: -0.158,
-      unit: "km",
-    },
-    {
-      area: "Arimba",
-      planned: 0.000,
-      actual: 0.000,
-      variance: 0.000,
-      unit: "km",
-    }
+    { area: "Casa Verde", designReport: 180, contract: 180, executed: 204 },
+    { area: "Escola Portuguesa", designReport: 800, contract: 800, executed: 324 },
+    { area: "Cowboy I", designReport: 0, contract: 0, executed: 0 },
+    { area: "Sofrio", designReport: 2108, contract: 2108, executed: 798 },
+    { area: "João de Almeida", designReport: 2500, contract: 2500, executed: 0 },
+    { area: "Caixote ou Socombar", designReport: 500, contract: 500, executed: 342 },
+    { area: "Arimba", designReport: 0, contract: 0, executed: 0 },
   ];
 
-  // Pipe Diameter Progress Matrix (Design/Planned per diameter vs. Installed per
-  // "Materials and Equipment in Stock" - Quantity Used, Section 9)
-  const FALLBACK_PIPE_DIAMETER_MATRIX = [
-    {
-      diameter: "De63 mm",
-      planned: 18.796,
-      installed: 16.877,
-      unit: "km",
-    },
-    {
-      diameter: "De75 mm",
-      planned: 1.078,
-      installed: 0.768,
-      unit: "km",
-    },
-    {
-      diameter: "De90 mm",
-      planned: 6.012,
-      installed: 5.277,
-      unit: "km",
-    },
-    {
-      diameter: "De110 mm",
-      planned: 2.075,
-      installed: 1.236,
-      unit: "km",
-    },
-    {
-      diameter: "De160 mm PN10",
-      planned: 4.929,
-      installed: 2.832,
-      unit: "km",
-    },
-    {
-      diameter: "De160 mm PN16",
-      planned: 0.299,
-      installed: 0.000,
-      unit: "km",
-    },
-    {
-      diameter: "De200 mm",
-      planned: 1.256,
-      installed: 1.152,
-      unit: "km",
-    },
-    {
-      diameter: "De250 mm",
-      planned: 2.203,
-      installed: 1.966,
-      unit: "km",
-    },
-    {
-      diameter: "De315 mm",
-      planned: 1.412,
-      installed: 1.0925,
-      unit: "km",
-    },
-    {
-      diameter: "Steel Pipe",
-      planned: 0.079,
-      installed: 0.000,
-      unit: "km",
-    }
+  // Pipe Diameter Wise Progress — Proposed Length / Executed, in metres.
+  const FALLBACK_PIPE_DIAMETER_PROGRESS = [
+    { diameter: "De63 mm", proposedLength: 18796, executed: 16877 },
+    { diameter: "De75 mm", proposedLength: 1078, executed: 768 },
+    { diameter: "De90 mm", proposedLength: 6012, executed: 5277 },
+    { diameter: "De110 mm", proposedLength: 2075, executed: 1236 },
+    { diameter: "De160 mm PN10", proposedLength: 4929, executed: 2832 },
+    { diameter: "De160 mm PN16", proposedLength: 299, executed: 0 },
+    { diameter: "De200 mm", proposedLength: 1256, executed: 1152 },
+    { diameter: "De250 mm", proposedLength: 2203, executed: 1966 },
+    { diameter: "De315 mm", proposedLength: 1412, executed: 1092.5 },
+    { diameter: "Steel Pipe", proposedLength: 79, executed: 0 },
   ];
 
-  // Monthly Progress Summary (Section 3.2 Planning Control + Executive Summary)
-  const FALLBACK_MONTHLY_PROGRESS = [
-    {
-      activity: "Pipeline Installation",
-      previousMonth: 29.5325,
-      currentMonth: 1.668,
-      cumulative: 31.2005,
-      unit: "km",
-    },
-    {
-      activity: "Hydro Testing",
-      previousMonth: 0,
-      currentMonth: 0,
-      cumulative: 0,
-      unit: "km",
-    },
-    {
-      activity: "House Connections",
-      previousMonth: 0,
-      currentMonth: 0,
-      cumulative: 0,
-      unit: "Nos",
-    },
-    {
-      activity: "Valve Chambers",
-      previousMonth: 0,
-      currentMonth: 0,
-      cumulative: 0,
-      unit: "Nos",
-    },
-    {
-      activity: "Bridge Crossings",
-      previousMonth: "Not specified",
-      currentMonth: "Not specified",
-      cumulative: "3 Nos planned",
-      unit: "",
-    }
+  // Activity Wise Progress (Section 3.2 Planning Control + Executive Summary)
+  const FALLBACK_ACTIVITY_PROGRESS = [
+    { activity: "Pipeline Installation", previousMonth: 29.5325, currentMonth: 1.668, cumulative: 31.2005, totalPercent: 44.6, unit: "km" },
+    { activity: "Hydro Testing", previousMonth: 0, currentMonth: 0, cumulative: 0, totalPercent: 0, unit: "km" },
+    { activity: "House Connections", previousMonth: 0, currentMonth: 0, cumulative: 0, totalPercent: 0, unit: "Nos" },
+    { activity: "Valve Chambers", previousMonth: 0, currentMonth: 0, cumulative: 0, totalPercent: 0, unit: "Nos" },
+    { activity: "Bridge Crossings", previousMonth: 0, currentMonth: 0, cumulative: 0, totalPercent: 0, unit: "Nos (of 3 planned)" },
   ];
 
   // Testing & Commissioning (Section 3.4 Tests / Executive Summary - Pressure/Disinfection Tests [E])
@@ -424,8 +305,8 @@
   function renderAll() {
     renderPipelineKpis();
     renderAreaProgressTable();
-    renderPipeDiameterMatrix();
-    renderMonthlyProgressTable();
+    renderPipeDiameterTable();
+    renderActivityProgressTable();
     updatePipelineAreaChart();
 
     renderHouseKpis();
@@ -438,16 +319,26 @@
   }
 
   /* =========================
-     PIPELINE
+     PIPELINE KPI CARDS
   ========================= */
 
   function renderPipelineKpis() {
-    const pipeline = REPORT_PIPELINE_SUMMARY;
-    const totalLength = REPORT_PIPELINE_SUMMARY.total;
+    const override = dashboardData?.pipeline_summary;
+
+    const pipeline = override
+      ? { laid: override.laidKm, hydroTested: override.hydroTestedKm, remaining: override.remainingKm }
+      : { laid: REPORT_PIPELINE_SUMMARY.laid, hydroTested: REPORT_PIPELINE_SUMMARY.hydroTested, remaining: REPORT_PIPELINE_SUMMARY.remaining };
+
+    const totalLength = override ? override.totalLengthKm : REPORT_PIPELINE_SUMMARY.total;
 
     setCountValue("pipelineLaidKm", pipeline.laid, 1);
     setCountValue("pipelineHydroTestedKm", pipeline.hydroTested, 1);
     setCountValue("pipelineRemainingKm", pipeline.remaining, 1);
+
+    const totalLabel = document.getElementById("pipelineTotalLabel");
+    if (totalLabel) {
+      totalLabel.textContent = `${formatProgressValue(totalLength, "km")} total alignment`;
+    }
 
     const laidDelta = document
       .getElementById("pipelineLaidKm")
@@ -464,62 +355,102 @@
       ?.closest(".card-body")
       ?.querySelector(".kpi-card__delta");
 
+    const safeTotal = totalLength || 1;
+
     if (laidDelta) {
-      laidDelta.innerHTML = `<i class="fa-solid fa-arrow-trend-up"></i> ${((pipeline.laid / totalLength) * 100).toFixed(1)}% of total`;
+      laidDelta.innerHTML = `<i class="fa-solid fa-arrow-trend-up"></i> ${((pipeline.laid / safeTotal) * 100).toFixed(1)}% of total`;
     }
 
     if (testedDelta) {
-      testedDelta.textContent = `${((pipeline.hydroTested / totalLength) * 100).toFixed(1)}% of total`;
+      testedDelta.textContent = `${((pipeline.hydroTested / safeTotal) * 100).toFixed(1)}% of total`;
     }
 
     if (remainingDelta) {
-      remainingDelta.textContent = `${((pipeline.remaining / totalLength) * 100).toFixed(1)}% of total`;
+      remainingDelta.textContent = `${((pipeline.remaining / safeTotal) * 100).toFixed(1)}% of total`;
     }
   }
+
+  function openPipelineSummaryModal() {
+    const override = dashboardData?.pipeline_summary;
+    const current = override || {
+      totalLengthKm: REPORT_PIPELINE_SUMMARY.total,
+      laidKm: REPORT_PIPELINE_SUMMARY.laid,
+      hydroTestedKm: REPORT_PIPELINE_SUMMARY.hydroTested,
+    };
+
+    openCrudModal({
+      title: "Update Pipeline Progress",
+      fields: [
+        inputField("Total Alignment (km)", "totalLengthKm", current.totalLengthKm, "number", true, "0.001"),
+        inputField("Laid (km)", "laidKm", current.laidKm, "number", true, "0.001"),
+        inputField("Hydro-Tested (km)", "hydroTestedKm", current.hydroTestedKm, "number", true, "0.001"),
+      ],
+      onSubmit: async (payload) => {
+        payload.totalLengthKm = numberValue(payload.totalLengthKm);
+        payload.laidKm = numberValue(payload.laidKm);
+        payload.hydroTestedKm = numberValue(payload.hydroTestedKm);
+
+        await WSDP_API.request(
+          "PUT",
+          `/construction-progress/pipeline-summary/${PROJECT_ID}`,
+          payload
+        );
+
+        toast("Pipeline progress updated");
+        await loadDashboard();
+      },
+    });
+  }
+
+  /* =========================
+     AREA-WISE PROGRESS
+  ========================= */
 
   function renderAreaProgressTable() {
     const tbody = document.querySelector("#areaProgressTableBody");
     if (!tbody) return;
 
-    const source =
-      dashboardData?.area_progress ||
-      dashboardData?.areaProgress ||
-      dashboardData?.area_wise_progress;
-
-    const rows = pickRows(source, FALLBACK_AREA_PROGRESS);
+    const isLive = Array.isArray(dashboardData?.area_progress) && dashboardData.area_progress.length;
+    const rows = pickRows(dashboardData?.area_progress, FALLBACK_AREA_PROGRESS);
 
     tbody.innerHTML = "";
 
     if (!rows.length) {
-      tbody.innerHTML = emptyRow(4, "No area-wise progress data available.");
+      tbody.innerHTML = emptyRow(7, "No area-wise progress data available.");
       return;
     }
 
-    rows.forEach((item) => {
-      const areaName = normalizeAreaName(item.area || item.zone || item.name);
-      const planned = item.planned;
-      const actual = item.actual;
-      const varianceValue =
-        item.variance !== undefined && item.variance !== null
-          ? item.variance
-          : numberValue(actual) - numberValue(planned);
-
-      const unit = item.unit || "km";
-      const varianceClass =
-        numberValue(varianceValue) < 0 ? "down" :
-        numberValue(varianceValue) > 0 ? "up" : "flat";
+    rows.forEach((item, index) => {
+      const areaName = normalizeAreaName(item.area);
+      const designReport = item.designReport ?? item.designReportM;
+      const contract = item.contract ?? item.contractM;
+      const executed = item.executed;
+      const balance = item.balance !== undefined ? item.balance : numberValue(contract) - numberValue(executed);
+      const balanceClass = numberValue(balance) < 0 ? "down" : numberValue(balance) > 0 ? "up" : "flat";
 
       tbody.insertAdjacentHTML(
         "beforeend",
         `
           <tr>
+            <td class="sno-col">${index + 1}</td>
             <td>${escapeHtml(areaName)}</td>
-            <td class="num">${formatProgressValue(planned, unit)}</td>
-            <td class="num">${formatProgressValue(actual, unit)}</td>
+            <td class="num">${formatProgressValue(designReport, "m")}</td>
+            <td class="num">${formatProgressValue(contract, "m")}</td>
+            <td class="num">${formatProgressValue(executed, "m")}</td>
             <td class="num">
-              <span class="kpi-card__delta ${varianceClass}" style="justify-content:flex-end;">
-                ${formatSignedValue(varianceValue, unit)}
+              <span class="kpi-card__delta ${balanceClass}" style="justify-content:flex-end;">
+                ${formatSignedValue(balance, "m")}
               </span>
+            </td>
+            <td class="actions-col">
+              ${
+                isLive
+                  ? `
+                    <button class="btn-ghost edit-area-progress" type="button" data-id="${item.id}">Edit</button>
+                    <button class="btn-ghost delete-area-progress" type="button" data-id="${item.id}">Delete</button>
+                  `
+                  : `<span style="color:var(--text-muted);font-size:12px;">Report data</span>`
+              }
             </td>
           </tr>
         `
@@ -527,72 +458,254 @@
     });
   }
 
-  function renderPipeDiameterMatrix() {
+  function openAreaProgressModal(id) {
+    const existing = id
+      ? dashboardData.area_progress.find((x) => x.id === id)
+      : null;
+
+    openCrudModal({
+      title: existing ? "Edit Area-wise Progress" : "Add Area-wise Progress",
+      fields: [
+        inputField("Area", "area", existing?.area, "text", true),
+        inputField("As per Detailed Design Report (m)", "designReport", existing?.designReport ?? 0, "number", true, "0.01"),
+        inputField("Contract (m)", "contract", existing?.contract ?? 0, "number", true, "0.01"),
+        inputField("Executed (m)", "executed", existing?.executed ?? 0, "number", true, "0.01"),
+      ],
+      onSubmit: async (payload) => {
+        payload.projectId = PROJECT_ID;
+        payload.designReport = numberValue(payload.designReport);
+        payload.contract = numberValue(payload.contract);
+        payload.executed = numberValue(payload.executed);
+
+        if (id) {
+          await WSDP_API.request(
+            "PUT",
+            `/construction-progress/area-progress/${id}`,
+            payload
+          );
+        } else {
+          await WSDP_API.request(
+            "POST",
+            "/construction-progress/area-progress",
+            payload
+          );
+        }
+
+        toast("Area-wise progress saved successfully");
+        await loadDashboard();
+      },
+    });
+  }
+
+  async function deleteAreaProgress(id) {
+    if (!confirm("Delete this area-wise progress row?")) return;
+
+    await WSDP_API.request(
+      "DELETE",
+      `/construction-progress/area-progress/${id}`
+    );
+
+    toast("Area-wise progress row deleted");
+    await loadDashboard();
+  }
+
+  /* =========================
+     PIPE DIAMETER WISE PROGRESS
+  ========================= */
+
+  function renderPipeDiameterTable() {
     const tbody = document.querySelector("#pipeDiameterTableBody");
     if (!tbody) return;
 
-    const source =
-      dashboardData?.pipe_diameter_matrix ||
-      dashboardData?.pipeDiameterMatrix ||
-      dashboardData?.diameter_matrix;
-
-    const rows = pickRows(source, FALLBACK_PIPE_DIAMETER_MATRIX);
+    const isLive = Array.isArray(dashboardData?.pipe_diameter_progress) && dashboardData.pipe_diameter_progress.length;
+    const rows = pickRows(dashboardData?.pipe_diameter_progress, FALLBACK_PIPE_DIAMETER_PROGRESS);
 
     tbody.innerHTML = "";
 
     if (!rows.length) {
-      tbody.innerHTML = emptyRow(3, "No pipe diameter matrix data available.");
+      tbody.innerHTML = emptyRow(6, "No pipe diameter progress data available.");
       return;
     }
 
-    rows.forEach((item) => {
-      const unit = item.unit || "km";
+    rows.forEach((item, index) => {
+      const proposedLength = item.proposedLength;
+      const executed = item.executed;
+      const balance = item.balance !== undefined ? item.balance : numberValue(proposedLength) - numberValue(executed);
 
       tbody.insertAdjacentHTML(
         "beforeend",
         `
           <tr>
-            <td>${escapeHtml(item.diameter || item.pipeDiameter || "-")}</td>
-            <td class="num">${formatProgressValue(item.planned, unit)}</td>
-            <td class="num">${formatProgressValue(item.installed ?? item.actual, unit)}</td>
+            <td class="sno-col">${index + 1}</td>
+            <td>${escapeHtml(item.diameter)}</td>
+            <td class="num">${formatProgressValue(proposedLength, "m")}</td>
+            <td class="num">${formatProgressValue(executed, "m")}</td>
+            <td class="num">${formatProgressValue(balance, "m")}</td>
+            <td class="actions-col">
+              ${
+                isLive
+                  ? `
+                    <button class="btn-ghost edit-pipe-diameter" type="button" data-id="${item.id}">Edit</button>
+                    <button class="btn-ghost delete-pipe-diameter" type="button" data-id="${item.id}">Delete</button>
+                  `
+                  : `<span style="color:var(--text-muted);font-size:12px;">Report data</span>`
+              }
+            </td>
           </tr>
         `
       );
     });
   }
 
-  function renderMonthlyProgressTable() {
-    const tbody = document.querySelector("#monthlyProgressTableBody");
+  function openPipeDiameterModal(id) {
+    const existing = id
+      ? dashboardData.pipe_diameter_progress.find((x) => x.id === id)
+      : null;
+
+    openCrudModal({
+      title: existing ? "Edit Pipe Diameter Wise Progress" : "Add Pipe Diameter Wise Progress",
+      fields: [
+        inputField("Pipe Diameter", "diameter", existing?.diameter, "text", true),
+        inputField("Proposed Length (m)", "proposedLength", existing?.proposedLength ?? 0, "number", true, "0.01"),
+        inputField("Executed (m)", "executed", existing?.executed ?? 0, "number", true, "0.01"),
+      ],
+      onSubmit: async (payload) => {
+        payload.projectId = PROJECT_ID;
+        payload.proposedLength = numberValue(payload.proposedLength);
+        payload.executed = numberValue(payload.executed);
+
+        if (id) {
+          await WSDP_API.request(
+            "PUT",
+            `/construction-progress/pipe-diameter-progress/${id}`,
+            payload
+          );
+        } else {
+          await WSDP_API.request(
+            "POST",
+            "/construction-progress/pipe-diameter-progress",
+            payload
+          );
+        }
+
+        toast("Pipe diameter progress saved successfully");
+        await loadDashboard();
+      },
+    });
+  }
+
+  async function deletePipeDiameterProgress(id) {
+    if (!confirm("Delete this pipe diameter progress row?")) return;
+
+    await WSDP_API.request(
+      "DELETE",
+      `/construction-progress/pipe-diameter-progress/${id}`
+    );
+
+    toast("Pipe diameter progress row deleted");
+    await loadDashboard();
+  }
+
+  /* =========================
+     ACTIVITY WISE PROGRESS
+  ========================= */
+
+  function renderActivityProgressTable() {
+    const tbody = document.querySelector("#activityProgressTableBody");
     if (!tbody) return;
 
-    const rows =
-      dashboardData?.monthly_progress ||
-      dashboardData?.monthlyProgress ||
-      dashboardData?.progress_monthly ||
-      FALLBACK_MONTHLY_PROGRESS;
+    const isLive = Array.isArray(dashboardData?.activity_progress) && dashboardData.activity_progress.length;
+    const rows = pickRows(dashboardData?.activity_progress, FALLBACK_ACTIVITY_PROGRESS);
 
     tbody.innerHTML = "";
 
     if (!rows.length) {
-      tbody.innerHTML = emptyRow(4, "No monthly progress data available.");
+      tbody.innerHTML = emptyRow(7, "No activity-wise progress data available.");
       return;
     }
 
-    rows.forEach((item) => {
+    rows.forEach((item, index) => {
       const unit = item.unit || "";
+      const totalPercent = item.totalPercent;
 
       tbody.insertAdjacentHTML(
         "beforeend",
         `
           <tr>
-            <td>${escapeHtml(item.activity || item.activityName || "-")}</td>
-            <td class="num">${formatMaybeValue(item.previousMonth ?? item.previous_month, unit)}</td>
-            <td class="num">${formatMaybeValue(item.currentMonth ?? item.current_month, unit)}</td>
+            <td class="sno-col">${index + 1}</td>
+            <td>${escapeHtml(item.activity)}</td>
+            <td class="num">${formatMaybeValue(item.previousMonth, unit)}</td>
+            <td class="num">${formatMaybeValue(item.currentMonth, unit)}</td>
             <td class="num">${formatMaybeValue(item.cumulative, unit)}</td>
+            <td class="num">${hasNumericValue(totalPercent) ? `${numberValue(totalPercent).toFixed(1)}%` : "-"}</td>
+            <td class="actions-col">
+              ${
+                isLive
+                  ? `
+                    <button class="btn-ghost edit-activity-progress" type="button" data-id="${item.id}">Edit</button>
+                    <button class="btn-ghost delete-activity-progress" type="button" data-id="${item.id}">Delete</button>
+                  `
+                  : `<span style="color:var(--text-muted);font-size:12px;">Report data</span>`
+              }
+            </td>
           </tr>
         `
       );
     });
+  }
+
+  function openActivityProgressModal(id) {
+    const existing = id
+      ? dashboardData.activity_progress.find((x) => x.id === id)
+      : null;
+
+    openCrudModal({
+      title: existing ? "Edit Activity Wise Progress" : "Add Activity Wise Progress",
+      fields: [
+        inputField("Activity", "activity", existing?.activity, "text", true),
+        inputField("Previous Month", "previousMonth", existing?.previousMonth ?? 0, "number", true, "0.01"),
+        inputField("Current Month", "currentMonth", existing?.currentMonth ?? 0, "number", true, "0.01"),
+        inputField("Cumulative", "cumulative", existing?.cumulative ?? 0, "number", true, "0.01"),
+        inputField("Total (%)", "totalPercent", existing?.totalPercent ?? 0, "number", true, "0.1"),
+        inputField("Unit", "unit", existing?.unit || "km", "text", false),
+      ],
+      onSubmit: async (payload) => {
+        payload.projectId = PROJECT_ID;
+        payload.previousMonth = numberValue(payload.previousMonth);
+        payload.currentMonth = numberValue(payload.currentMonth);
+        payload.cumulative = numberValue(payload.cumulative);
+        payload.totalPercent = numberValue(payload.totalPercent);
+
+        if (id) {
+          await WSDP_API.request(
+            "PUT",
+            `/construction-progress/activity-progress/${id}`,
+            payload
+          );
+        } else {
+          await WSDP_API.request(
+            "POST",
+            "/construction-progress/activity-progress",
+            payload
+          );
+        }
+
+        toast("Activity-wise progress saved successfully");
+        await loadDashboard();
+      },
+    });
+  }
+
+  async function deleteActivityProgress(id) {
+    if (!confirm("Delete this activity-wise progress row?")) return;
+
+    await WSDP_API.request(
+      "DELETE",
+      `/construction-progress/activity-progress/${id}`
+    );
+
+    toast("Activity-wise progress row deleted");
+    await loadDashboard();
   }
 
   function updatePipelineAreaChart() {
@@ -602,11 +715,27 @@
       return;
     }
 
-    const rows = FALLBACK_AREA_PROGRESS;
+    const rows = pickRows(dashboardData?.area_progress, null) || [];
 
-    chart.data.labels = rows.map((item) => item.area);
-    chart.data.datasets[0].data = rows.map((item) => numberValue(item.planned));
-    chart.data.datasets[1].data = rows.map((item) => numberValue(item.actual));
+    if (rows.length) {
+      chart.data.labels = rows.map((item) => normalizeAreaName(item.area));
+      chart.data.datasets[0].data = rows.map((item) => numberValue(item.contract) / 1000);
+      chart.data.datasets[1].data = rows.map((item) => numberValue(item.executed) / 1000);
+    } else {
+      const fallbackRows = [
+        { area: "Casa Verde", planned: 0.180, actual: 0.204 },
+        { area: "Escola Portuguesa", planned: 0.800, actual: 0.324 },
+        { area: "Cowboy I", planned: 0.000, actual: 0.000 },
+        { area: "Sofrio", planned: 2.108, actual: 0.798 },
+        { area: "João de Almeida", planned: 2.500, actual: 0.000 },
+        { area: "Caixote ou Socombar", planned: 0.500, actual: 0.342 },
+        { area: "Arimba", planned: 0.000, actual: 0.000 },
+      ];
+      chart.data.labels = fallbackRows.map((item) => item.area);
+      chart.data.datasets[0].data = fallbackRows.map((item) => numberValue(item.planned));
+      chart.data.datasets[1].data = fallbackRows.map((item) => numberValue(item.actual));
+    }
+
     chart.update();
   }
 
@@ -615,7 +744,10 @@
   ========================= */
 
   function renderHouseKpis() {
-    const totals = REPORT_HOUSE_CONNECTIONS;
+    const override = dashboardData?.house_summary;
+
+    const totals = override || REPORT_HOUSE_CONNECTIONS;
+    const scopeTotal = numberValue(totals.completed) + numberValue(totals.inProgress) + numberValue(totals.remaining) || 1;
 
     setCountValue("houseCompletedCount", totals.completed, 0);
     setCountValue("houseInProgressCount", totals.inProgress, 0);
@@ -636,13 +768,40 @@
       ?.closest(".card-body")
       ?.querySelector(".kpi-card__delta");
 
-    if (completedDelta) completedDelta.textContent = "0.0% of scope";
-    if (inProgressDelta) inProgressDelta.textContent = "0.0% of scope";
-    if (remainingDelta) remainingDelta.textContent = "100.0% of scope";
+    if (completedDelta) completedDelta.textContent = `${((numberValue(totals.completed) / scopeTotal) * 100).toFixed(1)}% of scope`;
+    if (inProgressDelta) inProgressDelta.textContent = `${((numberValue(totals.inProgress) / scopeTotal) * 100).toFixed(1)}% of scope`;
+    if (remainingDelta) remainingDelta.textContent = `${((numberValue(totals.remaining) / scopeTotal) * 100).toFixed(1)}% of scope`;
+  }
+
+  function openHouseSummaryModal() {
+    const totals = dashboardData?.house_summary || REPORT_HOUSE_CONNECTIONS;
+
+    openCrudModal({
+      title: "Update House Connections Summary",
+      fields: [
+        inputField("Completed", "completed", totals.completed, "number", true),
+        inputField("In Progress", "inProgress", totals.inProgress, "number", true),
+        inputField("Remaining", "remaining", totals.remaining, "number", true),
+      ],
+      onSubmit: async (payload) => {
+        payload.completed = parseInt(payload.completed || 0, 10);
+        payload.inProgress = parseInt(payload.inProgress || 0, 10);
+        payload.remaining = parseInt(payload.remaining || 0, 10);
+
+        await WSDP_API.request(
+          "PUT",
+          `/construction-progress/house-summary/${PROJECT_ID}`,
+          payload
+        );
+
+        toast("House connections summary updated");
+        await loadDashboard();
+      },
+    });
   }
 
   /* =========================
-     TESTING
+     TESTING (Pressure Testing Status)
   ========================= */
 
   function renderTestingTable() {
@@ -654,17 +813,18 @@
     tbody.innerHTML = "";
 
     if (!rows.length) {
-      tbody.innerHTML = emptyRow(5, "No testing activities added yet.");
+      tbody.innerHTML = emptyRow(6, "No testing activities added yet.");
       return;
     }
 
-    rows.forEach((activity) => {
+    rows.forEach((activity, index) => {
       const isReportFallback = String(activity.id || "").startsWith("report-");
 
       tbody.insertAdjacentHTML(
         "beforeend",
         `
           <tr>
+            <td class="sno-col">${index + 1}</td>
             <td>${escapeHtml(activity.activityName || activity.name || "-")}</td>
             <td class="num">${formatProgressValue(activity.plannedValue ?? activity.planned, activity.unit || "")}</td>
             <td class="num">${formatProgressValue(activity.actualValue ?? activity.actual, activity.unit || "")}</td>
@@ -751,11 +911,11 @@
   }
 
   /* =========================
-     VALVE SUMMARY
+     VALVE SUMMARY (Valve Chamber Construction Progress)
   ========================= */
 
   function renderValveSummary() {
-    const valve = REPORT_VALVE_SUMMARY;
+    const valve = dashboardData?.valve || REPORT_VALVE_SUMMARY;
 
     setText("valvePlannedCount", valve.planned);
     setText("valveCompletedCount", valve.completed);
@@ -798,7 +958,7 @@
   }
 
   /* =========================
-     BRIDGE CROSSINGS
+     BRIDGE CROSSINGS (Bridge-Crossing Structure Progress)
   ========================= */
 
   function renderBridgeCrossingsTable() {
@@ -810,17 +970,18 @@
     tbody.innerHTML = "";
 
     if (!rows.length) {
-      tbody.innerHTML = emptyRow(5, "No bridge crossings added yet.");
+      tbody.innerHTML = emptyRow(6, "No bridge crossings added yet.");
       return;
     }
 
-    rows.forEach((crossing) => {
+    rows.forEach((crossing, index) => {
       const isReportFallback = String(crossing.id || "").startsWith("report-");
 
       tbody.insertAdjacentHTML(
         "beforeend",
         `
           <tr>
+            <td class="sno-col">${index + 1}</td>
             <td>${escapeHtml(crossing.area || crossing.crossingName || "-")}</td>
             <td>${escapeHtml(crossing.crossingType || crossing.type || "-")}</td>
             <td class="num">${escapeHtml(crossing.span || "-")}</td>
@@ -1204,6 +1365,50 @@
     if (!target) return;
 
     try {
+      if (target.id === "editPipelineSummaryBtn") {
+        openPipelineSummaryModal();
+      }
+
+      if (target.id === "addAreaProgressBtn") {
+        openAreaProgressModal();
+      }
+
+      if (target.classList.contains("edit-area-progress")) {
+        openAreaProgressModal(target.dataset.id);
+      }
+
+      if (target.classList.contains("delete-area-progress")) {
+        await deleteAreaProgress(target.dataset.id);
+      }
+
+      if (target.id === "addPipeDiameterBtn") {
+        openPipeDiameterModal();
+      }
+
+      if (target.classList.contains("edit-pipe-diameter")) {
+        openPipeDiameterModal(target.dataset.id);
+      }
+
+      if (target.classList.contains("delete-pipe-diameter")) {
+        await deletePipeDiameterProgress(target.dataset.id);
+      }
+
+      if (target.id === "addActivityProgressBtn") {
+        openActivityProgressModal();
+      }
+
+      if (target.classList.contains("edit-activity-progress")) {
+        openActivityProgressModal(target.dataset.id);
+      }
+
+      if (target.classList.contains("delete-activity-progress")) {
+        await deleteActivityProgress(target.dataset.id);
+      }
+
+      if (target.id === "editHouseSummaryBtn") {
+        openHouseSummaryModal();
+      }
+
       if (target.id === "addTestingActivityBtn") {
         openTestingModal();
       }
