@@ -19,13 +19,13 @@
      REPORT-BASED FALLBACK DATA
      Source: 50CS3_LUBANGO_UCP-P_ENG_MR_Technical_July 2026 report
 
-     This is used ONLY as an offline safety net if the dashboard API
-     call fails entirely (network/CORS/500). In normal operation the
-     backend auto-seeds these same figures as real, editable database
-     rows the first time a project's dashboard loads — so every row
-     you see on the module has a genuine id, and Edit/Delete always
-     work. This local copy just guarantees the page is never left
-     blank if the API is briefly unreachable.
+     Used ONLY as an offline safety net if the very first dashboard
+     fetch fails entirely (network/CORS/500), so the page is never left
+     blank. Once the initial load succeeds, all further Add/Edit/Delete
+     actions patch dashboardData directly from the server's save
+     response (see the CRUD handlers below) — they never re-fetch the
+     whole dashboard, so a slow or failing GET can no longer make an
+     already-saved edit appear to "revert".
      ========================================================= */
 
   const FALLBACK_PIPELINE_SUMMARY = {
@@ -88,10 +88,9 @@
     { area: "As per Detailed Design", crossingType: "River/Stream Crossing", span: "3 Nos Planned", status: "Not Started" },
   ];
 
-  // Per-table arrays of whatever rows are currently rendered (live from the
-  // API OR the local fallback above). Populated fresh on every render call
-  // and used by the Edit/Delete button handlers to look the row up by its
-  // position in the table rather than assuming a backend id always exists.
+  // Per-table arrays of whatever rows are currently rendered. Populated
+  // fresh on every render call and used by Edit/Delete button handlers to
+  // look the row up by its position in the table.
   let currentAreaRows = [];
   let currentPipeDiameterRows = [];
   let currentActivityRows = [];
@@ -134,13 +133,40 @@
     return formatProgressValue(value, unit);
   }
 
-  // Returns `source` when it is a non-empty array, otherwise falls back to
-  // the provided report-based fallback rows.
   function pickRows(source, fallback) {
     if (Array.isArray(source) && source.length) {
       return source;
     }
     return Array.isArray(fallback) ? fallback : [];
+  }
+
+  // Ensures dashboardData and the named array field both exist, so local
+  // patch helpers never throw against a null/undefined dashboardData (e.g.
+  // if the very first fetch failed and the page is still showing fallback
+  // data when the user performs their first Add).
+  function ensureDashboardArray(field) {
+    if (!dashboardData) {
+      dashboardData = {};
+    }
+    if (!Array.isArray(dashboardData[field])) {
+      dashboardData[field] = [];
+    }
+    return dashboardData[field];
+  }
+
+  function upsertById(list, item) {
+    if (!item || !item.id) return list;
+    const idx = list.findIndex((x) => x.id === item.id);
+    if (idx === -1) {
+      list.push(item);
+    } else {
+      list[idx] = item;
+    }
+    return list;
+  }
+
+  function removeById(list, id) {
+    return list.filter((x) => x.id !== id);
   }
 
   function normalizeAreaName(value) {
@@ -260,6 +286,12 @@
     return true;
   }
 
+  // Full dashboard fetch. Called ONCE on page load (via wsdp:authready).
+  // Deliberately NOT called after individual Add/Edit/Delete actions —
+  // those patch dashboardData directly from the save response instead
+  // (see applyXxx helpers below), which is both faster (no 10-table
+  // re-fetch per click) and immune to a slow/failing GET making a
+  // just-saved edit look like it "reverted".
   async function loadDashboard() {
     try {
       if (!PROJECT_ID) {
@@ -281,9 +313,6 @@
         error.message || "Live data unavailable — showing latest report figures",
         "fa-circle-exclamation"
       );
-      // Even if the backend call fails (404 / 500 / CORS / not authenticated yet),
-      // still render the tables using the report-based fallback data so the
-      // page is never left blank.
       dashboardData = null;
       renderAll();
     }
@@ -377,26 +406,24 @@
         payload.laidKm = numberValue(payload.laidKm);
         payload.hydroTestedKm = numberValue(payload.hydroTestedKm);
 
-        await WSDP_API.request(
+        const response = await WSDP_API.request(
           "PUT",
           `/construction-progress/pipeline-summary/${PROJECT_ID}`,
           payload
         );
 
+        const saved = unwrap(response);
+        if (!dashboardData) dashboardData = {};
+        dashboardData.pipeline_summary = saved;
+        renderPipelineKpis();
+
         toast("Pipeline progress updated");
-        await loadDashboard();
       },
     });
   }
 
   /* =========================
      AREA-WISE PROGRESS
-     Every row — live from the API or local fallback — gets a working Edit
-     button. If the row has a real database id, Edit saves via PUT and
-     Delete is available. If it doesn't (fallback data only, e.g. because
-     the API call failed), Edit instead saves via POST, creating a real
-     persisted row from those values; Delete is hidden since there is
-     nothing in the database yet to delete.
   ========================= */
 
   function renderAreaProgressTable() {
@@ -463,22 +490,28 @@
         payload.contract = numberValue(payload.contract);
         payload.executed = numberValue(payload.executed);
 
+        let response;
         if (existing?.id) {
-          await WSDP_API.request(
+          response = await WSDP_API.request(
             "PUT",
             `/construction-progress/area-progress/${existing.id}`,
             payload
           );
         } else {
-          await WSDP_API.request(
+          response = await WSDP_API.request(
             "POST",
             "/construction-progress/area-progress",
             payload
           );
         }
 
+        const saved = unwrap(response);
+        const list = ensureDashboardArray("area_progress");
+        upsertById(list, saved);
+        renderAreaProgressTable();
+        updatePipelineAreaChart();
+
         toast("Area-wise progress saved successfully");
-        await loadDashboard();
       },
     });
   }
@@ -493,8 +526,11 @@
       `/construction-progress/area-progress/${existing.id}`
     );
 
+    dashboardData.area_progress = removeById(ensureDashboardArray("area_progress"), existing.id);
+    renderAreaProgressTable();
+    updatePipelineAreaChart();
+
     toast("Area-wise progress row deleted");
-    await loadDashboard();
   }
 
   /* =========================
@@ -555,22 +591,27 @@
         payload.proposedLength = numberValue(payload.proposedLength);
         payload.executed = numberValue(payload.executed);
 
+        let response;
         if (existing?.id) {
-          await WSDP_API.request(
+          response = await WSDP_API.request(
             "PUT",
             `/construction-progress/pipe-diameter-progress/${existing.id}`,
             payload
           );
         } else {
-          await WSDP_API.request(
+          response = await WSDP_API.request(
             "POST",
             "/construction-progress/pipe-diameter-progress",
             payload
           );
         }
 
+        const saved = unwrap(response);
+        const list = ensureDashboardArray("pipe_diameter_progress");
+        upsertById(list, saved);
+        renderPipeDiameterTable();
+
         toast("Pipe diameter progress saved successfully");
-        await loadDashboard();
       },
     });
   }
@@ -585,8 +626,10 @@
       `/construction-progress/pipe-diameter-progress/${existing.id}`
     );
 
+    dashboardData.pipe_diameter_progress = removeById(ensureDashboardArray("pipe_diameter_progress"), existing.id);
+    renderPipeDiameterTable();
+
     toast("Pipe diameter progress row deleted");
-    await loadDashboard();
   }
 
   /* =========================
@@ -652,22 +695,27 @@
         payload.cumulative = numberValue(payload.cumulative);
         payload.totalPercent = numberValue(payload.totalPercent);
 
+        let response;
         if (existing?.id) {
-          await WSDP_API.request(
+          response = await WSDP_API.request(
             "PUT",
             `/construction-progress/activity-progress/${existing.id}`,
             payload
           );
         } else {
-          await WSDP_API.request(
+          response = await WSDP_API.request(
             "POST",
             "/construction-progress/activity-progress",
             payload
           );
         }
 
+        const saved = unwrap(response);
+        const list = ensureDashboardArray("activity_progress");
+        upsertById(list, saved);
+        renderActivityProgressTable();
+
         toast("Activity-wise progress saved successfully");
-        await loadDashboard();
       },
     });
   }
@@ -682,8 +730,10 @@
       `/construction-progress/activity-progress/${existing.id}`
     );
 
+    dashboardData.activity_progress = removeById(ensureDashboardArray("activity_progress"), existing.id);
+    renderActivityProgressTable();
+
     toast("Activity-wise progress row deleted");
-    await loadDashboard();
   }
 
   function updatePipelineAreaChart() {
@@ -766,14 +816,18 @@
         payload.inProgress = parseInt(payload.inProgress || 0, 10);
         payload.remaining = parseInt(payload.remaining || 0, 10);
 
-        await WSDP_API.request(
+        const response = await WSDP_API.request(
           "PUT",
           `/construction-progress/house-summary/${PROJECT_ID}`,
           payload
         );
 
+        const saved = unwrap(response);
+        if (!dashboardData) dashboardData = {};
+        dashboardData.house_summary = saved;
+        renderHouseKpis();
+
         toast("House connections summary updated");
-        await loadDashboard();
       },
     });
   }
@@ -851,22 +905,27 @@
         payload.plannedValue = numberValue(payload.plannedValue);
         payload.actualValue = numberValue(payload.actualValue);
 
+        let response;
         if (existing?.id) {
-          await WSDP_API.request(
+          response = await WSDP_API.request(
             "PUT",
             `/construction-progress/testing-activity/${existing.id}`,
             payload
           );
         } else {
-          await WSDP_API.request(
+          response = await WSDP_API.request(
             "POST",
             "/construction-progress/testing-activity",
             payload
           );
         }
 
+        const saved = unwrap(response);
+        const list = ensureDashboardArray("testing");
+        upsertById(list, saved);
+        renderTestingTable();
+
         toast("Testing activity saved successfully");
-        await loadDashboard();
       },
     });
   }
@@ -881,8 +940,10 @@
       `/construction-progress/testing-activity/${existing.id}`
     );
 
+    dashboardData.testing = removeById(ensureDashboardArray("testing"), existing.id);
+    renderTestingTable();
+
     toast("Testing activity deleted");
-    await loadDashboard();
   }
 
   /* =========================
@@ -920,14 +981,18 @@
         payload.inProgress = parseInt(payload.inProgress || 0, 10);
         payload.notStarted = parseInt(payload.notStarted || 0, 10);
 
-        await WSDP_API.request(
+        const response = await WSDP_API.request(
           "PUT",
           `/construction-progress/valve-summary/${PROJECT_ID}`,
           payload
         );
 
+        const saved = unwrap(response);
+        if (!dashboardData) dashboardData = {};
+        dashboardData.valve = saved;
+        renderValveSummary();
+
         toast("Valve chamber summary updated");
-        await loadDashboard();
       },
     });
   }
@@ -1004,22 +1069,27 @@
         payload.crossingName = payload.area;
         payload.method = payload.span;
 
+        let response;
         if (existing?.id) {
-          await WSDP_API.request(
+          response = await WSDP_API.request(
             "PUT",
             `/construction-progress/bridge-crossing/${existing.id}`,
             payload
           );
         } else {
-          await WSDP_API.request(
+          response = await WSDP_API.request(
             "POST",
             "/construction-progress/bridge-crossing",
             payload
           );
         }
 
+        const saved = unwrap(response);
+        const list = ensureDashboardArray("crossings");
+        upsertById(list, saved);
+        renderBridgeCrossingsTable();
+
         toast("Bridge crossing saved successfully");
-        await loadDashboard();
       },
     });
   }
@@ -1034,8 +1104,10 @@
       `/construction-progress/bridge-crossing/${existing.id}`
     );
 
+    dashboardData.crossings = removeById(ensureDashboardArray("crossings"), existing.id);
+    renderBridgeCrossingsTable();
+
     toast("Bridge crossing deleted");
-    await loadDashboard();
   }
 
   /* =========================
@@ -1061,6 +1133,12 @@
       e.preventDefault();
 
       const payload = Object.fromEntries(new FormData(form));
+      const submitBtn = document.querySelector('button[form="crudForm"]');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.dataset.originalText = submitBtn.textContent;
+        submitBtn.textContent = "Saving...";
+      }
 
       try {
         await config.onSubmit(payload);
@@ -1068,6 +1146,11 @@
       } catch (err) {
         console.error(err);
         toast(err.message || "Save failed", "fa-circle-exclamation");
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = submitBtn.dataset.originalText || "Save";
+        }
       }
     };
   }
@@ -1433,11 +1516,9 @@
   document.addEventListener("DOMContentLoaded", function () {
     initConstructionDateRangePicker();
 
-    // Render tables immediately with report-based fallback data (dashboardData
-    // is still null at this point). This guarantees the tables are never left
-    // blank, even if the "wsdp:authready" event is delayed, never fires, or the
-    // backend dashboard endpoint errors out. Once live data loads successfully
-    // (see loadDashboard/renderAll below), this gets overwritten automatically.
+    // Render tables immediately with report-based fallback data. This
+    // guarantees the tables are never left blank while waiting for
+    // "wsdp:authready" to fire and the real loadDashboard() to complete.
     renderAll();
 
     const areaFilter = document.getElementById("areaScopeFilter");
