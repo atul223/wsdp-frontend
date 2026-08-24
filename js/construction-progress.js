@@ -20,12 +20,10 @@
      Source: 50CS3_LUBANGO_UCP-P_ENG_MR_Technical_July 2026 report
 
      Used ONLY as a last-resort offline safety net if the dashboard GET
-     fails even after retries (see loadDashboard below), so the page is
-     never left blank. Once the initial load succeeds, all further
-     Add/Edit/Delete actions patch dashboardData directly from the
-     server's save response — they never re-fetch the whole dashboard,
-     so a slow or failing GET elsewhere can no longer make an
-     already-saved edit appear to "revert".
+     fails even after retries, so the page is never left blank. Once the
+     initial load succeeds, all further Add/Edit/Delete actions patch
+     dashboardData directly from the server's save response — they never
+     re-fetch the whole dashboard for their own sake.
      ========================================================= */
 
   const FALLBACK_PIPELINE_SUMMARY = {
@@ -248,6 +246,17 @@
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  // Appends a cache-busting query param so this exact URL is NEVER reused
+  // by a browser HTTP cache or an intermediate CDN/proxy cache (this
+  // stack's frontend sits behind Cloudflare). Combined with the
+  // Cache-Control: no-store headers the backend now sends on these two
+  // GET endpoints, this closes off caching as a possible cause of a
+  // refresh showing stale, pre-edit data.
+  function noCacheUrl(url) {
+    const sep = url.includes("?") ? "&" : "?";
+    return `${url}${sep}_ts=${Date.now()}`;
+  }
+
   async function ensureSessionAndProject() {
     let user = WSDP_API.getCurrentUser();
 
@@ -267,7 +276,7 @@
 
     const result = await WSDP_API.request(
       "GET",
-      "/construction-progress/default-project"
+      noCacheUrl("/construction-progress/default-project")
     );
 
     const project = unwrap(result);
@@ -286,13 +295,11 @@
     return true;
   }
 
-  // Full dashboard fetch. Called ONCE on page load. Retries a couple of
-  // times with a short backoff before giving up — this protects against
-  // exactly the kind of transient blip (Render cold start, brief pooler
-  // hiccup) that can otherwise make a single failed GET wrongly display
-  // the static fallback numbers in place of real, already-saved data.
-  // Individual Add/Edit/Delete actions never call this — they patch
-  // dashboardData directly from their own save response instead.
+  // Full dashboard fetch. Called ONCE on page load, with a couple of
+  // retries on transient failure. Individual Add/Edit/Delete actions
+  // never call this — they patch dashboardData directly from their own
+  // save response instead (see verifyRowPersisted below for the extra
+  // confirmation step on top of that).
   async function loadDashboard(attempt = 1) {
     const MAX_ATTEMPTS = 3;
 
@@ -304,14 +311,14 @@
 
       const response = await WSDP_API.request(
         "GET",
-        `/construction-progress/dashboard/${PROJECT_ID}`
+        noCacheUrl(`/construction-progress/dashboard/${PROJECT_ID}`)
       );
 
       dashboardData = unwrap(response);
 
       renderAll();
     } catch (error) {
-      if (attempt < MAX_ATTEMPTS) {
+      if (attempt < 3) {
         console.warn(
           `[construction-progress] dashboard fetch failed (attempt ${attempt}/${MAX_ATTEMPTS}), retrying...`,
           error
@@ -327,6 +334,41 @@
       );
       dashboardData = null;
       renderAll();
+    }
+  }
+
+  /**
+   * *** EXTRA SAFETY NET ***
+   * After a create/update returns what LOOKS like a successful save
+   * (a row with a real id), this independently re-fetches the dashboard
+   * fresh (no-store + cache-busted, bypassing everything we just patched
+   * in memory) and confirms the saved row is actually present in that
+   * fresh response. If it is NOT — meaning something server-side or a
+   * caching layer we don't control is dropping it — the user is warned
+   * IMMEDIATELY, at the moment of saving, instead of silently discovering
+   * a "lost" edit after a later refresh.
+   */
+  async function verifyRowPersisted(field, id, label) {
+    try {
+      const response = await WSDP_API.request(
+        "GET",
+        noCacheUrl(`/construction-progress/dashboard/${PROJECT_ID}`)
+      );
+      const fresh = unwrap(response);
+      const rows = Array.isArray(fresh?.[field]) ? fresh[field] : [];
+      const found = rows.some((row) => row.id === id);
+
+      if (!found) {
+        console.error(`[construction-progress] verification failed: ${label} id=${id} not found in a fresh, uncached re-fetch.`);
+        toast(
+          `Warning: "${label}" saved, but could not be verified on a fresh reload. Please refresh and check.`,
+          "fa-triangle-exclamation"
+        );
+      }
+    } catch (err) {
+      // Verification itself failing (e.g. transient network issue) should
+      // not be treated as proof the save failed — just log it.
+      console.warn(`[construction-progress] could not verify persistence of ${label}:`, err);
     }
   }
 
@@ -527,6 +569,7 @@
         updatePipelineAreaChart();
 
         toast("Area-wise progress saved successfully");
+        verifyRowPersisted("area_progress", saved.id, `Area: ${saved.area}`);
       },
     });
   }
@@ -630,6 +673,7 @@
         renderPipeDiameterTable();
 
         toast("Pipe diameter progress saved successfully");
+        verifyRowPersisted("pipe_diameter_progress", saved.id, `Diameter: ${saved.diameter}`);
       },
     });
   }
@@ -737,6 +781,7 @@
         renderActivityProgressTable();
 
         toast("Activity-wise progress saved successfully");
+        verifyRowPersisted("activity_progress", saved.id, `Activity: ${saved.activity}`);
       },
     });
   }
@@ -950,6 +995,7 @@
         renderTestingTable();
 
         toast("Testing activity saved successfully");
+        verifyRowPersisted("testing", saved.id, `Testing: ${saved.activityName}`);
       },
     });
   }
@@ -1117,6 +1163,7 @@
         renderBridgeCrossingsTable();
 
         toast("Bridge crossing saved successfully");
+        verifyRowPersisted("crossings", saved.id, `Crossing: ${saved.crossingName}`);
       },
     });
   }
