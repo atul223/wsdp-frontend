@@ -16,35 +16,38 @@
   let dashboardData = null;
 
   /* =========================================================
-     REPORT-BASED DATA
+     REPORT-BASED FALLBACK DATA
      Source: 50CS3_LUBANGO_UCP-P_ENG_MR_Technical_July 2026 report
-     Used only until live data exists in the backend for each table —
-     once a row is added/edited on the module it is persisted via the
-     API and this fallback is no longer shown for that table.
+
+     This is used ONLY as an offline safety net if the dashboard API
+     call fails entirely (network/CORS/500). In normal operation the
+     backend auto-seeds these same figures as real, editable database
+     rows the first time a project's dashboard loads — so every row
+     you see on the module has a genuine id, and Edit/Delete always
+     work. This local copy just guarantees the page is never left
+     blank if the API is briefly unreachable.
      ========================================================= */
 
-  const REPORT_PIPELINE_SUMMARY = {
+  const FALLBACK_PIPELINE_SUMMARY = {
     total: 70.0,
     laid: 31.2005,
     hydroTested: 0,
     remaining: 38.7995,
   };
 
-  const REPORT_HOUSE_CONNECTIONS = {
+  const FALLBACK_HOUSE_CONNECTIONS = {
     completed: 0,
     inProgress: 0,
     remaining: 5000,
   };
 
-  const REPORT_VALVE_SUMMARY = {
+  const FALLBACK_VALVE_SUMMARY = {
     planned: 11,
     completed: 0,
     inProgress: 0,
     notStarted: 11,
   };
 
-  // Area-wise Progress (Section 3.2 Planning Control). Values converted to
-  // metres to match the "(m)" columns: Design Report / Contract / Executed.
   const FALLBACK_AREA_PROGRESS = [
     { area: "Casa Verde", designReport: 180, contract: 180, executed: 204 },
     { area: "Escola Portuguesa", designReport: 800, contract: 800, executed: 324 },
@@ -55,7 +58,6 @@
     { area: "Arimba", designReport: 0, contract: 0, executed: 0 },
   ];
 
-  // Pipe Diameter Wise Progress — Proposed Length / Executed, in metres.
   const FALLBACK_PIPE_DIAMETER_PROGRESS = [
     { diameter: "De63 mm", proposedLength: 18796, executed: 16877 },
     { diameter: "De75 mm", proposedLength: 1078, executed: 768 },
@@ -69,7 +71,6 @@
     { diameter: "Steel Pipe", proposedLength: 79, executed: 0 },
   ];
 
-  // Activity Wise Progress (Section 3.2 Planning Control + Executive Summary)
   const FALLBACK_ACTIVITY_PROGRESS = [
     { activity: "Pipeline Installation", previousMonth: 29.5325, currentMonth: 1.668, cumulative: 31.2005, totalPercent: 44.6, unit: "km" },
     { activity: "Hydro Testing", previousMonth: 0, currentMonth: 0, cumulative: 0, totalPercent: 0, unit: "km" },
@@ -78,36 +79,24 @@
     { activity: "Bridge Crossings", previousMonth: 0, currentMonth: 0, cumulative: 0, totalPercent: 0, unit: "Nos (of 3 planned)" },
   ];
 
-  // Testing & Commissioning (Section 3.4 Tests / Executive Summary - Pressure/Disinfection Tests [E])
   const FALLBACK_TESTING_ACTIVITIES = [
-    {
-      id: "report-testing-1",
-      activityName: "Pipeline Pressure Testing",
-      plannedValue: 70.0,
-      actualValue: 0,
-      unit: "km",
-      status: "Not Started",
-    },
-    {
-      id: "report-testing-2",
-      activityName: "Disinfection Testing",
-      plannedValue: 70.0,
-      actualValue: 0,
-      unit: "km",
-      status: "Not Started",
-    }
+    { activityName: "Pipeline Pressure Testing", plannedValue: 70.0, actualValue: 0, unit: "km", status: "Not Started" },
+    { activityName: "Disinfection Testing", plannedValue: 70.0, actualValue: 0, unit: "km", status: "Not Started" },
   ];
 
-  // Bridge Crossings (Section 2.2 Table 1 - "Pipeline crossing a river/stream: 3 no's")
   const FALLBACK_BRIDGE_CROSSINGS = [
-    {
-      id: "report-bridge-1",
-      area: "As per Detailed Design",
-      crossingType: "River/Stream Crossing",
-      span: "3 Nos Planned",
-      status: "Not Started",
-    }
+    { area: "As per Detailed Design", crossingType: "River/Stream Crossing", span: "3 Nos Planned", status: "Not Started" },
   ];
+
+  // Per-table arrays of whatever rows are currently rendered (live from the
+  // API OR the local fallback above). Populated fresh on every render call
+  // and used by the Edit/Delete button handlers to look the row up by its
+  // position in the table rather than assuming a backend id always exists.
+  let currentAreaRows = [];
+  let currentPipeDiameterRows = [];
+  let currentActivityRows = [];
+  let currentTestingRows = [];
+  let currentBridgeRows = [];
 
   function unwrap(result) {
     return result?.data?.data ?? result?.data ?? result;
@@ -146,9 +135,7 @@
   }
 
   // Returns `source` when it is a non-empty array, otherwise falls back to
-  // the provided report-based fallback rows. Used by every table renderer so
-  // that live backend data (once available) always takes priority over the
-  // static report fallback.
+  // the provided report-based fallback rows.
   function pickRows(source, fallback) {
     if (Array.isArray(source) && source.length) {
       return source;
@@ -327,9 +314,9 @@
 
     const pipeline = override
       ? { laid: override.laidKm, hydroTested: override.hydroTestedKm, remaining: override.remainingKm }
-      : { laid: REPORT_PIPELINE_SUMMARY.laid, hydroTested: REPORT_PIPELINE_SUMMARY.hydroTested, remaining: REPORT_PIPELINE_SUMMARY.remaining };
+      : { laid: FALLBACK_PIPELINE_SUMMARY.laid, hydroTested: FALLBACK_PIPELINE_SUMMARY.hydroTested, remaining: FALLBACK_PIPELINE_SUMMARY.remaining };
 
-    const totalLength = override ? override.totalLengthKm : REPORT_PIPELINE_SUMMARY.total;
+    const totalLength = override ? override.totalLengthKm : FALLBACK_PIPELINE_SUMMARY.total;
 
     setCountValue("pipelineLaidKm", pipeline.laid, 1);
     setCountValue("pipelineHydroTestedKm", pipeline.hydroTested, 1);
@@ -373,9 +360,9 @@
   function openPipelineSummaryModal() {
     const override = dashboardData?.pipeline_summary;
     const current = override || {
-      totalLengthKm: REPORT_PIPELINE_SUMMARY.total,
-      laidKm: REPORT_PIPELINE_SUMMARY.laid,
-      hydroTestedKm: REPORT_PIPELINE_SUMMARY.hydroTested,
+      totalLengthKm: FALLBACK_PIPELINE_SUMMARY.total,
+      laidKm: FALLBACK_PIPELINE_SUMMARY.laid,
+      hydroTestedKm: FALLBACK_PIPELINE_SUMMARY.hydroTested,
     };
 
     openCrudModal({
@@ -404,14 +391,20 @@
 
   /* =========================
      AREA-WISE PROGRESS
+     Every row — live from the API or local fallback — gets a working Edit
+     button. If the row has a real database id, Edit saves via PUT and
+     Delete is available. If it doesn't (fallback data only, e.g. because
+     the API call failed), Edit instead saves via POST, creating a real
+     persisted row from those values; Delete is hidden since there is
+     nothing in the database yet to delete.
   ========================= */
 
   function renderAreaProgressTable() {
     const tbody = document.querySelector("#areaProgressTableBody");
     if (!tbody) return;
 
-    const isLive = Array.isArray(dashboardData?.area_progress) && dashboardData.area_progress.length;
     const rows = pickRows(dashboardData?.area_progress, FALLBACK_AREA_PROGRESS);
+    currentAreaRows = rows;
 
     tbody.innerHTML = "";
 
@@ -422,11 +415,12 @@
 
     rows.forEach((item, index) => {
       const areaName = normalizeAreaName(item.area);
-      const designReport = item.designReport ?? item.designReportM;
-      const contract = item.contract ?? item.contractM;
+      const designReport = item.designReport;
+      const contract = item.contract;
       const executed = item.executed;
       const balance = item.balance !== undefined ? item.balance : numberValue(contract) - numberValue(executed);
       const balanceClass = numberValue(balance) < 0 ? "down" : numberValue(balance) > 0 ? "up" : "flat";
+      const hasId = Boolean(item.id);
 
       tbody.insertAdjacentHTML(
         "beforeend",
@@ -443,14 +437,8 @@
               </span>
             </td>
             <td class="actions-col">
-              ${
-                isLive
-                  ? `
-                    <button class="btn-ghost edit-area-progress" type="button" data-id="${item.id}">Edit</button>
-                    <button class="btn-ghost delete-area-progress" type="button" data-id="${item.id}">Delete</button>
-                  `
-                  : `<span style="color:var(--text-muted);font-size:12px;">Report data</span>`
-              }
+              <button class="btn-ghost edit-area-progress" type="button" data-index="${index}">Edit</button>
+              ${hasId ? `<button class="btn-ghost delete-area-progress" type="button" data-index="${index}">Delete</button>` : ""}
             </td>
           </tr>
         `
@@ -458,10 +446,8 @@
     });
   }
 
-  function openAreaProgressModal(id) {
-    const existing = id
-      ? dashboardData.area_progress.find((x) => x.id === id)
-      : null;
+  function openAreaProgressModal(index) {
+    const existing = index !== null && index !== undefined ? currentAreaRows[index] : null;
 
     openCrudModal({
       title: existing ? "Edit Area-wise Progress" : "Add Area-wise Progress",
@@ -477,10 +463,10 @@
         payload.contract = numberValue(payload.contract);
         payload.executed = numberValue(payload.executed);
 
-        if (id) {
+        if (existing?.id) {
           await WSDP_API.request(
             "PUT",
-            `/construction-progress/area-progress/${id}`,
+            `/construction-progress/area-progress/${existing.id}`,
             payload
           );
         } else {
@@ -497,12 +483,14 @@
     });
   }
 
-  async function deleteAreaProgress(id) {
+  async function deleteAreaProgress(index) {
+    const existing = currentAreaRows[index];
+    if (!existing?.id) return;
     if (!confirm("Delete this area-wise progress row?")) return;
 
     await WSDP_API.request(
       "DELETE",
-      `/construction-progress/area-progress/${id}`
+      `/construction-progress/area-progress/${existing.id}`
     );
 
     toast("Area-wise progress row deleted");
@@ -517,8 +505,8 @@
     const tbody = document.querySelector("#pipeDiameterTableBody");
     if (!tbody) return;
 
-    const isLive = Array.isArray(dashboardData?.pipe_diameter_progress) && dashboardData.pipe_diameter_progress.length;
     const rows = pickRows(dashboardData?.pipe_diameter_progress, FALLBACK_PIPE_DIAMETER_PROGRESS);
+    currentPipeDiameterRows = rows;
 
     tbody.innerHTML = "";
 
@@ -531,6 +519,7 @@
       const proposedLength = item.proposedLength;
       const executed = item.executed;
       const balance = item.balance !== undefined ? item.balance : numberValue(proposedLength) - numberValue(executed);
+      const hasId = Boolean(item.id);
 
       tbody.insertAdjacentHTML(
         "beforeend",
@@ -542,14 +531,8 @@
             <td class="num">${formatProgressValue(executed, "m")}</td>
             <td class="num">${formatProgressValue(balance, "m")}</td>
             <td class="actions-col">
-              ${
-                isLive
-                  ? `
-                    <button class="btn-ghost edit-pipe-diameter" type="button" data-id="${item.id}">Edit</button>
-                    <button class="btn-ghost delete-pipe-diameter" type="button" data-id="${item.id}">Delete</button>
-                  `
-                  : `<span style="color:var(--text-muted);font-size:12px;">Report data</span>`
-              }
+              <button class="btn-ghost edit-pipe-diameter" type="button" data-index="${index}">Edit</button>
+              ${hasId ? `<button class="btn-ghost delete-pipe-diameter" type="button" data-index="${index}">Delete</button>` : ""}
             </td>
           </tr>
         `
@@ -557,10 +540,8 @@
     });
   }
 
-  function openPipeDiameterModal(id) {
-    const existing = id
-      ? dashboardData.pipe_diameter_progress.find((x) => x.id === id)
-      : null;
+  function openPipeDiameterModal(index) {
+    const existing = index !== null && index !== undefined ? currentPipeDiameterRows[index] : null;
 
     openCrudModal({
       title: existing ? "Edit Pipe Diameter Wise Progress" : "Add Pipe Diameter Wise Progress",
@@ -574,10 +555,10 @@
         payload.proposedLength = numberValue(payload.proposedLength);
         payload.executed = numberValue(payload.executed);
 
-        if (id) {
+        if (existing?.id) {
           await WSDP_API.request(
             "PUT",
-            `/construction-progress/pipe-diameter-progress/${id}`,
+            `/construction-progress/pipe-diameter-progress/${existing.id}`,
             payload
           );
         } else {
@@ -594,12 +575,14 @@
     });
   }
 
-  async function deletePipeDiameterProgress(id) {
+  async function deletePipeDiameterProgress(index) {
+    const existing = currentPipeDiameterRows[index];
+    if (!existing?.id) return;
     if (!confirm("Delete this pipe diameter progress row?")) return;
 
     await WSDP_API.request(
       "DELETE",
-      `/construction-progress/pipe-diameter-progress/${id}`
+      `/construction-progress/pipe-diameter-progress/${existing.id}`
     );
 
     toast("Pipe diameter progress row deleted");
@@ -614,8 +597,8 @@
     const tbody = document.querySelector("#activityProgressTableBody");
     if (!tbody) return;
 
-    const isLive = Array.isArray(dashboardData?.activity_progress) && dashboardData.activity_progress.length;
     const rows = pickRows(dashboardData?.activity_progress, FALLBACK_ACTIVITY_PROGRESS);
+    currentActivityRows = rows;
 
     tbody.innerHTML = "";
 
@@ -627,6 +610,7 @@
     rows.forEach((item, index) => {
       const unit = item.unit || "";
       const totalPercent = item.totalPercent;
+      const hasId = Boolean(item.id);
 
       tbody.insertAdjacentHTML(
         "beforeend",
@@ -639,14 +623,8 @@
             <td class="num">${formatMaybeValue(item.cumulative, unit)}</td>
             <td class="num">${hasNumericValue(totalPercent) ? `${numberValue(totalPercent).toFixed(1)}%` : "-"}</td>
             <td class="actions-col">
-              ${
-                isLive
-                  ? `
-                    <button class="btn-ghost edit-activity-progress" type="button" data-id="${item.id}">Edit</button>
-                    <button class="btn-ghost delete-activity-progress" type="button" data-id="${item.id}">Delete</button>
-                  `
-                  : `<span style="color:var(--text-muted);font-size:12px;">Report data</span>`
-              }
+              <button class="btn-ghost edit-activity-progress" type="button" data-index="${index}">Edit</button>
+              ${hasId ? `<button class="btn-ghost delete-activity-progress" type="button" data-index="${index}">Delete</button>` : ""}
             </td>
           </tr>
         `
@@ -654,10 +632,8 @@
     });
   }
 
-  function openActivityProgressModal(id) {
-    const existing = id
-      ? dashboardData.activity_progress.find((x) => x.id === id)
-      : null;
+  function openActivityProgressModal(index) {
+    const existing = index !== null && index !== undefined ? currentActivityRows[index] : null;
 
     openCrudModal({
       title: existing ? "Edit Activity Wise Progress" : "Add Activity Wise Progress",
@@ -676,10 +652,10 @@
         payload.cumulative = numberValue(payload.cumulative);
         payload.totalPercent = numberValue(payload.totalPercent);
 
-        if (id) {
+        if (existing?.id) {
           await WSDP_API.request(
             "PUT",
-            `/construction-progress/activity-progress/${id}`,
+            `/construction-progress/activity-progress/${existing.id}`,
             payload
           );
         } else {
@@ -696,12 +672,14 @@
     });
   }
 
-  async function deleteActivityProgress(id) {
+  async function deleteActivityProgress(index) {
+    const existing = currentActivityRows[index];
+    if (!existing?.id) return;
     if (!confirm("Delete this activity-wise progress row?")) return;
 
     await WSDP_API.request(
       "DELETE",
-      `/construction-progress/activity-progress/${id}`
+      `/construction-progress/activity-progress/${existing.id}`
     );
 
     toast("Activity-wise progress row deleted");
@@ -746,7 +724,7 @@
   function renderHouseKpis() {
     const override = dashboardData?.house_summary;
 
-    const totals = override || REPORT_HOUSE_CONNECTIONS;
+    const totals = override || FALLBACK_HOUSE_CONNECTIONS;
     const scopeTotal = numberValue(totals.completed) + numberValue(totals.inProgress) + numberValue(totals.remaining) || 1;
 
     setCountValue("houseCompletedCount", totals.completed, 0);
@@ -774,7 +752,7 @@
   }
 
   function openHouseSummaryModal() {
-    const totals = dashboardData?.house_summary || REPORT_HOUSE_CONNECTIONS;
+    const totals = dashboardData?.house_summary || FALLBACK_HOUSE_CONNECTIONS;
 
     openCrudModal({
       title: "Update House Connections Summary",
@@ -809,6 +787,7 @@
     if (!tbody) return;
 
     const rows = pickRows(dashboardData?.testing, FALLBACK_TESTING_ACTIVITIES);
+    currentTestingRows = rows;
 
     tbody.innerHTML = "";
 
@@ -818,33 +797,29 @@
     }
 
     rows.forEach((activity, index) => {
-      const isReportFallback = String(activity.id || "").startsWith("report-");
+      const hasId = Boolean(activity.id);
 
       tbody.insertAdjacentHTML(
         "beforeend",
         `
           <tr>
             <td class="sno-col">${index + 1}</td>
-            <td>${escapeHtml(activity.activityName || activity.name || "-")}</td>
-            <td class="num">${formatProgressValue(activity.plannedValue ?? activity.planned, activity.unit || "")}</td>
-            <td class="num">${formatProgressValue(activity.actualValue ?? activity.actual, activity.unit || "")}</td>
+            <td>${escapeHtml(activity.activityName || "-")}</td>
+            <td class="num">${formatProgressValue(activity.plannedValue, activity.unit || "")}</td>
+            <td class="num">${formatProgressValue(activity.actualValue, activity.unit || "")}</td>
             <td>
               <span class="status-chip ${getStatusClass(activity.status)}">
                 ${escapeHtml(activity.status || "Not Started")}
               </span>
             </td>
             <td class="actions-col">
+              <button class="btn-ghost edit-testing" type="button" data-index="${index}">
+                Edit
+              </button>
               ${
-                isReportFallback
-                  ? `<span style="color:var(--text-muted);font-size:12px;">Report data</span>`
-                  : `
-                    <button class="btn-ghost edit-testing" type="button" data-id="${activity.id}">
-                      Edit
-                    </button>
-                    <button class="btn-ghost delete-testing" type="button" data-id="${activity.id}">
-                      Delete
-                    </button>
-                  `
+                hasId
+                  ? `<button class="btn-ghost delete-testing" type="button" data-index="${index}">Delete</button>`
+                  : ""
               }
             </td>
           </tr>
@@ -853,10 +828,8 @@
     });
   }
 
-  function openTestingModal(id) {
-    const existing = id
-      ? dashboardData.testing.find((x) => x.id === id)
-      : null;
+  function openTestingModal(index) {
+    const existing = index !== null && index !== undefined ? currentTestingRows[index] : null;
 
     openCrudModal({
       title: existing ? "Edit Testing Activity" : "Add Testing Activity",
@@ -878,10 +851,10 @@
         payload.plannedValue = numberValue(payload.plannedValue);
         payload.actualValue = numberValue(payload.actualValue);
 
-        if (id) {
+        if (existing?.id) {
           await WSDP_API.request(
             "PUT",
-            `/construction-progress/testing-activity/${id}`,
+            `/construction-progress/testing-activity/${existing.id}`,
             payload
           );
         } else {
@@ -898,12 +871,14 @@
     });
   }
 
-  async function deleteTestingActivity(id) {
+  async function deleteTestingActivity(index) {
+    const existing = currentTestingRows[index];
+    if (!existing?.id) return;
     if (!confirm("Delete this testing activity?")) return;
 
     await WSDP_API.request(
       "DELETE",
-      `/construction-progress/testing-activity/${id}`
+      `/construction-progress/testing-activity/${existing.id}`
     );
 
     toast("Testing activity deleted");
@@ -915,7 +890,7 @@
   ========================= */
 
   function renderValveSummary() {
-    const valve = dashboardData?.valve || REPORT_VALVE_SUMMARY;
+    const valve = dashboardData?.valve || FALLBACK_VALVE_SUMMARY;
 
     setText("valvePlannedCount", valve.planned);
     setText("valveCompletedCount", valve.completed);
@@ -966,6 +941,7 @@
     if (!tbody) return;
 
     const rows = pickRows(dashboardData?.crossings, FALLBACK_BRIDGE_CROSSINGS);
+    currentBridgeRows = rows;
 
     tbody.innerHTML = "";
 
@@ -975,7 +951,7 @@
     }
 
     rows.forEach((crossing, index) => {
-      const isReportFallback = String(crossing.id || "").startsWith("report-");
+      const hasId = Boolean(crossing.id);
 
       tbody.insertAdjacentHTML(
         "beforeend",
@@ -983,25 +959,21 @@
           <tr>
             <td class="sno-col">${index + 1}</td>
             <td>${escapeHtml(crossing.area || crossing.crossingName || "-")}</td>
-            <td>${escapeHtml(crossing.crossingType || crossing.type || "-")}</td>
-            <td class="num">${escapeHtml(crossing.span || "-")}</td>
+            <td>${escapeHtml(crossing.crossingType || "-")}</td>
+            <td class="num">${escapeHtml(crossing.span || crossing.method || "-")}</td>
             <td>
               <span class="status-chip ${getStatusClass(crossing.status)}">
                 ${escapeHtml(crossing.status || "Not Started")}
               </span>
             </td>
             <td class="actions-col">
+              <button class="btn-ghost edit-bridge" type="button" data-index="${index}">
+                Edit
+              </button>
               ${
-                isReportFallback
-                  ? `<span style="color:var(--text-muted);font-size:12px;">Report fallback</span>`
-                  : `
-                    <button class="btn-ghost edit-bridge" type="button" data-id="${crossing.id}">
-                      Edit
-                    </button>
-                    <button class="btn-ghost delete-bridge" type="button" data-id="${crossing.id}">
-                      Delete
-                    </button>
-                  `
+                hasId
+                  ? `<button class="btn-ghost delete-bridge" type="button" data-index="${index}">Delete</button>`
+                  : ""
               }
             </td>
           </tr>
@@ -1010,17 +982,15 @@
     });
   }
 
-  function openBridgeModal(id) {
-    const existing = id
-      ? dashboardData.crossings.find((x) => x.id === id)
-      : null;
+  function openBridgeModal(index) {
+    const existing = index !== null && index !== undefined ? currentBridgeRows[index] : null;
 
     openCrudModal({
       title: existing ? "Edit Bridge Crossing" : "Add Bridge Crossing",
       fields: [
         inputField("Area", "area", existing?.area || existing?.crossingName, "text", true),
-        inputField("Type", "crossingType", existing?.crossingType || existing?.type, "text", true),
-        inputField("Span", "span", existing?.span || "", "text", true),
+        inputField("Type", "crossingType", existing?.crossingType, "text", true),
+        inputField("Span", "span", existing?.span || existing?.method || "", "text", true),
         selectField("Status", "status", existing?.status, [
           "Complete",
           "In Progress",
@@ -1034,10 +1004,10 @@
         payload.crossingName = payload.area;
         payload.method = payload.span;
 
-        if (id) {
+        if (existing?.id) {
           await WSDP_API.request(
             "PUT",
-            `/construction-progress/bridge-crossing/${id}`,
+            `/construction-progress/bridge-crossing/${existing.id}`,
             payload
           );
         } else {
@@ -1054,12 +1024,14 @@
     });
   }
 
-  async function deleteBridgeCrossing(id) {
+  async function deleteBridgeCrossing(index) {
+    const existing = currentBridgeRows[index];
+    if (!existing?.id) return;
     if (!confirm("Delete this bridge crossing?")) return;
 
     await WSDP_API.request(
       "DELETE",
-      `/construction-progress/bridge-crossing/${id}`
+      `/construction-progress/bridge-crossing/${existing.id}`
     );
 
     toast("Bridge crossing deleted");
@@ -1365,6 +1337,8 @@
     if (!target) return;
 
     try {
+      const index = target.dataset.index !== undefined ? parseInt(target.dataset.index, 10) : null;
+
       if (target.id === "editPipelineSummaryBtn") {
         openPipelineSummaryModal();
       }
@@ -1374,11 +1348,11 @@
       }
 
       if (target.classList.contains("edit-area-progress")) {
-        openAreaProgressModal(target.dataset.id);
+        openAreaProgressModal(index);
       }
 
       if (target.classList.contains("delete-area-progress")) {
-        await deleteAreaProgress(target.dataset.id);
+        await deleteAreaProgress(index);
       }
 
       if (target.id === "addPipeDiameterBtn") {
@@ -1386,11 +1360,11 @@
       }
 
       if (target.classList.contains("edit-pipe-diameter")) {
-        openPipeDiameterModal(target.dataset.id);
+        openPipeDiameterModal(index);
       }
 
       if (target.classList.contains("delete-pipe-diameter")) {
-        await deletePipeDiameterProgress(target.dataset.id);
+        await deletePipeDiameterProgress(index);
       }
 
       if (target.id === "addActivityProgressBtn") {
@@ -1398,11 +1372,11 @@
       }
 
       if (target.classList.contains("edit-activity-progress")) {
-        openActivityProgressModal(target.dataset.id);
+        openActivityProgressModal(index);
       }
 
       if (target.classList.contains("delete-activity-progress")) {
-        await deleteActivityProgress(target.dataset.id);
+        await deleteActivityProgress(index);
       }
 
       if (target.id === "editHouseSummaryBtn") {
@@ -1414,11 +1388,11 @@
       }
 
       if (target.classList.contains("edit-testing")) {
-        openTestingModal(target.dataset.id);
+        openTestingModal(index);
       }
 
       if (target.classList.contains("delete-testing")) {
-        await deleteTestingActivity(target.dataset.id);
+        await deleteTestingActivity(index);
       }
 
       if (target.id === "editValveSummaryBtn") {
@@ -1430,11 +1404,11 @@
       }
 
       if (target.classList.contains("edit-bridge")) {
-        openBridgeModal(target.dataset.id);
+        openBridgeModal(index);
       }
 
       if (target.classList.contains("delete-bridge")) {
-        await deleteBridgeCrossing(target.dataset.id);
+        await deleteBridgeCrossing(index);
       }
 
       if (target.id === "cancelCrudBtn") {
