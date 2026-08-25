@@ -18,6 +18,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://unpkg.com/@tmcw/togeojson@5.8.1/dist/togeojson.umd.js"></script>
 
+<!-- Import: Excel template parsing -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- Export: whole-dashboard -> PDF -->
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
 <!-- App styles -->
 <link rel="stylesheet" href="css/styles.css" />
 
@@ -358,10 +364,10 @@
         </div>
 
         <div class="home-project-actions">
-          <button class="btn-ghost" type="button">
+          <button class="btn-ghost" type="button" id="homeImportBtn">
             <i class="fa-solid fa-upload"></i> Import
           </button>
-          <button class="btn-ghost" type="button">
+          <button class="btn-ghost" type="button" id="homeExportBtn">
             <i class="fa-solid fa-download"></i> Export
           </button>
         </div>
@@ -386,19 +392,19 @@
 
         <span class="headline-pill success">
           <i class="fa-solid fa-circle-check"></i>
-          IPC-01 Approved & IPC-02 Submitted (17.96%)
+          IPC-01 Approved &amp; IPC-02 Submitted (17.96%)
         </span>
 
         <span class="headline-pill critical">
           <i class="fa-solid fa-triangle-exclamation"></i>
-          EOT & Recovery Plan: Processing for Approval
+          EOT &amp; Recovery Plan: Processing for Approval
         </span>
       </div>
 
       <!-- ============ KPI CARDS ============ -->
       <div class="lubango-kpi-grid fade-in">
 
-        <a class="card kpi-card kpi-card--compact" href="construction-progress.html" data-tooltip="Click to view Construction Progress module">
+        <a class="card kpi-card kpi-card--compact" data-card-key="overall_physical_progress" href="construction-progress.html" data-tooltip="Click to view Construction Progress module">
           <div class="kpi-card__top">
             <div class="kpi-card__label">Overall Physical Progress</div>
             <div class="kpi-card__icon icon-tone-amber">
@@ -411,7 +417,7 @@
           <div class="kpi-card__delta flat">Weighted across 6 activities</div>
         </a>
 
-        <a class="card kpi-card kpi-card--compact" href="construction-progress.html#pipeline" data-tooltip="Click to view Pipeline Progress">
+        <a class="card kpi-card kpi-card--compact" data-card-key="pipe_laying" href="construction-progress.html#pipeline" data-tooltip="Click to view Pipeline Progress">
           <div class="kpi-card__top">
             <div class="kpi-card__label">Pipe Laying</div>
             <div class="kpi-card__icon icon-tone-amber">
@@ -424,7 +430,7 @@
           <div class="kpi-card__delta flat">23,628.5 / 92,677 m (DDR)</div>
         </a>
 
-        <a class="card kpi-card kpi-card--compact" href="construction-progress.html#house-connections" data-tooltip="Click to view House Connections">
+        <a class="card kpi-card kpi-card--compact" data-card-key="household_connections" href="construction-progress.html#house-connections" data-tooltip="Click to view House Connections">
           <div class="kpi-card__top">
             <div class="kpi-card__label">Household Connections</div>
             <div class="kpi-card__icon icon-tone-red">
@@ -437,7 +443,7 @@
           <div class="kpi-card__delta flat">0 / 5,303 (DDR)</div>
         </a>
 
-        <a class="card kpi-card kpi-card--compact" href="risk-delay.html#delay-analysis" data-tooltip="Click to view Delay Analysis">
+        <a class="card kpi-card kpi-card--compact" data-card-key="months_elapsed_remaining" href="risk-delay.html#delay-analysis" data-tooltip="Click to view Delay Analysis">
           <div class="kpi-card__top">
             <div class="kpi-card__label">Months Elapsed / Remaining</div>
             <div class="kpi-card__icon icon-tone-amber">
@@ -448,7 +454,7 @@
           <div class="kpi-card__delta flat">Delay accrued 6.5 months</div>
         </a>
 
-        <a class="card kpi-card kpi-card--compact" href="financial-dashboard.html" data-tooltip="Click to view Financial Dashboard">
+        <a class="card kpi-card kpi-card--compact" data-card-key="cumulative_billing" href="financial-dashboard.html" data-tooltip="Click to view Financial Dashboard">
           <div class="kpi-card__top">
             <div class="kpi-card__label">Cumulative Billing</div>
             <div class="kpi-card__icon icon-tone-blue">
@@ -461,7 +467,7 @@
           <div class="kpi-card__delta flat">650.99 M AOA of 3,625.58 M</div>
         </a>
 
-        <a class="card kpi-card kpi-card--compact" href="financial-dashboard.html" data-tooltip="Click to view IPC Status">
+        <a class="card kpi-card kpi-card--compact" data-card-key="ipc_status" href="financial-dashboard.html" data-tooltip="Click to view IPC Status">
           <div class="kpi-card__top">
             <div class="kpi-card__label">IPC Status</div>
             <div class="kpi-card__icon icon-tone-green">
@@ -472,7 +478,7 @@
           <div class="kpi-card__delta flat">IPC-02: 246.34 M AOA Submitted</div>
         </a>
 
-        <a class="card kpi-card kpi-card--compact" href="ehs-dashboard.html#ehs" data-tooltip="Click to view EHS Dashboard">
+        <a class="card kpi-card kpi-card--compact" data-card-key="eshs_compliance" href="ehs-dashboard.html#ehs" data-tooltip="Click to view EHS Dashboard">
           <div class="kpi-card__top">
             <div class="kpi-card__label">ESHS Compliance</div>
             <div class="kpi-card__icon icon-tone-amber">
@@ -485,7 +491,7 @@
           <div class="kpi-card__delta flat">Target ≥ 90%</div>
         </a>
 
-        <a class="card kpi-card kpi-card--compact" href="ehs-dashboard.html#ehs" data-tooltip="Click to view Lost-Time Accidents">
+        <a class="card kpi-card kpi-card--compact" data-card-key="lost_time_accidents" href="ehs-dashboard.html#ehs" data-tooltip="Click to view Lost-Time Accidents">
           <div class="kpi-card__top">
             <div class="kpi-card__label">Lost-Time Accidents</div>
             <div class="kpi-card__icon icon-tone-green">
@@ -498,7 +504,7 @@
           <div class="kpi-card__delta flat">Zero injuries</div>
         </a>
 
-        <a class="card kpi-card kpi-card--compact" href="social-environmental.html" data-tooltip="Click to view Social & Environmental module">
+        <a class="card kpi-card kpi-card--compact" data-card-key="grievances_resolved" href="social-environmental.html" data-tooltip="Click to view Social & Environmental module">
           <div class="kpi-card__top">
             <div class="kpi-card__label">Grievances Resolved</div>
             <div class="kpi-card__icon icon-tone-green">
@@ -509,7 +515,7 @@
           <div class="kpi-card__delta flat">100% — Satisfied</div>
         </a>
 
-        <a class="card kpi-card kpi-card--compact" href="construction-progress.html" data-tooltip="Click to view Active Work Fronts">
+        <a class="card kpi-card kpi-card--compact" data-card-key="active_work_fronts" href="construction-progress.html" data-tooltip="Click to view Active Work Fronts">
           <div class="kpi-card__top">
             <div class="kpi-card__label">Active Work Fronts</div>
             <div class="kpi-card__icon icon-tone-amber">
@@ -552,13 +558,21 @@
           </div>
         </div>
 
+        <!--
+          REVISION: "Cumulative Financial Execution (Million AOA)" replaced
+          by "Cashflow (Million AOA)" -- same live cash_flow dataset the
+          Financial Dashboard's Cashflow chart uses, but rendered as a LINE
+          chart here (Planned vs Actual) rather than the grouped-bar style
+          used on the Financial Dashboard. Rendered/owned by
+          js/home-dashboard.js on canvas #cashflowChart.
+        -->
         <div class="card col-span-6">
           <div class="card-header">
-            <h3>Cumulative Financial Execution (Million AOA)</h3>
+            <h3>Cashflow (Million AOA)</h3>
           </div>
           <div class="card-body">
             <div class="chart-card-height">
-              <canvas id="financialExecutionChart"></canvas>
+              <canvas id="cashflowChart"></canvas>
             </div>
           </div>
         </div>
@@ -605,6 +619,7 @@
 <script src="js/shell.js"></script>
 <script src="js/main.js"></script>
 <script src="js/charts.js"></script>
+<script src="js/home-dashboard.js"></script>
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
