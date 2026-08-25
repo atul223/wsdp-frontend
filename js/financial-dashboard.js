@@ -4,35 +4,25 @@
 
    Keeps existing website theme, layout, colors and API wrapper.
 
-   REVISION SUMMARY (this update):
-   - FIX #1 (indirect): duplicate <script> includes of api.js/shell.js/
-     main.js removed from financial-dashboard.html (see that file) —
-     this is the most likely cause of the navigation freeze between
-     multi-section modules.
-   - FIX #2: Full CRUD (edit + reset-to-default) added for all 8 KPI
-     summary/reference cards (Financial Progress, Physical Progress,
-     Cumulative Expenditure, IPC Status, Total Contract, Advance
-     Payment 20%, Contract Balance, Prov. Sum (15%)), backed by the new
-     financial-summary-card.routes.js / FinancialSummaryCard model.
-   - FIX #3: (root cause was data, not code) Payment Tracking edit/
-     delete already worked once real rows (with ids) load — now more
-     likely to actually load thanks to the FIX #5 resilience change.
-   - FIX #4: single "Planned vs Actual Progress" chart split into two:
-     #physicalProgressChart (Planned vs Actual Physical %) and
-     #financialProgressChart (Planned vs Actual Financial %). Same
-     line-chart pattern/colors/legend/tooltip style as before, just
-     split across two canvases instead of one with 4 datasets.
-   - FIX #5: reloadAll() now uses Promise.allSettled instead of
-     Promise.all, so a single failing endpoint (e.g. one table not yet
-     migrated) no longer blanks the ENTIRE dashboard back to fallback
-     values — each section renders independently with whatever data it
-     successfully received.
-   - FIX #6: "Addenda / Amendments" heading renamed to "Amendments" in
-     financial-dashboard.html (table IDs/wiring left unchanged to avoid
-     unnecessary risk).
-
-   Load order required:
-   api.js, i18n.js, shell.js, main.js, Chart.js, then this file.
+   REVISION SUMMARY (this update, on top of the previous CRUD/chart
+   split revision):
+   - FIX (row jumps to last row on edit, ANY table): every list table
+     (IPC Tracker, Bank Guarantees, Amendments, Payment Tracking) now
+     goes through applyStableOrder() right after being fetched. This
+     remembers each row's on-screen position (by id) for the lifetime
+     of the page session, and only appends genuinely NEW rows (ones
+     never seen before) at the end. Editing a row can therefore never
+     make it visually "jump" to the bottom, regardless of what order
+     the backend query returns rows in (e.g. if a sort column such as
+     a date field is null/changed by the edit). Rows disappear from
+     the remembered order automatically once deleted.
+   - (Payment Tracking Edit/Delete missing): this was a backend data
+     issue, not a frontend one — see payment-tracking.controller.js,
+     which now auto-provisions the 4 default rows as real, editable DB
+     records the first time a project's Payment Tracking list is empty.
+     No frontend change was required for this specific bug, but the
+     stable-order fix above also applies to this table once its rows
+     have real ids.
    ============================================================ */
 
 (function () {
@@ -51,7 +41,15 @@
     physicalProgressChart: null,
     financialProgressChart: null,
     activeInvoice: null,
-    activeBudget: null
+    activeBudget: null,
+    // FIX: remembers the display order (array of ids) for each table,
+    // so edits never reshuffle rows. Reset naturally on full page reload.
+    stableOrder: {
+      ipc: [],
+      bankGuarantee: [],
+      amendment: [],
+      paymentTracking: []
+    }
   };
 
   const STATUS_LABELS = {
@@ -109,9 +107,6 @@
   ];
 
   // Metadata describing every editable KPI summary/reference card.
-  // type: "money"   -> value_primary (M AOA) + value_secondary (M USD)
-  // type: "percent" -> value_primary (a plain % number)
-  // type: "text"    -> value_text (main) + sub_text (secondary line)
   const SUMMARY_CARD_META = {
     financial_progress_pct: { label: "Financial Progress", type: "percent", unit: "%" },
     physical_progress_pct: { label: "Physical Progress", type: "percent", unit: "%" },
@@ -150,6 +145,54 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
+  }
+
+  /* ---------------------------------------------------------------
+     FIX: stable row ordering helper.
+     Prevents a row from visually "jumping to the end" of a table
+     after it is edited, regardless of what order the backend's list
+     endpoint returns rows in on the next fetch.
+
+     How it works:
+     - The first time a set of rows (identified by id) is seen, their
+       order is remembered in state.stableOrder[orderKey].
+     - On every subsequent load, rows already known keep their
+       remembered position; only genuinely new ids get appended at
+       the end (in the order the backend returned them).
+     - If any row lacks an id (i.e. we're looking at pure fallback /
+       placeholder data with no backend records yet), ordering is left
+       untouched since there is nothing reliable to key off of.
+     --------------------------------------------------------------- */
+  function applyStableOrder(items, orderKey) {
+    if (!Array.isArray(items) || !items.length) {
+      state.stableOrder[orderKey] = [];
+      return items;
+    }
+
+    const allHaveIds = items.every(function (item) { return item && item.id; });
+    if (!allHaveIds) {
+      return items;
+    }
+
+    const itemsById = new Map(items.map(function (item) { return [item.id, item]; }));
+    const knownOrder = state.stableOrder[orderKey] || [];
+    const orderedIds = [];
+
+    knownOrder.forEach(function (id) {
+      if (itemsById.has(id) && orderedIds.indexOf(id) === -1) {
+        orderedIds.push(id);
+      }
+    });
+
+    items.forEach(function (item) {
+      if (orderedIds.indexOf(item.id) === -1) {
+        orderedIds.push(item.id);
+      }
+    });
+
+    state.stableOrder[orderKey] = orderedIds;
+
+    return orderedIds.map(function (id) { return itemsById.get(id); }).filter(Boolean);
   }
 
   function parseStoredProject(value) {
@@ -668,7 +711,7 @@
   }
 
   /* ---------------------------------------------------------------
-     KPI SUMMARY / REFERENCE CARDS — now with full CRUD (edit + reset)
+     KPI SUMMARY / REFERENCE CARDS — full CRUD (edit + reset)
      --------------------------------------------------------------- */
 
   function getMergedCard(cardKey) {
@@ -714,8 +757,6 @@
         resetSummaryCard(cardKey);
       });
 
-      // Insert icon element first, then edit/reset buttons after it so
-      // the icon (money-bag, chart, etc.) still appears first visually.
       actionsEl.appendChild(editBtn);
       actionsEl.appendChild(resetBtn);
     });
@@ -878,8 +919,6 @@
         "Overall physical work progress from the average of activities"
     );
 
-    // FIX #5: Cumulative Expenditure now reads from the backend instead
-    // of being permanently hardcoded to 651.00 / 1.01M regardless of data.
     const cumAoa = s.cumulative_expenditure_m_aoa !== undefined && s.cumulative_expenditure_m_aoa !== null
       ? s.cumulative_expenditure_m_aoa
       : 651.00;
@@ -892,8 +931,6 @@
     );
     setCardDelta("Cumulative Expenditure", s.cumulative_expenditure_note || "of USD 5.60M contract value");
 
-    // FIX #5: IPC Status now reads from the backend instead of being
-    // permanently hardcoded to "IPC-02" regardless of data.
     const ipcValue = s.ipc_status_value || "IPC-02";
     const ipcSubtext = s.ipc_status_subtext || "(Withhold by Employer due to Quality of Work)";
     const ipcNote = s.ipc_status_note || "IPC-01 released, IPC-02 Withhold";
@@ -1069,13 +1106,6 @@
       });
     }
 
-    /* -----------------------------------------------------------
-       FIX #4: split into two charts (Physical / Financial), same
-       line-chart pattern, colors, legend and tooltip style as the
-       original combined chart — just two datasets each instead of
-       four datasets on one canvas.
-       ----------------------------------------------------------- */
-
     const sharedLineOptions = {
       maintainAspectRatio: false,
       plugins: {
@@ -1179,8 +1209,7 @@
   }
 
   /* ---------------------------------------------------------------
-     PAYMENT TRACKING  (fully editable, backed by
-     PaymentTrackingItem model / payment-tracking.routes.js)
+     PAYMENT TRACKING
      --------------------------------------------------------------- */
 
   function ensurePaymentTrackingActions() {
@@ -1738,8 +1767,7 @@
   }
 
   /* ---------------------------------------------------------------
-     AMENDMENTS (heading renamed to "Amendments" in HTML — ids/wiring
-     left unchanged here to avoid unnecessary disruption)
+     AMENDMENTS
      --------------------------------------------------------------- */
 
   function ensureAmendmentsActions() {
@@ -1912,7 +1940,8 @@
   }
 
   /* ---------------------------------------------------------------
-     Data loaders
+     Data loaders — FIX: each now pipes results through
+     applyStableOrder() so rows never visually jump after an edit.
      --------------------------------------------------------------- */
 
   async function loadSummary() {
@@ -1931,35 +1960,28 @@
 
   async function loadIpcTracker() {
     const result = await request("GET", "/projects/" + state.projectId + "/ipc-tracker");
-    state.ipcs = Array.isArray(result.data) ? result.data : [];
+    const rows = Array.isArray(result.data) ? result.data : [];
+    state.ipcs = applyStableOrder(rows, "ipc");
   }
 
   async function loadAmendments() {
     const result = await request("GET", "/projects/" + state.projectId + "/amendments");
-    state.amendments = Array.isArray(result.data) ? result.data : [];
+    const rows = Array.isArray(result.data) ? result.data : [];
+    state.amendments = applyStableOrder(rows, "amendment");
   }
 
   async function loadBankGuarantees() {
     const result = await request("GET", "/projects/" + state.projectId + "/bank-guarantees");
-    state.bankGuarantees = Array.isArray(result.data) ? result.data : [];
+    const rows = Array.isArray(result.data) ? result.data : [];
+    state.bankGuarantees = applyStableOrder(rows, "bankGuarantee");
   }
 
   async function loadPaymentTracking() {
     const result = await request("GET", "/projects/" + state.projectId + "/payment-tracking");
-    state.paymentTracking = Array.isArray(result.data) ? result.data : [];
+    const rows = Array.isArray(result.data) ? result.data : [];
+    state.paymentTracking = applyStableOrder(rows, "paymentTracking");
   }
 
-  /* -----------------------------------------------------------------
-     FIX #5: Promise.allSettled instead of Promise.all.
-     Previously, if ANY single loader rejected (e.g. one table's
-     migration hadn't been applied yet, or a transient 500), the whole
-     Promise.all rejected and init()'s catch block reverted the ENTIRE
-     dashboard to fallback/hardcoded values — even sections whose data
-     had already loaded successfully. Now each loader's success/failure
-     is handled independently: whichever succeeded keeps its real data,
-     whichever failed is reported via toast/console but doesn't wipe
-     out the rest of the dashboard.
-     ----------------------------------------------------------------- */
   async function reloadAll() {
     const loaders = [
       { name: "Budgets", fn: loadBudgets },
