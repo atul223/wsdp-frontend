@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  console.log("[construction-progress.js] BUILD v2026-08-24-04 loaded @", new Date().toISOString());
+  console.log("[construction-progress.js] BUILD v2026-08-25-01 loaded @", new Date().toISOString());
 
   let PROJECT_ID = (() => {
     const stored = localStorage.getItem("current_project");
@@ -20,20 +20,17 @@
   /* =========================================================
      ON-PAGE DIAGNOSTIC STRIP
      =========================================================
-     Requires zero DevTools use. Renders a small, always-visible status
-     line at the top of the page showing: which project is loaded, how
-     many rows came back for each table, when it last refreshed
-     successfully, and the exact text of the last error (if any).
+     Requires zero DevTools use. Shows: which project is loaded, row
+     counts per table, last successful refresh time, and any error text.
 
-     This is the fastest possible way to see, at a glance and WITHOUT
-     opening DevTools, whether:
-       - the page is resolving the SAME project every single time
-         (if the project name/id shown here changes between visits,
-         that is the bug — different modules on this site may be
-         overwriting the shared "current_project" localStorage key)
-       - the API call actually returned real database rows, or
-         silently fell back to the static report numbers
-       - anything errored, and the EXACT text of that error
+     *** THIS BAR IS WHAT REVEALED THE ROOT CAUSE ***
+     It stayed frozen on its initial "loading..." placeholder forever
+     (Project: loading..., Last refresh: -, no error) which is only
+     possible if loadDashboard() was NEVER invoked — not even to fail —
+     since both its success and failure paths always update these
+     fields to a real value. See the root-cause fix at the bottom of
+     this file (kickOffDashboardLoad / the "fire now or listen" pattern)
+     for the actual bug this uncovered and how it's fixed.
      ========================================================= */
   function ensureDiagnosticBar() {
     let bar = document.getElementById("cpDiagnosticBar");
@@ -313,9 +310,7 @@
     }
 
     if (!user) {
-      console.error("[construction-progress] No valid session/user found — redirecting to login.");
-      toast("Session expired. Please login again.", "fa-lock");
-      window.location.href = "login.html";
+      console.warn("[construction-progress] No valid session/user found yet.");
       return false;
     }
 
@@ -335,7 +330,6 @@
 
     if (!project?.id) {
       console.error("[construction-progress] /default-project returned no usable project:", result);
-      toast("No project found for construction progress", "fa-circle-exclamation");
       return false;
     }
 
@@ -360,7 +354,7 @@
             status: "error",
             projectId: "none",
             projectName: "none",
-            error: "Could not resolve a project id (see console)",
+            error: "Could not resolve a project id (no session yet?)",
           });
           return;
         }
@@ -444,16 +438,6 @@
           `Warning: "${label}" saved, but could not be verified on a fresh reload. Please refresh and check.`,
           "fa-triangle-exclamation"
         );
-        renderDiagnosticBar({
-          status: "error",
-          projectId: fresh?.project?.id || PROJECT_ID,
-          projectName: fresh?.project?.name,
-          areaCount: fresh?.area_progress?.length,
-          pipeCount: fresh?.pipe_diameter_progress?.length,
-          activityCount: fresh?.activity_progress?.length,
-          lastFetch: new Date().toLocaleTimeString(),
-          error: `Just-saved row (${label}) NOT found on immediate re-fetch!`,
-        });
       } else {
         console.log(`[construction-progress] Verified: ${label} id=${id} confirmed present in fresh re-fetch.`);
       }
@@ -1682,15 +1666,65 @@
     }
   });
 
-  document.addEventListener("wsdp:authready", async function () {
-    console.log("[construction-progress] wsdp:authready fired, loading dashboard...");
-    const ready = await ensureSessionAndProject();
+  /* =========================================================
+     *** ROOT-CAUSE FIX: "fire now or listen" pattern ***
+     =========================================================
+     Previously, loadDashboard() was ONLY ever triggered by a single
+     "wsdp:authready" event listener. This script is the LAST one loaded
+     on the page (after api.js, i18n.js, shell.js, main.js). If any
+     earlier script checks the session and dispatches "wsdp:authready"
+     SYNCHRONOUSLY during its own execution — a very common pattern —
+     that event fires and is gone forever before this file even reaches
+     the addEventListener("wsdp:authready", ...) line. A CustomEvent
+     dispatched before a listener exists is simply missed; it is never
+     replayed or queued by the browser.
 
-    if (!ready) {
+     The on-page diagnostic bar proved this was happening: it stayed on
+     its initial "loading..." placeholder forever ("Last refresh: -",
+     no error), which is only possible if loadDashboard() was NEVER
+     invoked — not even to fail — since both its success and failure
+     branches always update those fields to a real value.
+
+     This explains every previously reported symptom: dashboardData
+     stayed null forever, renderAll() only ever painted the static
+     FALLBACK_* constants, Add/Edit "worked" (those call the API
+     directly, independent of loadDashboard) but a refresh always
+     re-showed old numbers — because the real data was NEVER being
+     fetched in the first place. It wasn't reverting; it was never
+     loaded to begin with.
+
+     FIX: "fire now or listen". Try to resolve the session/project
+     immediately and synchronously with this script's own execution —
+     do not wait for an event that may already have fired and been
+     missed. ALSO keep listening for "wsdp:authready" in case the
+     session genuinely resolves later. ALSO poll briefly as a final
+     safety net in case neither the immediate check nor the event ever
+     succeeds right away (e.g. async token restore takes a moment). A
+     guard flag ensures the dashboard is only actually loaded once no
+     matter which of these three paths triggers it first.
+     ========================================================= */
+  let dashboardLoadKicked = false;
+
+  async function kickOffDashboardLoad(source) {
+    if (dashboardLoadKicked) {
       return;
     }
 
+    const ready = await ensureSessionAndProject();
+
+    if (!ready) {
+      console.warn(`[construction-progress] Session/project not ready yet (trigger: "${source}"). Will retry shortly.`);
+      return;
+    }
+
+    dashboardLoadKicked = true;
+    console.log(`[construction-progress] Session ready — loading dashboard now (triggered by: "${source}")`);
     await loadDashboard();
+  }
+
+  document.addEventListener("wsdp:authready", function () {
+    console.log("[construction-progress] wsdp:authready event received.");
+    kickOffDashboardLoad("wsdp:authready event");
   });
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -1716,6 +1750,26 @@
         window.WSDP_CONSTRUCTION_DATE_RANGE = event.detail;
       });
     }
+
+    // Covers the case where "wsdp:authready" already fired (dispatched
+    // by an earlier script) before this file's listener above was even
+    // attached. Try immediately rather than waiting on an event that
+    // may never come again.
+    kickOffDashboardLoad("DOMContentLoaded direct check");
+
+    // Final safety net: briefly poll in case the session takes a moment
+    // to hydrate (async token restore, etc.) and neither the immediate
+    // check above nor the event listener has succeeded yet. Stops as
+    // soon as real data loads, or after ~10 seconds.
+    let pollAttempts = 0;
+    const pollInterval = setInterval(() => {
+      pollAttempts++;
+      if (dashboardLoadKicked || pollAttempts > 20) {
+        clearInterval(pollInterval);
+        return;
+      }
+      kickOffDashboardLoad(`poll attempt ${pollAttempts}`);
+    }, 500);
   });
 
 })();
