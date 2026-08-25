@@ -4,23 +4,35 @@
 
    Keeps existing website theme, layout, colors and API wrapper.
 
-   IMPORTANT ARCHITECTURE FIX (this revision):
-   - IPC Tracker now reads/writes the real `Ipc` model via
-     ipc-tracker.routes.js (previously it incorrectly derived rows
-     from Budget/Invoice, which is a different, unrelated table).
-   - Amendments and Bank Guarantees now have full Add/Edit/Delete
-     wired to amendment.routes.js and bank-guarantee.routes.js.
-   - Payment Tracking is now a fully editable table backed by the
-     new PaymentTrackingItem model / payment-tracking.routes.js
-     (see schema.prisma + migration.sql provided alongside this file).
-   - Every table (Payment Tracking, IPC Tracker, Bank Guarantees,
-     Amendments) now has an S.No. column (auto-renumbered) and an
-     Actions column with Edit/Delete, plus an "+ Add" button.
-   - "Manage Budgets" / Budget+Invoice CRUD is left completely
-     untouched (separate feature, not part of the 4 visible tables).
+   REVISION SUMMARY (this update):
+   - FIX #1 (indirect): duplicate <script> includes of api.js/shell.js/
+     main.js removed from financial-dashboard.html (see that file) —
+     this is the most likely cause of the navigation freeze between
+     multi-section modules.
+   - FIX #2: Full CRUD (edit + reset-to-default) added for all 8 KPI
+     summary/reference cards (Financial Progress, Physical Progress,
+     Cumulative Expenditure, IPC Status, Total Contract, Advance
+     Payment 20%, Contract Balance, Prov. Sum (15%)), backed by the new
+     financial-summary-card.routes.js / FinancialSummaryCard model.
+   - FIX #3: (root cause was data, not code) Payment Tracking edit/
+     delete already worked once real rows (with ids) load — now more
+     likely to actually load thanks to the FIX #5 resilience change.
+   - FIX #4: single "Planned vs Actual Progress" chart split into two:
+     #physicalProgressChart (Planned vs Actual Physical %) and
+     #financialProgressChart (Planned vs Actual Financial %). Same
+     line-chart pattern/colors/legend/tooltip style as before, just
+     split across two canvases instead of one with 4 datasets.
+   - FIX #5: reloadAll() now uses Promise.allSettled instead of
+     Promise.all, so a single failing endpoint (e.g. one table not yet
+     migrated) no longer blanks the ENTIRE dashboard back to fallback
+     values — each section renders independently with whatever data it
+     successfully received.
+   - FIX #6: "Addenda / Amendments" heading renamed to "Amendments" in
+     financial-dashboard.html (table IDs/wiring left unchanged to avoid
+     unnecessary risk).
 
    Load order required:
-   api.js, shell.js, main.js, Chart.js, then this file.
+   api.js, i18n.js, shell.js, main.js, Chart.js, then this file.
    ============================================================ */
 
 (function () {
@@ -36,7 +48,8 @@
     paymentTracking: [],
     summary: null,
     cashFlowChart: null,
-    finPhysChart: null,
+    physicalProgressChart: null,
+    financialProgressChart: null,
     activeInvoice: null,
     activeBudget: null
   };
@@ -55,6 +68,8 @@
     rejected: "danger"
   };
 
+  // Fallback constants — used only when the backend / session is
+  // completely unavailable (e.g. first paint, or total network failure).
   const FALLBACK_REFERENCE_CARDS = {
     total_contract_m_aoa: 3625.58,
     total_contract_m_usd: 5.60,
@@ -67,124 +82,46 @@
   };
 
   const FALLBACK_IPC_TRACKER = [
-    {
-      ipc: "IPC-01",
-      period: "Feb 2026",
-      aoa_amount: 404659374.56,
-      usd_amount: 624995.17,
-      percentage: 11.16,
-      ace_status: "Certified",
-      client_status: "Approved",
-      is_cumulative: false
-    },
-    {
-      ipc: "IPC-02",
-      period: "Apr 2026",
-      aoa_amount: 246340149.83,
-      usd_amount: 380471.61,
-      percentage: 6.79,
-      ace_status: "Certified 24/06",
-      client_status: "Submitted",
-      is_cumulative: false
-    },
-    {
-      ipc: "Cumulative",
-      period: "—",
-      aoa_amount: 650999524.39,
-      usd_amount: 1005466.78,
-      percentage: 17.96,
-      ace_status: "—",
-      client_status: "—",
-      is_cumulative: true
-    },
-    {
-      ipc: "IPC-03",
-      period: "—",
-      aoa_amount: null,
-      usd_amount: null,
-      percentage: null,
-      ace_status: "Future",
-      client_status: "—",
-      is_cumulative: false
-    }
+    { ipc: "IPC-01", period: "Feb 2026", aoa_amount: 404659374.56, usd_amount: 624995.17, percentage: 11.16, ace_status: "Certified", client_status: "Approved", is_cumulative: false },
+    { ipc: "IPC-02", period: "Apr 2026", aoa_amount: 246340149.83, usd_amount: 380471.61, percentage: 6.79, ace_status: "Certified 24/06", client_status: "Submitted", is_cumulative: false },
+    { ipc: "Cumulative", period: "—", aoa_amount: 650999524.39, usd_amount: 1005466.78, percentage: 17.96, ace_status: "—", client_status: "—", is_cumulative: true },
+    { ipc: "IPC-03", period: "—", aoa_amount: null, usd_amount: null, percentage: null, ace_status: "Future", client_status: "—", is_cumulative: false }
   ];
 
   const FALLBACK_PAYMENT_TRACKING = [
-    {
-      description: "Contract Value",
-      amount_aoa: 3625580000.00,
-      amount_usd: 5599704.50,
-      is_highlighted: true
-    },
-    {
-      description: "Amount Invoiced",
-      amount_aoa: 650999524.39,
-      amount_usd: 1005466.78,
-      is_highlighted: false
-    },
-    {
-      description: "Amount Paid",
-      amount_aoa: 404659374.56,
-      amount_usd: 624995.17,
-      is_highlighted: false
-    },
-    {
-      description: "Outstanding",
-      amount_aoa: 246340149.83,
-      amount_usd: 380471.61,
-      is_highlighted: true
-    }
+    { description: "Contract Value", amount_aoa: 3625580000.00, amount_usd: 5599704.50, is_highlighted: true },
+    { description: "Amount Invoiced", amount_aoa: 650999524.39, amount_usd: 1005466.78, is_highlighted: false },
+    { description: "Amount Paid", amount_aoa: 404659374.56, amount_usd: 624995.17, is_highlighted: false },
+    { description: "Outstanding", amount_aoa: 246340149.83, amount_usd: 380471.61, is_highlighted: true }
   ];
 
   const FALLBACK_BANK_GUARANTEES = [
-    {
-      guarantee: "Advance Payment Guarantees (APG)",
-      bank: "Bank of China",
-      usd_amount: 1119940.90,
-      valid_until: "2026-08-23",
-      status: "Expires < 60d · Renew"
-    },
-    {
-      guarantee: "Performance Security (PG)",
-      bank: "Bank of China",
-      usd_amount: 559970.45,
-      valid_until: "2026-12-31",
-      status: "Valid"
-    }
+    { guarantee: "Advance Payment Guarantees (APG)", bank: "Bank of China", usd_amount: 1119940.90, valid_until: "2026-08-23", status: "Expires < 60d · Renew" },
+    { guarantee: "Performance Security (PG)", bank: "Bank of China", usd_amount: 559970.45, valid_until: "2026-12-31", status: "Valid" }
   ];
 
   const FALLBACK_AMENDMENTS = [
-    {
-      amendment: "Amendment No. 01",
-      amendment_date: null,
-      scope: "Initial amendment record to be updated from contract file",
-      status: "Record pending"
-    },
-    {
-      amendment: "Amendment No. 02",
-      amendment_date: null,
-      scope: "Second amendment record to be updated from contract file",
-      status: "Record pending"
-    },
-    {
-      amendment: "Amendment No. 03",
-      amendment_date: null,
-      scope: "Third amendment record to be updated from contract file",
-      status: "Record pending"
-    },
-    {
-      amendment: "Amendment No. 04",
-      amendment_date: "2026-05-07",
-      scope: "Revised DDR scope: 92.677 km / 5,303 HSC (USD 6,044,736.58)",
-      status: "Under Employer review"
-    },
-    {
-      amendment: "Amendment No. 05",
-      amendment_date: null,
-      scope: "EOT + Price Adjustment",
-      status: "Pending CTCE"
-    }
+    { amendment: "Amendment No. 01", amendment_date: null, scope: "Initial amendment record to be updated from contract file", status: "Record pending" },
+    { amendment: "Amendment No. 02", amendment_date: null, scope: "Second amendment record to be updated from contract file", status: "Record pending" },
+    { amendment: "Amendment No. 03", amendment_date: null, scope: "Third amendment record to be updated from contract file", status: "Record pending" },
+    { amendment: "Amendment No. 04", amendment_date: "2026-05-07", scope: "Revised DDR scope: 92.677 km / 5,303 HSC (USD 6,044,736.58)", status: "Under Employer review" },
+    { amendment: "Amendment No. 05", amendment_date: null, scope: "EOT + Price Adjustment", status: "Pending CTCE" }
   ];
+
+  // Metadata describing every editable KPI summary/reference card.
+  // type: "money"   -> value_primary (M AOA) + value_secondary (M USD)
+  // type: "percent" -> value_primary (a plain % number)
+  // type: "text"    -> value_text (main) + sub_text (secondary line)
+  const SUMMARY_CARD_META = {
+    financial_progress_pct: { label: "Financial Progress", type: "percent", unit: "%" },
+    physical_progress_pct: { label: "Physical Progress", type: "percent", unit: "%" },
+    cumulative_expenditure: { label: "Cumulative Expenditure", type: "money" },
+    ipc_status: { label: "IPC Status", type: "text" },
+    total_contract: { label: "Total Contract", type: "money" },
+    advance_payment_20: { label: "Advance Payment 20%", type: "money" },
+    contract_balance: { label: "Contract Balance", type: "money" },
+    prov_sum_15: { label: "Prov. Sum (15%)", type: "money" }
+  };
 
   function api() {
     if (!window.WSDP_API) {
@@ -363,6 +300,42 @@
         margin-top: 18px;
       }
 
+      .kpi-card__top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .kpi-card__actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .kpi-card__edit-btn {
+        border: 1px solid var(--border-color, #e3e7eb);
+        background: var(--card-bg, #fff);
+        color: var(--text-muted, #6b7280);
+        border-radius: 6px;
+        width: 24px;
+        height: 24px;
+        font-size: 11px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .kpi-card__edit-btn:hover {
+        background: var(--color-neutral-light, #eef3f7);
+        color: var(--text-primary, #16232f);
+      }
+
+      .kpi-card__edit-btn.reset {
+        color: #b91c1c;
+      }
+
       .kpi-card__subvalue {
         margin-top: 4px;
         font-size: 12px;
@@ -516,7 +489,12 @@
         padding: 16px 20px;
         border-top: 1px solid var(--border-color, #e3e7eb);
         display: flex;
-        justify-content: flex-end;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .financial-modal__foot-right {
+        display: flex;
         gap: 10px;
       }
 
@@ -549,6 +527,10 @@
     }
 
     return null;
+  }
+
+  function findKpiCardByKey(cardKey) {
+    return document.querySelector('.kpi-card[data-card-key="' + cardKey + '"]');
   }
 
   function setCountValue(label, value, decimals) {
@@ -686,62 +668,189 @@
   }
 
   /* ---------------------------------------------------------------
-     Reference / summary KPI cards (unchanged from prior revision)
+     KPI SUMMARY / REFERENCE CARDS — now with full CRUD (edit + reset)
+     --------------------------------------------------------------- */
+
+  function getMergedCard(cardKey) {
+    const cards = (state.summary && state.summary.summary_cards) || {};
+    return cards[cardKey] || null;
+  }
+
+  function ensureCardEditButtons() {
+    Object.keys(SUMMARY_CARD_META).forEach(function (cardKey) {
+      const card = findKpiCardByKey(cardKey);
+      if (!card) return;
+
+      let actionsEl = card.querySelector(".kpi-card__actions");
+      if (!actionsEl) {
+        actionsEl = document.createElement("div");
+        actionsEl.className = "kpi-card__actions";
+        const top = card.querySelector(".kpi-card__top");
+        if (top) top.appendChild(actionsEl);
+      }
+
+      if (actionsEl.querySelector("[data-summary-card-edit]")) {
+        return; // already wired
+      }
+
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.className = "kpi-card__edit-btn";
+      editBtn.title = "Edit " + SUMMARY_CARD_META[cardKey].label;
+      editBtn.setAttribute("data-summary-card-edit", cardKey);
+      editBtn.innerHTML = '<i class="fa-solid fa-pen"></i>';
+      editBtn.addEventListener("click", function () {
+        if (!requireProjectOrToast()) return;
+        openSummaryCardModal(cardKey);
+      });
+
+      const resetBtn = document.createElement("button");
+      resetBtn.type = "button";
+      resetBtn.className = "kpi-card__edit-btn reset";
+      resetBtn.title = "Reset " + SUMMARY_CARD_META[cardKey].label + " to default";
+      resetBtn.setAttribute("data-summary-card-reset", cardKey);
+      resetBtn.innerHTML = '<i class="fa-solid fa-rotate-left"></i>';
+      resetBtn.addEventListener("click", function () {
+        resetSummaryCard(cardKey);
+      });
+
+      // Insert icon element first, then edit/reset buttons after it so
+      // the icon (money-bag, chart, etc.) still appears first visually.
+      actionsEl.appendChild(editBtn);
+      actionsEl.appendChild(resetBtn);
+    });
+  }
+
+  function openSummaryCardModal(cardKey) {
+    const meta = SUMMARY_CARD_META[cardKey];
+    if (!meta) return;
+
+    const current = getMergedCard(cardKey) || {};
+
+    let body = "";
+
+    if (meta.type === "money") {
+      body = `
+        <div class="financial-form-grid">
+          <div class="financial-field">
+            <label>Value (M AOA)</label>
+            <input name="value_primary" type="number" step="0.01" value="${escapeHtml(current.value_primary !== null && current.value_primary !== undefined ? current.value_primary : "")}">
+          </div>
+          <div class="financial-field">
+            <label>Value (M USD)</label>
+            <input name="value_secondary" type="number" step="0.01" value="${escapeHtml(current.value_secondary !== null && current.value_secondary !== undefined ? current.value_secondary : "")}">
+          </div>
+          <div class="financial-field full">
+            <label>Delta / description text</label>
+            <input name="note_text" maxlength="200" value="${escapeHtml(current.note_text || "")}">
+          </div>
+        </div>
+      `;
+    } else if (meta.type === "percent") {
+      body = `
+        <div class="financial-form-grid">
+          <div class="financial-field">
+            <label>Value (%)</label>
+            <input name="value_primary" type="number" step="0.01" min="0" max="100" value="${escapeHtml(current.value_primary !== null && current.value_primary !== undefined ? current.value_primary : "")}">
+          </div>
+          <div class="financial-field full">
+            <label>Delta / description text</label>
+            <input name="note_text" maxlength="200" value="${escapeHtml(current.note_text || "")}">
+          </div>
+        </div>
+      `;
+    } else {
+      body = `
+        <div class="financial-form-grid">
+          <div class="financial-field full">
+            <label>Main value (e.g. IPC-02)</label>
+            <input name="value_text" maxlength="100" value="${escapeHtml(current.value_text || "")}">
+          </div>
+          <div class="financial-field full">
+            <label>Sub-text (e.g. reason / qualifier)</label>
+            <input name="sub_text" maxlength="200" value="${escapeHtml(current.sub_text || "")}">
+          </div>
+          <div class="financial-field full">
+            <label>Delta / description text</label>
+            <input name="note_text" maxlength="200" value="${escapeHtml(current.note_text || "")}">
+          </div>
+        </div>
+      `;
+    }
+
+    openModal("Edit " + meta.label, body, async function (form) {
+      const payload = {};
+
+      if (meta.type === "money") {
+        payload.value_primary = form.get("value_primary") ? Number(form.get("value_primary")) : null;
+        payload.value_secondary = form.get("value_secondary") ? Number(form.get("value_secondary")) : null;
+        payload.note_text = String(form.get("note_text") || "").trim() || null;
+      } else if (meta.type === "percent") {
+        payload.value_primary = form.get("value_primary") ? Number(form.get("value_primary")) : null;
+        payload.note_text = String(form.get("note_text") || "").trim() || null;
+      } else {
+        payload.value_text = String(form.get("value_text") || "").trim() || null;
+        payload.sub_text = String(form.get("sub_text") || "").trim() || null;
+        payload.note_text = String(form.get("note_text") || "").trim() || null;
+      }
+
+      await request("PUT", "/projects/" + state.projectId + "/financial-summary-cards/" + cardKey, payload);
+      toast(meta.label + " updated successfully");
+    });
+  }
+
+  async function resetSummaryCard(cardKey) {
+    if (!requireProjectOrToast()) return;
+
+    const meta = SUMMARY_CARD_META[cardKey];
+    const yes = window.confirm('Reset "' + (meta ? meta.label : cardKey) + '" back to its default/computed value?');
+    if (!yes) return;
+
+    try {
+      await request("DELETE", "/projects/" + state.projectId + "/financial-summary-cards/" + cardKey);
+      toast((meta ? meta.label : "Card") + " reset to default", "fa-rotate-left");
+      await reloadAll();
+    } catch (err) {
+      toast(err.message || "Reset failed", "fa-triangle-exclamation");
+    }
+  }
+
+  /* ---------------------------------------------------------------
+     Reference / summary KPI cards
      --------------------------------------------------------------- */
 
   function renderReferenceCards() {
-    const ref = (state.summary && state.summary.reference_cards) || FALLBACK_REFERENCE_CARDS;
+    const ref = (state.summary && state.summary.reference_cards) || {};
+    const cards = (state.summary && state.summary.summary_cards) || {};
 
-    setCardValue(
-      "Total Contract",
-      formatMoneyPair(
-        ref.total_contract_m_aoa || FALLBACK_REFERENCE_CARDS.total_contract_m_aoa,
-        ref.total_contract_m_usd || FALLBACK_REFERENCE_CARDS.total_contract_m_usd
-      )
-    );
-    setCardDelta("Total Contract", "Contract value in AOA and USD");
+    const totalContractAoa = ref.total_contract_m_aoa ?? FALLBACK_REFERENCE_CARDS.total_contract_m_aoa;
+    const totalContractUsd = ref.total_contract_m_usd ?? FALLBACK_REFERENCE_CARDS.total_contract_m_usd;
+    setCardValue("Total Contract", formatMoneyPair(totalContractAoa, totalContractUsd));
+    setCardDelta("Total Contract", (cards.total_contract && cards.total_contract.note_text) || "Contract value in AOA and USD");
 
-    setCardValue(
-      "Advance Payment 20%",
-      formatMoneyPair(
-        ref.advance_payment_20_m_aoa || FALLBACK_REFERENCE_CARDS.advance_payment_20_m_aoa,
-        ref.advance_payment_20_m_usd || FALLBACK_REFERENCE_CARDS.advance_payment_20_m_usd
-      )
-    );
-    setCardDelta("Advance Payment 20%", "Advance payment disbursed");
+    const advanceAoa = ref.advance_payment_20_m_aoa ?? FALLBACK_REFERENCE_CARDS.advance_payment_20_m_aoa;
+    const advanceUsd = ref.advance_payment_20_m_usd ?? FALLBACK_REFERENCE_CARDS.advance_payment_20_m_usd;
+    setCardValue("Advance Payment 20%", formatMoneyPair(advanceAoa, advanceUsd));
+    setCardDelta("Advance Payment 20%", (cards.advance_payment_20 && cards.advance_payment_20.note_text) || "Advance payment disbursed");
 
-    setCardValue(
-      "Contract Balance",
-      formatMoneyPair(
-        ref.contract_balance_m_aoa || FALLBACK_REFERENCE_CARDS.contract_balance_m_aoa,
-        ref.contract_balance_m_usd || FALLBACK_REFERENCE_CARDS.contract_balance_m_usd
-      )
-    );
-    setCardDelta("Contract Balance", "Remaining contract balance");
+    const balanceAoa = ref.contract_balance_m_aoa ?? FALLBACK_REFERENCE_CARDS.contract_balance_m_aoa;
+    const balanceUsd = ref.contract_balance_m_usd ?? FALLBACK_REFERENCE_CARDS.contract_balance_m_usd;
+    setCardValue("Contract Balance", formatMoneyPair(balanceAoa, balanceUsd));
+    setCardDelta("Contract Balance", (cards.contract_balance && cards.contract_balance.note_text) || "Remaining contract balance");
 
-    const provCard = findKpiCard("Prov. Sum (50%)") || findKpiCard("Prov. Sum (15%)");
-    if (provCard) {
-      const labelEl = provCard.querySelector(".kpi-card__label");
-      if (labelEl) {
-        labelEl.textContent = "Prov. Sum (15%)";
-      }
-    }
-
-    setCardValue(
-      "Prov. Sum (15%)",
-      formatMoneyPair(
-        ref.prov_sum_15_m_aoa || FALLBACK_REFERENCE_CARDS.prov_sum_15_m_aoa,
-        ref.prov_sum_15_m_usd || FALLBACK_REFERENCE_CARDS.prov_sum_15_m_usd
-      )
-    );
+    const provAoa = ref.prov_sum_15_m_aoa ?? FALLBACK_REFERENCE_CARDS.prov_sum_15_m_aoa;
+    const provUsd = ref.prov_sum_15_m_usd ?? FALLBACK_REFERENCE_CARDS.prov_sum_15_m_usd;
+    setCardValue("Prov. Sum (15%)", formatMoneyPair(provAoa, provUsd));
     setCardDelta(
       "Prov. Sum (15%)",
-      "3,000 USD is claimed in IPC-02. Available balance is 727,396.24 USD."
+      (cards.prov_sum_15 && cards.prov_sum_15.note_text) ||
+        "3,000 USD is claimed in IPC-02. Available balance is 727,396.24 USD."
     );
   }
 
   function renderSummary() {
     const s = state.summary || {};
+    const cards = s.summary_cards || {};
 
     const financialProgress = Number(
       s.financial_progress_pct !== undefined && s.financial_progress_pct !== null
@@ -756,24 +865,46 @@
     );
 
     setCountValue("Financial Progress", financialProgress, 2);
-    setCardDelta("Financial Progress", "Cumulation of both IPC-01 and IPC-02");
+    setCardDelta(
+      "Financial Progress",
+      (cards.financial_progress_pct && cards.financial_progress_pct.note_text) ||
+        "Cumulation of both IPC-01 and IPC-02"
+    );
 
     setCountValue("Physical Progress", physicalProgress, 2);
-    setCardDelta("Physical Progress", "Overall physical work progress from the average of activities");
+    setCardDelta(
+      "Physical Progress",
+      (cards.physical_progress_pct && cards.physical_progress_pct.note_text) ||
+        "Overall physical work progress from the average of activities"
+    );
 
+    // FIX #5: Cumulative Expenditure now reads from the backend instead
+    // of being permanently hardcoded to 651.00 / 1.01M regardless of data.
+    const cumAoa = s.cumulative_expenditure_m_aoa !== undefined && s.cumulative_expenditure_m_aoa !== null
+      ? s.cumulative_expenditure_m_aoa
+      : 651.00;
+    const cumUsd = s.cumulative_expenditure_m_usd !== undefined && s.cumulative_expenditure_m_usd !== null
+      ? s.cumulative_expenditure_m_usd
+      : 1.01;
     setCardValue(
       "Cumulative Expenditure",
-      '<span>651.00</span><span class="unit">M AOA</span><div class="kpi-card__subvalue">USD 1.01M</div>'
+      '<span>' + escapeHtml(formatM(cumAoa)) + '</span><span class="unit">M AOA</span><div class="kpi-card__subvalue">USD ' + escapeHtml(formatM(cumUsd)) + 'M</div>'
     );
-    setCardDelta("Cumulative Expenditure", "of USD 5.60M contract value");
+    setCardDelta("Cumulative Expenditure", s.cumulative_expenditure_note || "of USD 5.60M contract value");
 
+    // FIX #5: IPC Status now reads from the backend instead of being
+    // permanently hardcoded to "IPC-02" regardless of data.
+    const ipcValue = s.ipc_status_value || "IPC-02";
+    const ipcSubtext = s.ipc_status_subtext || "(Withhold by Employer due to Quality of Work)";
+    const ipcNote = s.ipc_status_note || "IPC-01 released, IPC-02 Withhold";
     setCardValue(
       "IPC Status",
-      'IPC-02<div class="kpi-card__subvalue">(Withhold by Employer due to Quality of Work)</div>'
+      escapeHtml(ipcValue) + '<div class="kpi-card__subvalue">' + escapeHtml(ipcSubtext) + '</div>'
     );
-    setCardDelta("IPC Status", "IPC-01 released, IPC-02 Withhold");
+    setCardDelta("IPC Status", ipcNote);
 
     renderReferenceCards();
+    ensureCardEditButtons();
   }
 
   function destroyChart(canvas) {
@@ -938,17 +1069,54 @@
       });
     }
 
-    const finPhysCanvas = document.getElementById("finPhysChart");
+    /* -----------------------------------------------------------
+       FIX #4: split into two charts (Physical / Financial), same
+       line-chart pattern, colors, legend and tooltip style as the
+       original combined chart — just two datasets each instead of
+       four datasets on one canvas.
+       ----------------------------------------------------------- */
 
-    if (finPhysCanvas) {
-      destroyChart(finPhysCanvas);
+    const sharedLineOptions = {
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: "top",
+          align: "end",
+          labels: {
+            boxWidth: 10,
+            boxHeight: 10,
+            usePointStyle: true,
+            pointStyle: "circle"
+          }
+        }
+      },
+      scales: {
+        y: {
+          min: 0,
+          max: 100,
+          ticks: {
+            callback: function (value) {
+              return value + "%";
+            }
+          }
+        },
+        x: {
+          grid: {
+            display: false
+          }
+        }
+      }
+    };
 
-      state.finPhysChart = new Chart(finPhysCanvas, {
+    const physicalCanvas = document.getElementById("physicalProgressChart");
+
+    if (physicalCanvas) {
+      destroyChart(physicalCanvas);
+
+      state.physicalProgressChart = new Chart(physicalCanvas, {
         type: "line",
         data: {
-          labels: progress.map(function (item) {
-            return item.month;
-          }),
+          labels: progress.map(function (item) { return item.month; }),
           datasets: [
             {
               label: "Planned Physical %",
@@ -967,7 +1135,23 @@
               borderWidth: 3,
               pointRadius: 3,
               tension: 0.35
-            },
+            }
+          ]
+        },
+        options: sharedLineOptions
+      });
+    }
+
+    const financialCanvas = document.getElementById("financialProgressChart");
+
+    if (financialCanvas) {
+      destroyChart(financialCanvas);
+
+      state.financialProgressChart = new Chart(financialCanvas, {
+        type: "line",
+        data: {
+          labels: progress.map(function (item) { return item.month; }),
+          datasets: [
             {
               label: "Planned Financial %",
               data: progress.map(item => item.planned_financial),
@@ -989,43 +1173,13 @@
             }
           ]
         },
-        options: {
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              position: "top",
-              align: "end",
-              labels: {
-                boxWidth: 10,
-                boxHeight: 10,
-                usePointStyle: true,
-                pointStyle: "circle"
-              }
-            }
-          },
-          scales: {
-            y: {
-              min: 0,
-              max: 100,
-              ticks: {
-                callback: function (value) {
-                  return value + "%";
-                }
-              }
-            },
-            x: {
-              grid: {
-                display: false
-              }
-            }
-          }
-        }
+        options: sharedLineOptions
       });
     }
   }
 
   /* ---------------------------------------------------------------
-     PAYMENT TRACKING  (new: fully editable, backed by
+     PAYMENT TRACKING  (fully editable, backed by
      PaymentTrackingItem model / payment-tracking.routes.js)
      --------------------------------------------------------------- */
 
@@ -1180,7 +1334,7 @@
   }
 
   /* ---------------------------------------------------------------
-     IPC TRACKER  (now backed by the real `Ipc` model, not Invoice)
+     IPC TRACKER
      --------------------------------------------------------------- */
 
   function ensureIpcActions() {
@@ -1584,7 +1738,8 @@
   }
 
   /* ---------------------------------------------------------------
-     AMENDMENTS
+     AMENDMENTS (heading renamed to "Amendments" in HTML — ids/wiring
+     left unchanged here to avoid unnecessary disruption)
      --------------------------------------------------------------- */
 
   function ensureAmendmentsActions() {
@@ -1794,15 +1949,39 @@
     state.paymentTracking = Array.isArray(result.data) ? result.data : [];
   }
 
+  /* -----------------------------------------------------------------
+     FIX #5: Promise.allSettled instead of Promise.all.
+     Previously, if ANY single loader rejected (e.g. one table's
+     migration hadn't been applied yet, or a transient 500), the whole
+     Promise.all rejected and init()'s catch block reverted the ENTIRE
+     dashboard to fallback/hardcoded values — even sections whose data
+     had already loaded successfully. Now each loader's success/failure
+     is handled independently: whichever succeeded keeps its real data,
+     whichever failed is reported via toast/console but doesn't wipe
+     out the rest of the dashboard.
+     ----------------------------------------------------------------- */
   async function reloadAll() {
-    await Promise.all([
-      loadBudgets(),
-      loadIpcTracker(),
-      loadAmendments(),
-      loadBankGuarantees(),
-      loadPaymentTracking(),
-      loadSummary()
-    ]);
+    const loaders = [
+      { name: "Budgets", fn: loadBudgets },
+      { name: "IPC Tracker", fn: loadIpcTracker },
+      { name: "Amendments", fn: loadAmendments },
+      { name: "Bank Guarantees", fn: loadBankGuarantees },
+      { name: "Payment Tracking", fn: loadPaymentTracking },
+      { name: "Financial Summary", fn: loadSummary }
+    ];
+
+    const results = await Promise.allSettled(loaders.map((loader) => loader.fn()));
+
+    results.forEach((result, index) => {
+      if (result.status === "rejected") {
+        const name = loaders[index].name;
+        console.error("Failed to load " + name + ":", result.reason);
+        toast(
+          name + " could not be refreshed — showing last known data.",
+          "fa-triangle-exclamation"
+        );
+      }
+    });
 
     renderSummary();
     renderCharts();
@@ -1846,12 +2025,15 @@
           </div>
 
           <div class="financial-modal__foot">
-            <button type="button" class="financial-btn financial-btn-secondary" id="financialModalCancel">
-              Cancel
-            </button>
-            <button type="submit" class="financial-btn financial-btn-primary">
-              Save
-            </button>
+            <span></span>
+            <div class="financial-modal__foot-right">
+              <button type="button" class="financial-btn financial-btn-secondary" id="financialModalCancel">
+                Cancel
+              </button>
+              <button type="submit" class="financial-btn financial-btn-primary">
+                Save
+              </button>
+            </div>
           </div>
         </form>
       </div>
@@ -1893,7 +2075,7 @@
   }
 
   /* ---------------------------------------------------------------
-     Budget management (UNCHANGED - separate from the 4 visible tables)
+     Budget management (UNCHANGED - separate from the visible tables)
      --------------------------------------------------------------- */
 
   function openBudgetModal(budget) {
