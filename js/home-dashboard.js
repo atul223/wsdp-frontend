@@ -7,16 +7,19 @@
 
    Responsibilities:
    1) Full CRUD (edit + reset-to-default) for the 10 KPI summary
-      cards, backed by the new HomeSummaryCard model /
+      cards, backed by the HomeSummaryCard model /
       homeSummaryCard.routes.js.
    2) "Cashflow" line chart (Planned vs Actual, M AOA) replacing the
-      old "Cumulative Financial Execution" chart — reuses the SAME
-      live cash_flow data already served by
-      GET /projects/:id/financial-summary (the endpoint
-      financial-dashboard.js already calls), so both dashboards always
-      agree.
+      old "Cumulative Financial Execution" chart.
    3) Functional Import (Excel template -> bulk-updates all summary
       cards) and Export (whole Home Dashboard -> PDF).
+   4) Functional module search box: clicking/focusing #globalSearch
+      (the SAME shared topbar search input rendered by shell.js on
+      every page) shows a dropdown of every sub-section heading
+      found on THIS page (Home Dashboard) and jumps to it on click.
+      This is wired ONLY here (home-dashboard.js, loaded only by
+      index.html), so main.js's shared placeholder search behavior on
+      every other page is completely untouched.
    ============================================================ */
 
 (function () {
@@ -198,7 +201,8 @@
   }
 
   /* ---------------------------------------------------------------
-     Dynamic styles (edit/reset icon buttons, modal, import/export)
+     Dynamic styles (edit/reset icon buttons, modal, import/export,
+     module search dropdown)
      --------------------------------------------------------------- */
   function injectStyles() {
     if (document.getElementById("homeDashboardDynamicStyles")) return;
@@ -312,6 +316,79 @@
       .home-btn-secondary { background: var(--color-neutral-light, #eef3f7); color: var(--text-primary, #16232f); }
 
       #homeImportFileInput { display: none; }
+
+      /* ---------- Module search dropdown ---------- */
+      .home-search-dropdown {
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 0;
+        width: 100%;
+        min-width: 280px;
+        max-height: 360px;
+        overflow-y: auto;
+        background: var(--bg-card, #fff);
+        border: 1px solid var(--border-color, #e3e7eb);
+        border-radius: 10px;
+        box-shadow: 0 16px 40px rgba(16, 35, 61, 0.16);
+        z-index: 60;
+        padding: 6px;
+      }
+
+      .home-search-dropdown__group-label {
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: .05em;
+        text-transform: uppercase;
+        color: var(--text-muted, #8c9aa8);
+        padding: 8px 10px 4px;
+      }
+
+      .home-search-dropdown__item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 10px;
+        border-radius: 7px;
+        cursor: pointer;
+        font-size: 13px;
+        color: var(--text-primary, #16232f);
+      }
+
+      .home-search-dropdown__item i {
+        width: 16px;
+        text-align: center;
+        color: var(--text-muted, #8c9aa8);
+        flex-shrink: 0;
+      }
+
+      .home-search-dropdown__item:hover,
+      .home-search-dropdown__item.active-hover {
+        background: var(--color-primary-light, #e7eef9);
+        color: var(--color-primary, #0A4595);
+      }
+
+      .home-search-dropdown__item:hover i,
+      .home-search-dropdown__item.active-hover i {
+        color: var(--color-primary, #0A4595);
+      }
+
+      .home-search-dropdown__empty {
+        padding: 16px 10px;
+        text-align: center;
+        font-size: 12.5px;
+        color: var(--text-muted, #8c9aa8);
+      }
+
+      .home-search-highlight {
+        animation: homeSearchPulse 1.6s ease-out;
+        border-radius: var(--radius-md, 12px);
+      }
+
+      @keyframes homeSearchPulse {
+        0% { box-shadow: 0 0 0 0 rgba(10, 69, 149, 0.45); }
+        70% { box-shadow: 0 0 0 14px rgba(10, 69, 149, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(10, 69, 149, 0); }
+      }
     `;
     document.head.appendChild(style);
   }
@@ -362,9 +439,6 @@
 
     if (valueEl) {
       if (meta.type === "text") {
-        // Preserve the trailing <span class="unit"> markup pattern used on
-        // number/percent cards? Text cards render as plain text (matches
-        // the current "04 / 07" / "01 \u2713 / 02 \u2713" style exactly).
         valueEl.textContent = merged.value;
       } else {
         const numeric = Number(merged.value);
@@ -537,11 +611,7 @@
   }
 
   /* ---------------------------------------------------------------
-     Cashflow chart (replaces "Cumulative Financial Execution").
-     Same source data as the Financial Dashboard's Cashflow chart
-     (GET /projects/:id/financial-summary -> data.cash_flow), but
-     rendered as a LINE chart here per requirement, instead of the
-     grouped-bar/histogram style used on the Financial Dashboard.
+     Cashflow chart (replaces "Cumulative Financial Execution")
      --------------------------------------------------------------- */
 
   async function loadCashFlow() {
@@ -788,6 +858,225 @@
   }
 
   /* ---------------------------------------------------------------
+     Module search: dropdown of every sub-section heading on this
+     page, with click-to-scroll navigation. Wired onto the SAME
+     shared #globalSearch input that shell.js renders on every page
+     (id + .search-box wrapper class confirmed from the codebase) --
+     but since this file only loads on index.html, none of this
+     touches any other module/page.
+     --------------------------------------------------------------- */
+
+  function buildSearchIndex() {
+    const index = [];
+
+    // 1) Headline indicators strip (no <h2> of its own -- single
+    //    hardcoded entry pointing at the whole strip).
+    const headlineStrip = document.querySelector(".headline-strip");
+    if (headlineStrip) {
+      index.push({ group: "Overview", label: "Headline Indicators", icon: "fa-bullhorn", el: headlineStrip });
+    }
+
+    // 2) Every KPI summary card (label read directly from the DOM,
+    //    so it always matches whatever is currently rendered).
+    document.querySelectorAll(".lubango-kpi-grid .kpi-card").forEach(function (card) {
+      const labelEl = card.querySelector(".kpi-card__label");
+      if (!labelEl) return;
+      index.push({
+        group: "Summary Cards",
+        label: labelEl.textContent.trim(),
+        icon: "fa-gauge-high",
+        el: card
+      });
+    });
+
+    // 3) Section headings (<h2> inside .section-heading) + each
+    //    individual chart card's <h3> underneath it.
+    document.querySelectorAll(".section-heading").forEach(function (heading) {
+      const h2 = heading.querySelector("h2");
+      if (!h2) return;
+
+      const sectionLabel = h2.textContent.trim();
+      index.push({ group: "Sections", label: sectionLabel, icon: "fa-layer-group", el: heading });
+
+      // Chart cards live in the very next sibling element (the
+      // .grid.grid-12 wrapper, or the GIS Map's .card wrapper).
+      const contentBlock = heading.nextElementSibling;
+      if (contentBlock) {
+        contentBlock.querySelectorAll(".card-header h3").forEach(function (h3) {
+          const cardEl = h3.closest(".card");
+          if (!cardEl) return;
+          index.push({
+            group: sectionLabel,
+            label: h3.textContent.trim(),
+            icon: "fa-chart-line",
+            el: cardEl
+          });
+        });
+      }
+    });
+
+    return index;
+  }
+
+  function getSearchAnchor(input) {
+    return input.closest(".search-box") || input.parentElement;
+  }
+
+  function highlightElement(el) {
+    el.classList.remove("home-search-highlight");
+    // force reflow so the animation restarts if the same target is
+    // selected twice in a row
+    void el.offsetWidth;
+    el.classList.add("home-search-highlight");
+    setTimeout(function () {
+      el.classList.remove("home-search-highlight");
+    }, 1700);
+  }
+
+  function initModuleSearch() {
+    const input = document.getElementById("globalSearch");
+    if (!input) return;
+
+    const anchor = getSearchAnchor(input);
+    if (getComputedStyle(anchor).position === "static") {
+      anchor.style.position = "relative";
+    }
+
+    const searchIndex = buildSearchIndex();
+    let dropdown = null;
+    let activeIndex = -1;
+    let visibleItems = [];
+
+    function closeDropdown() {
+      if (dropdown) {
+        dropdown.remove();
+        dropdown = null;
+      }
+      activeIndex = -1;
+      visibleItems = [];
+    }
+
+    function selectEntry(entry) {
+      closeDropdown();
+      input.value = "";
+      input.blur();
+      entry.el.scrollIntoView({ behavior: "smooth", block: "start" });
+      highlightElement(entry.el);
+    }
+
+    function renderDropdown(query) {
+      const q = (query || "").trim().toLowerCase();
+
+      const filtered = q
+        ? searchIndex.filter(function (entry) { return entry.label.toLowerCase().includes(q); })
+        : searchIndex;
+
+      if (!dropdown) {
+        dropdown = document.createElement("div");
+        dropdown.className = "home-search-dropdown";
+        anchor.appendChild(dropdown);
+      }
+
+      activeIndex = -1;
+      visibleItems = [];
+
+      if (!filtered.length) {
+        dropdown.innerHTML = '<div class="home-search-dropdown__empty">No matching section found.</div>';
+        return;
+      }
+
+      let html = "";
+      let lastGroup = null;
+
+      filtered.forEach(function (entry, i) {
+        if (entry.group !== lastGroup) {
+          html += '<div class="home-search-dropdown__group-label">' + escapeHtml(entry.group) + "</div>";
+          lastGroup = entry.group;
+        }
+        html +=
+          '<div class="home-search-dropdown__item" data-index="' + i + '">' +
+          '<i class="fa-solid ' + entry.icon + '"></i>' +
+          "<span>" + escapeHtml(entry.label) + "</span>" +
+          "</div>";
+      });
+
+      dropdown.innerHTML = html;
+      visibleItems = filtered;
+
+      dropdown.querySelectorAll(".home-search-dropdown__item").forEach(function (item) {
+        item.addEventListener("mousedown", function (e) {
+          // mousedown (not click) so it fires before the input's blur
+          e.preventDefault();
+          const idx = Number(item.getAttribute("data-index"));
+          selectEntry(visibleItems[idx]);
+        });
+      });
+    }
+
+    input.addEventListener("focus", function () {
+      renderDropdown(input.value);
+    });
+
+    input.addEventListener("click", function () {
+      if (!dropdown) renderDropdown(input.value);
+    });
+
+    input.addEventListener("input", function () {
+      renderDropdown(input.value);
+    });
+
+    // Intercept Enter/Escape/Arrow keys ONLY while our dropdown is open,
+    // in the capture phase, so main.js's existing keydown handler on
+    // this same input (the placeholder "Enter to search" toast) never
+    // fires when the module search dropdown is actively being used.
+    input.addEventListener(
+      "keydown",
+      function (e) {
+        if (!dropdown || !visibleItems.length) return;
+
+        if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          const items = Array.from(dropdown.querySelectorAll(".home-search-dropdown__item"));
+          items.forEach(function (it) { it.classList.remove("active-hover"); });
+          activeIndex =
+            e.key === "ArrowDown"
+              ? Math.min(activeIndex + 1, items.length - 1)
+              : Math.max(activeIndex - 1, 0);
+          const activeEl = items[activeIndex];
+          if (activeEl) {
+            activeEl.classList.add("active-hover");
+            activeEl.scrollIntoView({ block: "nearest" });
+          }
+          return;
+        }
+
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          const chosen = activeIndex >= 0 ? visibleItems[activeIndex] : visibleItems[0];
+          if (chosen) selectEntry(chosen);
+          return;
+        }
+
+        if (e.key === "Escape") {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          closeDropdown();
+          input.blur();
+        }
+      },
+      true // capture phase: runs before main.js's own keydown listener
+    );
+
+    document.addEventListener("click", function (e) {
+      if (!dropdown) return;
+      if (e.target === input || anchor.contains(e.target)) return;
+      closeDropdown();
+    });
+  }
+
+  /* ---------------------------------------------------------------
      Init
      --------------------------------------------------------------- */
 
@@ -799,6 +1088,7 @@
 
     wireImportButton();
     wireExportButton();
+    initModuleSearch();
 
     const sessionOk = await ensureSession();
     state.projectId = getProjectId();
