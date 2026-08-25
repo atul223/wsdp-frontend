@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Sign In — Water Supply Distribution Project</title>
+<title>Sign In — PDISA-2 Lubango | Water Supply Distribution Project</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -11,95 +11,351 @@
 <link rel="stylesheet" href="css/styles.css">
 
 <style>
-  /* Scoped to this page only — same variables styles.css already
-     defines elsewhere (see settings.html for the same pattern). */
+  /* ============================================================
+     Scoped to this page only — same variables styles.css already
+     defines elsewhere (see settings.html for the same pattern).
+     ============================================================ */
+
+  * { box-sizing: border-box; }
+
   body[data-page="login"] {
     min-height: 100vh;
+    margin: 0;
+    display: flex;
+    font-family: 'Inter', var(--font-base, -apple-system, sans-serif);
+    background: var(--bg-page, #F4F6F8);
+  }
+
+  .auth-shell {
+    display: flex;
+    width: 100%;
+    min-height: 100vh;
+  }
+
+  /* ---------- Left brand panel ---------- */
+  .auth-brandpanel {
+    position: relative;
+    flex: 1 1 46%;
+    max-width: 560px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 56px 52px;
+    color: #fff;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0) 40%),
+      radial-gradient(circle at 85% 85%, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 45%),
+      linear-gradient(160deg, var(--color-primary-dark, #062B5C) 0%, var(--color-primary, #0A4595) 55%, #0C58B8 100%);
+    overflow: hidden;
+  }
+  .auth-brandpanel::before {
+    /* subtle geometric grid texture */
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: linear-gradient(180deg, rgba(0,0,0,0.9), rgba(0,0,0,0.15));
+    pointer-events: none;
+  }
+  .auth-brandpanel::after {
+    /* thin accent line down the right edge for structure */
+    content: "";
+    position: absolute;
+    top: 0; right: 0; bottom: 0;
+    width: 4px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0));
+  }
+
+  .auth-brandpanel__top { position: relative; z-index: 1; }
+  .auth-brandpanel__mid { position: relative; z-index: 1; margin-top: 44px; }
+  .auth-brandpanel__bottom { position: relative; z-index: 1; }
+
+  .auth-brand-logo {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .auth-brand-logo img {
+    width: 46px;
+    height: 46px;
+    object-fit: contain;
+    background: #fff;
+    border-radius: 10px;
+    padding: 6px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+  }
+  .auth-brand-logo .name { font-weight: 800; font-size: 17px; letter-spacing: 0.2px; }
+  .auth-brand-logo .sub { font-size: 12px; color: rgba(255,255,255,0.72); margin-top: 2px; }
+
+  .auth-brandpanel__eyebrow {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.68);
+    margin-bottom: 14px;
+  }
+  .auth-brandpanel__title {
+    font-size: 30px;
+    font-weight: 800;
+    line-height: 1.28;
+    margin: 0 0 14px;
+    max-width: 420px;
+  }
+  .auth-brandpanel__desc {
+    font-size: 14px;
+    line-height: 1.7;
+    color: rgba(255,255,255,0.78);
+    max-width: 400px;
+    margin: 0 0 30px;
+  }
+
+  .auth-feature-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+  .auth-feature-list li {
+    display: flex; align-items: center; gap: 12px;
+    font-size: 13px; color: rgba(255,255,255,0.9);
+  }
+  .auth-feature-list i {
+    width: 30px; height: 30px; flex: 0 0 30px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 8px;
+    font-size: 13px;
+  }
+
+  .auth-brandpanel__bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 24px;
+    border-top: 1px solid rgba(255,255,255,0.16);
+    font-size: 11.5px;
+    color: rgba(255,255,255,0.6);
+  }
+  .auth-brandpanel__bottom span.dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: #33D17A; margin-right: 6px; box-shadow: 0 0 0 3px rgba(51,209,122,0.2);
+  }
+
+  /* ---------- Right form panel ---------- */
+  .auth-formpanel {
+    flex: 1 1 54%;
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 40px 24px;
     background: var(--bg-page, #F4F6F8);
   }
+
   .auth-card {
     width: 100%;
-    max-width: 380px;
-    background: var(--card-bg, #fff);
+    max-width: 400px;
+  }
+
+  .auth-card__logo-mobile {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+  .auth-card__logo-mobile img {
+    width: 40px; height: 40px; object-fit: contain;
+    border-radius: 9px; background: #fff;
     border: 1px solid var(--border-color, #E3E7EB);
-    border-radius: var(--radius-lg, 12px);
-    padding: var(--sp-6, 32px) var(--sp-5, 28px);
-    box-shadow: 0 2px 18px rgba(16, 30, 54, 0.06);
+    padding: 5px;
   }
-  .auth-brand { display: flex; align-items: center; gap: 10px; margin-bottom: var(--sp-5, 24px); }
-  .auth-brand__mark {
-    width: 38px; height: 38px; border-radius: 10px;
-    background: var(--color-primary, #0A4595);
-    color: #fff; display: flex; align-items: center; justify-content: center;
-    font-size: 17px;
-  }
-  .auth-brand__text .name { font-weight: 800; font-size: 15px; color: var(--text-primary, #16232F); }
-  .auth-brand__text .sub { font-size: 11.5px; color: var(--text-muted, #8C9AA8); }
-  .auth-title { font-size: 19px; font-weight: 700; color: var(--text-primary, #16232F); margin: 0 0 4px; }
-  .auth-subtitle { font-size: 13px; color: var(--text-muted, #8C9AA8); margin: 0 0 22px; }
-  .auth-field { margin-bottom: 16px; }
+  .auth-card__logo-mobile .name { font-weight: 800; font-size: 14.5px; color: var(--text-primary, #16232F); }
+  .auth-card__logo-mobile .sub { font-size: 11px; color: var(--text-muted, #8C9AA8); }
+
+  .auth-title { font-size: 24px; font-weight: 800; color: var(--text-primary, #16232F); margin: 0 0 6px; letter-spacing: -0.2px; }
+  .auth-subtitle { font-size: 13.5px; color: var(--text-muted, #8C9AA8); margin: 0 0 28px; line-height: 1.55; }
+
+  .auth-field { margin-bottom: 18px; }
   .auth-field label {
     display: block; font-size: 12.5px; font-weight: 600;
-    color: var(--text-primary, #16232F); margin-bottom: 6px;
+    color: var(--text-primary, #16232F); margin-bottom: 7px;
+  }
+  .auth-input-wrap { position: relative; }
+  .auth-input-wrap i.auth-input-icon {
+    position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+    font-size: 13px; color: var(--text-muted, #8C9AA8);
+    pointer-events: none;
   }
   .auth-field input {
-    width: 100%; box-sizing: border-box;
-    padding: 10px 12px; font-size: 13.5px; font-family: inherit;
+    width: 100%;
+    padding: 12px 14px 12px 38px;
+    font-size: 13.5px; font-family: inherit;
     border: 1px solid var(--border-color-strong, #C7CED6);
-    border-radius: 8px; outline: none;
-    transition: border-color var(--transition-base, 150ms ease);
+    border-radius: 9px; outline: none;
+    background: #fff;
+    color: var(--text-primary, #16232F);
+    transition: border-color 150ms ease, box-shadow 150ms ease;
   }
-  .auth-field input:focus { border-color: var(--color-primary, #0A4595); }
+  .auth-field input:focus {
+    border-color: var(--color-primary, #0A4595);
+    box-shadow: 0 0 0 3px rgba(10, 69, 149, 0.12);
+  }
+  .auth-field input::placeholder { color: #AEB8C2; }
+
+  .auth-toggle-pass {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; cursor: pointer;
+    font-size: 13px; color: var(--text-muted, #8C9AA8);
+    padding: 4px;
+  }
+  .auth-toggle-pass:hover { color: var(--color-primary, #0A4595); }
+
+  .auth-row-between {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: -6px 0 22px;
+    font-size: 12.5px;
+  }
+  .auth-remember { display: flex; align-items: center; gap: 7px; color: var(--text-muted, #8C9AA8); }
+  .auth-remember input { width: 14px; height: 14px; accent-color: var(--color-primary, #0A4595); cursor: pointer; }
+  .auth-forgot { color: var(--color-primary, #0A4595); text-decoration: none; font-weight: 600; }
+  .auth-forgot:hover { text-decoration: underline; }
+
   .auth-submit {
-    width: 100%; padding: 11px; font-size: 13.5px; font-weight: 700;
-    color: #fff; background: var(--color-primary, #0A4595);
-    border: none; border-radius: 8px; cursor: pointer;
-    transition: opacity var(--transition-base, 150ms ease);
+    width: 100%; padding: 12.5px; font-size: 13.5px; font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, var(--color-primary, #0A4595), #0C58B8);
+    border: none; border-radius: 9px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    box-shadow: 0 6px 16px rgba(10, 69, 149, 0.28);
+    transition: opacity 150ms ease, transform 150ms ease;
   }
-  .auth-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+  .auth-submit:hover:not(:disabled) { transform: translateY(-1px); }
+  .auth-submit:disabled { opacity: 0.65; cursor: not-allowed; transform: none; }
+
   .auth-error {
     display: none;
+    align-items: center; gap: 8px;
     background: var(--color-critical-light, #FBE7E5);
     color: var(--color-critical, #C0392B);
-    font-size: 12.5px; padding: 10px 12px; border-radius: 8px;
-    margin-bottom: 16px;
+    font-size: 12.5px; padding: 11px 13px; border-radius: 9px;
+    margin-bottom: 18px;
   }
-  .auth-error.visible { display: block; }
-  .auth-footer { text-align: center; margin-top: 18px; font-size: 12px; color: var(--text-muted, #8C9AA8); }
+  .auth-error.visible { display: flex; }
+
+  .auth-divider { display: flex; align-items: center; gap: 10px; margin: 26px 0 18px; }
+  .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--border-color, #E3E7EB); }
+  .auth-divider span { font-size: 11px; color: var(--text-muted, #8C9AA8); }
+
+  .auth-footer { text-align: center; margin-top: 6px; font-size: 11.5px; color: var(--text-muted, #8C9AA8); line-height: 1.6; }
+  .auth-footer i { margin-right: 4px; }
+
+  @media (max-width: 960px) {
+    .auth-brandpanel { display: none; }
+    .auth-formpanel { flex: 1 1 100%; }
+    .auth-card__logo-mobile { display: flex; }
+  }
+
+  @media (max-width: 420px) {
+    .auth-formpanel { padding: 32px 18px; }
+  }
 </style>
 </head>
 <body data-page="login">
 
-<div class="auth-card">
-  <div class="auth-brand">
-    <div class="auth-brand__mark"><i class="fa-solid fa-droplet"></i></div>
-    <div class="auth-brand__text">
-      <div class="name">PDISA WSDP</div>
-      <div class="sub">Water Supply Distribution</div>
+<div class="auth-shell">
+
+  <!-- ============== Left brand panel (hidden on small screens) ============== -->
+  <aside class="auth-brandpanel">
+    <div class="auth-brandpanel__top">
+      <div class="auth-brand-logo">
+        <img src="assets/images/pdisa-logo.png" alt="PDISA Logo" />
+        <div>
+          <div class="name">PDISA-2 Lubango</div>
+          <div class="sub">Water Supply Distribution Project</div>
+        </div>
+      </div>
     </div>
-  </div>
 
-  <h1 class="auth-title">Sign in</h1>
-  <p class="auth-subtitle">Enter your credentials to access the dashboard</p>
+    <div class="auth-brandpanel__mid">
+      <span class="auth-brandpanel__eyebrow">Monitoring &amp; Management Platform</span>
+      <h1 class="auth-brandpanel__title">Real-time visibility across every phase of your water supply infrastructure.</h1>
+      <p class="auth-brandpanel__desc">
+        Track construction progress, financials, resources, risks and compliance in a single,
+        secure workspace built for the PDISA-2 Lubango programme.
+      </p>
 
-  <div class="auth-error" id="authError"></div>
-
-  <form id="loginForm" novalidate>
-    <div class="auth-field">
-      <label for="email">Email</label>
-      <input type="email" id="email" name="email" autocomplete="username" required />
+      <ul class="auth-feature-list">
+        <li><i class="fa-solid fa-diagram-project"></i> Construction &amp; GIS progress tracking</li>
+        <li><i class="fa-solid fa-sack-dollar"></i> Financial &amp; payment monitoring</li>
+        <li><i class="fa-solid fa-triangle-exclamation"></i> Risk, delay &amp; EHS oversight</li>
+        <li><i class="fa-solid fa-file-shield"></i> Reports fully compliant &amp; audit-ready</li>
+      </ul>
     </div>
-    <div class="auth-field">
-      <label for="password">Password</label>
-      <input type="password" id="password" name="password" autocomplete="current-password" required />
-    </div>
-    <button type="submit" class="auth-submit" id="loginSubmitBtn">Sign In</button>
-  </form>
 
-  <div class="auth-footer">Water Supply Distribution Project — Monitoring Dashboard</div>
+    <div class="auth-brandpanel__bottom">
+      <div><span class="dot"></span>Systems operational</div>
+      <div>Funded by World Bank &amp; AfDB Group</div>
+    </div>
+  </aside>
+
+  <!-- ============== Right form panel ============== -->
+  <main class="auth-formpanel">
+    <div class="auth-card">
+
+      <div class="auth-card__logo-mobile">
+        <img src="assets/images/pdisa-logo.png" alt="PDISA Logo" />
+        <div>
+          <div class="name">PDISA WSDP</div>
+          <div class="sub">Water Supply Distribution</div>
+        </div>
+      </div>
+
+      <h1 class="auth-title">Welcome back</h1>
+      <p class="auth-subtitle">Sign in with your credentials to access the monitoring dashboard.</p>
+
+      <div class="auth-error" id="authError"><i class="fa-solid fa-circle-exclamation"></i><span id="authErrorText"></span></div>
+
+      <form id="loginForm" novalidate>
+        <div class="auth-field">
+          <label for="email">Email</label>
+          <div class="auth-input-wrap">
+            <i class="fa-solid fa-envelope auth-input-icon"></i>
+            <input type="email" id="email" name="email" autocomplete="username" placeholder="you@company.com" required />
+          </div>
+        </div>
+
+        <div class="auth-field">
+          <label for="password">Password</label>
+          <div class="auth-input-wrap">
+            <i class="fa-solid fa-lock auth-input-icon"></i>
+            <input type="password" id="password" name="password" autocomplete="current-password" placeholder="••••••••" required />
+            <button type="button" class="auth-toggle-pass" id="togglePassBtn" aria-label="Show password" tabindex="-1">
+              <i class="fa-solid fa-eye"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="auth-row-between">
+          <label class="auth-remember">
+            <input type="checkbox" id="rememberMe" /> Remember me
+          </label>
+          <a href="#" class="auth-forgot">Forgot password?</a>
+        </div>
+
+        <button type="submit" class="auth-submit" id="loginSubmitBtn">
+          <i class="fa-solid fa-right-to-bracket"></i> Sign In
+        </button>
+      </form>
+
+      <div class="auth-divider"><span>SECURE ACCESS</span></div>
+
+      <div class="auth-footer">
+        <i class="fa-solid fa-shield-halved"></i>PDISA-2 Lubango — Monitoring Dashboard<br>
+        Access restricted to authorized personnel only.
+      </div>
+    </div>
+  </main>
+
 </div>
 
 <script src="js/api.js"></script>
@@ -117,15 +373,28 @@
 
     var form = document.getElementById("loginForm");
     var errorBox = document.getElementById("authError");
+    var errorText = document.getElementById("authErrorText");
     var submitBtn = document.getElementById("loginSubmitBtn");
+    var toggleBtn = document.getElementById("togglePassBtn");
+    var passwordInput = document.getElementById("password");
 
     function showError(message) {
-      errorBox.textContent = message;
+      errorText.textContent = message;
       errorBox.classList.add("visible");
     }
     function hideError() {
       errorBox.classList.remove("visible");
     }
+
+    // Show / hide password — purely cosmetic, does not affect submit logic.
+    toggleBtn.addEventListener("click", function () {
+      var isPass = passwordInput.getAttribute("type") === "password";
+      passwordInput.setAttribute("type", isPass ? "text" : "password");
+      toggleBtn.innerHTML = isPass
+        ? '<i class="fa-solid fa-eye-slash"></i>'
+        : '<i class="fa-solid fa-eye"></i>';
+      toggleBtn.setAttribute("aria-label", isPass ? "Hide password" : "Show password");
+    });
 
     form.addEventListener("submit", function (e) {
       e.preventDefault();
@@ -135,7 +404,7 @@
       var password = document.getElementById("password").value;
 
       submitBtn.disabled = true;
-      submitBtn.textContent = "Signing in…";
+      submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Signing in…';
 
       window.WSDP_API.login(email, password)
         .then(async function () {
@@ -162,7 +431,7 @@
             showError(err.message || "Invalid email or password.");
           }
           submitBtn.disabled = false;
-          submitBtn.textContent = "Sign In";
+          submitBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Sign In';
         });
     });
   })();
