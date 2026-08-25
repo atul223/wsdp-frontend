@@ -1,6 +1,8 @@
 (function () {
   "use strict";
 
+  console.log("[construction-progress.js] BUILD v2026-08-24-04 loaded @", new Date().toISOString());
+
   let PROJECT_ID = (() => {
     const stored = localStorage.getItem("current_project");
 
@@ -16,14 +18,69 @@
   let dashboardData = null;
 
   /* =========================================================
+     ON-PAGE DIAGNOSTIC STRIP
+     =========================================================
+     Requires zero DevTools use. Renders a small, always-visible status
+     line at the top of the page showing: which project is loaded, how
+     many rows came back for each table, when it last refreshed
+     successfully, and the exact text of the last error (if any).
+
+     This is the fastest possible way to see, at a glance and WITHOUT
+     opening DevTools, whether:
+       - the page is resolving the SAME project every single time
+         (if the project name/id shown here changes between visits,
+         that is the bug — different modules on this site may be
+         overwriting the shared "current_project" localStorage key)
+       - the API call actually returned real database rows, or
+         silently fell back to the static report numbers
+       - anything errored, and the EXACT text of that error
+     ========================================================= */
+  function ensureDiagnosticBar() {
+    let bar = document.getElementById("cpDiagnosticBar");
+    if (bar) return bar;
+
+    bar = document.createElement("div");
+    bar.id = "cpDiagnosticBar";
+    bar.style.cssText =
+      "position:sticky;top:0;z-index:5000;background:#111827;color:#e5e7eb;" +
+      "font:12px/1.6 monospace;padding:8px 14px;display:flex;flex-wrap:wrap;" +
+      "gap:16px;align-items:center;border-bottom:2px solid #374151;";
+
+    const main = document.querySelector(".main-content") || document.body;
+    main.insertBefore(bar, main.firstChild);
+    return bar;
+  }
+
+  function renderDiagnosticBar(state) {
+    const bar = ensureDiagnosticBar();
+    const ok = state.status === "ok";
+
+    bar.innerHTML = `
+      <span style="color:${ok ? "#34d399" : "#f87171"};font-weight:700;">
+        ${ok ? "&#9679; LIVE DATA" : "&#9679; FALLBACK / ERROR"}
+      </span>
+      <span>Project: <b>${escapeHtml(state.projectName || "?")}</b> (${escapeHtml(state.projectId || "none")})</span>
+      <span>Area rows: <b>${state.areaCount ?? "-"}</b></span>
+      <span>Diameter rows: <b>${state.pipeCount ?? "-"}</b></span>
+      <span>Activity rows: <b>${state.activityCount ?? "-"}</b></span>
+      <span>Last refresh: <b>${state.lastFetch || "-"}</b></span>
+      ${state.error ? `<span style="color:#f87171;">Error: ${escapeHtml(state.error)}</span>` : ""}
+      <button type="button" id="cpDiagRefreshBtn" style="margin-left:auto;background:#374151;color:#e5e7eb;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;">
+        Force reload now
+      </button>
+    `;
+
+    const refreshBtn = document.getElementById("cpDiagRefreshBtn");
+    if (refreshBtn) {
+      refreshBtn.onclick = function () {
+        loadDashboard();
+      };
+    }
+  }
+
+  /* =========================================================
      REPORT-BASED FALLBACK DATA
      Source: 50CS3_LUBANGO_UCP-P_ENG_MR_Technical_July 2026 report
-
-     Used ONLY as a last-resort offline safety net if the dashboard GET
-     fails even after retries, so the page is never left blank. Once the
-     initial load succeeds, all further Add/Edit/Delete actions patch
-     dashboardData directly from the server's save response — they never
-     re-fetch the whole dashboard for their own sake.
      ========================================================= */
 
   const FALLBACK_PIPELINE_SUMMARY = {
@@ -86,9 +143,6 @@
     { area: "As per Detailed Design", crossingType: "River/Stream Crossing", span: "3 Nos Planned", status: "Not Started" },
   ];
 
-  // Per-table arrays of whatever rows are currently rendered. Populated
-  // fresh on every render call and used by Edit/Delete button handlers to
-  // look the row up by its position in the table.
   let currentAreaRows = [];
   let currentPipeDiameterRows = [];
   let currentActivityRows = [];
@@ -246,12 +300,6 @@
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  // Appends a cache-busting query param so this exact URL is NEVER reused
-  // by a browser HTTP cache or an intermediate CDN/proxy cache (this
-  // stack's frontend sits behind Cloudflare). Combined with the
-  // Cache-Control: no-store headers the backend now sends on these two
-  // GET endpoints, this closes off caching as a possible cause of a
-  // refresh showing stale, pre-edit data.
   function noCacheUrl(url) {
     const sep = url.includes("?") ? "&" : "?";
     return `${url}${sep}_ts=${Date.now()}`;
@@ -265,14 +313,18 @@
     }
 
     if (!user) {
+      console.error("[construction-progress] No valid session/user found — redirecting to login.");
       toast("Session expired. Please login again.", "fa-lock");
       window.location.href = "login.html";
       return false;
     }
 
     if (PROJECT_ID) {
+      console.log("[construction-progress] Using existing PROJECT_ID from localStorage:", PROJECT_ID);
       return true;
     }
+
+    console.log("[construction-progress] No PROJECT_ID in localStorage, calling /default-project...");
 
     const result = await WSDP_API.request(
       "GET",
@@ -282,11 +334,13 @@
     const project = unwrap(result);
 
     if (!project?.id) {
+      console.error("[construction-progress] /default-project returned no usable project:", result);
       toast("No project found for construction progress", "fa-circle-exclamation");
       return false;
     }
 
     PROJECT_ID = project.id;
+    console.log("[construction-progress] Resolved PROJECT_ID:", PROJECT_ID, project);
 
     localStorage.setItem("current_project", JSON.stringify(project));
     localStorage.setItem("current_project_code", project.code || "");
@@ -295,39 +349,72 @@
     return true;
   }
 
-  // Full dashboard fetch. Called ONCE on page load, with a couple of
-  // retries on transient failure. Individual Add/Edit/Delete actions
-  // never call this — they patch dashboardData directly from their own
-  // save response instead (see verifyRowPersisted below for the extra
-  // confirmation step on top of that).
   async function loadDashboard(attempt = 1) {
     const MAX_ATTEMPTS = 3;
 
     try {
       if (!PROJECT_ID) {
         const ready = await ensureSessionAndProject();
-        if (!ready) return;
+        if (!ready) {
+          renderDiagnosticBar({
+            status: "error",
+            projectId: "none",
+            projectName: "none",
+            error: "Could not resolve a project id (see console)",
+          });
+          return;
+        }
       }
 
-      const response = await WSDP_API.request(
-        "GET",
-        noCacheUrl(`/construction-progress/dashboard/${PROJECT_ID}`)
-      );
+      const url = noCacheUrl(`/construction-progress/dashboard/${PROJECT_ID}`);
+      console.log(`[construction-progress] Fetching dashboard (attempt ${attempt}): ${url}`);
+
+      const response = await WSDP_API.request("GET", url);
 
       dashboardData = unwrap(response);
 
+      console.log("[construction-progress] Dashboard loaded successfully. Row counts:", {
+        area_progress: dashboardData?.area_progress?.length ?? "MISSING",
+        pipe_diameter_progress: dashboardData?.pipe_diameter_progress?.length ?? "MISSING",
+        activity_progress: dashboardData?.activity_progress?.length ?? "MISSING",
+        testing: dashboardData?.testing?.length ?? "MISSING",
+        crossings: dashboardData?.crossings?.length ?? "MISSING",
+      });
+      console.log("[construction-progress] Full dashboard payload:", dashboardData);
+
+      renderDiagnosticBar({
+        status: "ok",
+        projectId: dashboardData?.project?.id || PROJECT_ID,
+        projectName: dashboardData?.project?.name,
+        areaCount: dashboardData?.area_progress?.length,
+        pipeCount: dashboardData?.pipe_diameter_progress?.length,
+        activityCount: dashboardData?.activity_progress?.length,
+        lastFetch: new Date().toLocaleTimeString(),
+      });
+
       renderAll();
     } catch (error) {
-      if (attempt < 3) {
-        console.warn(
-          `[construction-progress] dashboard fetch failed (attempt ${attempt}/${MAX_ATTEMPTS}), retrying...`,
-          error
-        );
+      console.error(
+        `[construction-progress] Dashboard fetch FAILED on attempt ${attempt}/${MAX_ATTEMPTS}. ` +
+        `Full error below — this is why fallback/old values may be showing:`,
+        error
+      );
+
+      if (attempt < MAX_ATTEMPTS) {
         await sleep(attempt * 700);
         return loadDashboard(attempt + 1);
       }
 
-      console.error("[construction-progress] dashboard fetch failed after retries, showing report fallback data:", error);
+      console.error("[construction-progress] Giving up after retries. Rendering static fallback data now.");
+
+      renderDiagnosticBar({
+        status: "error",
+        projectId: PROJECT_ID || "none",
+        projectName: "?",
+        lastFetch: new Date().toLocaleTimeString(),
+        error: error?.message || String(error),
+      });
+
       toast(
         error.message || "Live data unavailable — showing latest report figures",
         "fa-circle-exclamation"
@@ -337,17 +424,6 @@
     }
   }
 
-  /**
-   * *** EXTRA SAFETY NET ***
-   * After a create/update returns what LOOKS like a successful save
-   * (a row with a real id), this independently re-fetches the dashboard
-   * fresh (no-store + cache-busted, bypassing everything we just patched
-   * in memory) and confirms the saved row is actually present in that
-   * fresh response. If it is NOT — meaning something server-side or a
-   * caching layer we don't control is dropping it — the user is warned
-   * IMMEDIATELY, at the moment of saving, instead of silently discovering
-   * a "lost" edit after a later refresh.
-   */
   async function verifyRowPersisted(field, id, label) {
     try {
       const response = await WSDP_API.request(
@@ -359,16 +435,30 @@
       const found = rows.some((row) => row.id === id);
 
       if (!found) {
-        console.error(`[construction-progress] verification failed: ${label} id=${id} not found in a fresh, uncached re-fetch.`);
+        console.error(`[construction-progress] VERIFICATION FAILED: ${label} id=${id} not found in a fresh re-fetch immediately after saving.`, {
+          field,
+          savedId: id,
+          freshRowIds: rows.map((r) => r.id),
+        });
         toast(
           `Warning: "${label}" saved, but could not be verified on a fresh reload. Please refresh and check.`,
           "fa-triangle-exclamation"
         );
+        renderDiagnosticBar({
+          status: "error",
+          projectId: fresh?.project?.id || PROJECT_ID,
+          projectName: fresh?.project?.name,
+          areaCount: fresh?.area_progress?.length,
+          pipeCount: fresh?.pipe_diameter_progress?.length,
+          activityCount: fresh?.activity_progress?.length,
+          lastFetch: new Date().toLocaleTimeString(),
+          error: `Just-saved row (${label}) NOT found on immediate re-fetch!`,
+        });
+      } else {
+        console.log(`[construction-progress] Verified: ${label} id=${id} confirmed present in fresh re-fetch.`);
       }
     } catch (err) {
-      // Verification itself failing (e.g. transient network issue) should
-      // not be treated as proof the save failed — just log it.
-      console.warn(`[construction-progress] could not verify persistence of ${label}:`, err);
+      console.warn(`[construction-progress] Could not verify persistence of ${label} (verification fetch itself failed):`, err);
     }
   }
 
@@ -544,6 +634,8 @@
         payload.contract = numberValue(payload.contract);
         payload.executed = numberValue(payload.executed);
 
+        console.log("[construction-progress] Submitting Area-wise Progress:", existing?.id ? "UPDATE" : "CREATE", payload);
+
         let response;
         if (existing?.id) {
           response = await WSDP_API.request(
@@ -559,8 +651,11 @@
           );
         }
 
+        console.log("[construction-progress] Area-wise Progress save response:", response);
+
         const saved = unwrap(response);
         if (!saved?.id) {
+          console.error("[construction-progress] Save response did not contain a row id — treating as failed.", response);
           throw new Error("Server did not confirm the save. Please try again.");
         }
         const list = ensureDashboardArray("area_progress");
@@ -649,6 +744,8 @@
         payload.proposedLength = numberValue(payload.proposedLength);
         payload.executed = numberValue(payload.executed);
 
+        console.log("[construction-progress] Submitting Pipe Diameter Progress:", existing?.id ? "UPDATE" : "CREATE", payload);
+
         let response;
         if (existing?.id) {
           response = await WSDP_API.request(
@@ -664,8 +761,11 @@
           );
         }
 
+        console.log("[construction-progress] Pipe Diameter Progress save response:", response);
+
         const saved = unwrap(response);
         if (!saved?.id) {
+          console.error("[construction-progress] Save response did not contain a row id — treating as failed.", response);
           throw new Error("Server did not confirm the save. Please try again.");
         }
         const list = ensureDashboardArray("pipe_diameter_progress");
@@ -757,6 +857,8 @@
         payload.cumulative = numberValue(payload.cumulative);
         payload.totalPercent = numberValue(payload.totalPercent);
 
+        console.log("[construction-progress] Submitting Activity Wise Progress:", existing?.id ? "UPDATE" : "CREATE", payload);
+
         let response;
         if (existing?.id) {
           response = await WSDP_API.request(
@@ -772,8 +874,11 @@
           );
         }
 
+        console.log("[construction-progress] Activity Wise Progress save response:", response);
+
         const saved = unwrap(response);
         if (!saved?.id) {
+          console.error("[construction-progress] Save response did not contain a row id — treating as failed.", response);
           throw new Error("Server did not confirm the save. Please try again.");
         }
         const list = ensureDashboardArray("activity_progress");
@@ -1218,7 +1323,7 @@
         await config.onSubmit(payload);
         modal.hidden = true;
       } catch (err) {
-        console.error(err);
+        console.error("[construction-progress] Save failed:", err);
         toast(err.message || "Save failed", "fa-circle-exclamation");
       } finally {
         if (submitBtn) {
@@ -1578,6 +1683,7 @@
   });
 
   document.addEventListener("wsdp:authready", async function () {
+    console.log("[construction-progress] wsdp:authready fired, loading dashboard...");
     const ready = await ensureSessionAndProject();
 
     if (!ready) {
@@ -1588,11 +1694,11 @@
   });
 
   document.addEventListener("DOMContentLoaded", function () {
+    ensureDiagnosticBar();
+    renderDiagnosticBar({ status: "error", projectId: PROJECT_ID || "resolving...", projectName: "loading...", error: null });
+
     initConstructionDateRangePicker();
 
-    // Render tables immediately with report-based fallback data. This
-    // guarantees the tables are never left blank while waiting for
-    // "wsdp:authready" to fire and the real loadDashboard() to complete.
     renderAll();
 
     const areaFilter = document.getElementById("areaScopeFilter");
