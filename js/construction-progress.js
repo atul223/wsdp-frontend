@@ -1,8 +1,6 @@
 (function () {
   "use strict";
 
-  console.log("[construction-progress.js] BUILD v2026-08-25-01 loaded @", new Date().toISOString());
-
   let PROJECT_ID = (() => {
     const stored = localStorage.getItem("current_project");
 
@@ -18,66 +16,14 @@
   let dashboardData = null;
 
   /* =========================================================
-     ON-PAGE DIAGNOSTIC STRIP
-     =========================================================
-     Requires zero DevTools use. Shows: which project is loaded, row
-     counts per table, last successful refresh time, and any error text.
-
-     *** THIS BAR IS WHAT REVEALED THE ROOT CAUSE ***
-     It stayed frozen on its initial "loading..." placeholder forever
-     (Project: loading..., Last refresh: -, no error) which is only
-     possible if loadDashboard() was NEVER invoked — not even to fail —
-     since both its success and failure paths always update these
-     fields to a real value. See the root-cause fix at the bottom of
-     this file (kickOffDashboardLoad / the "fire now or listen" pattern)
-     for the actual bug this uncovered and how it's fixed.
-     ========================================================= */
-  function ensureDiagnosticBar() {
-    let bar = document.getElementById("cpDiagnosticBar");
-    if (bar) return bar;
-
-    bar = document.createElement("div");
-    bar.id = "cpDiagnosticBar";
-    bar.style.cssText =
-      "position:sticky;top:0;z-index:5000;background:#111827;color:#e5e7eb;" +
-      "font:12px/1.6 monospace;padding:8px 14px;display:flex;flex-wrap:wrap;" +
-      "gap:16px;align-items:center;border-bottom:2px solid #374151;";
-
-    const main = document.querySelector(".main-content") || document.body;
-    main.insertBefore(bar, main.firstChild);
-    return bar;
-  }
-
-  function renderDiagnosticBar(state) {
-    const bar = ensureDiagnosticBar();
-    const ok = state.status === "ok";
-
-    bar.innerHTML = `
-      <span style="color:${ok ? "#34d399" : "#f87171"};font-weight:700;">
-        ${ok ? "&#9679; LIVE DATA" : "&#9679; FALLBACK / ERROR"}
-      </span>
-      <span>Project: <b>${escapeHtml(state.projectName || "?")}</b> (${escapeHtml(state.projectId || "none")})</span>
-      <span>Area rows: <b>${state.areaCount ?? "-"}</b></span>
-      <span>Diameter rows: <b>${state.pipeCount ?? "-"}</b></span>
-      <span>Activity rows: <b>${state.activityCount ?? "-"}</b></span>
-      <span>Last refresh: <b>${state.lastFetch || "-"}</b></span>
-      ${state.error ? `<span style="color:#f87171;">Error: ${escapeHtml(state.error)}</span>` : ""}
-      <button type="button" id="cpDiagRefreshBtn" style="margin-left:auto;background:#374151;color:#e5e7eb;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;">
-        Force reload now
-      </button>
-    `;
-
-    const refreshBtn = document.getElementById("cpDiagRefreshBtn");
-    if (refreshBtn) {
-      refreshBtn.onclick = function () {
-        loadDashboard();
-      };
-    }
-  }
-
-  /* =========================================================
      REPORT-BASED FALLBACK DATA
      Source: 50CS3_LUBANGO_UCP-P_ENG_MR_Technical_July 2026 report
+
+     Used ONLY as a last-resort offline safety net if the dashboard GET
+     fails even after retries, so the page is never left blank. Once the
+     initial load succeeds, all further Add/Edit/Delete actions patch
+     dashboardData directly from the server's save response — they never
+     re-fetch the whole dashboard for their own sake.
      ========================================================= */
 
   const FALLBACK_PIPELINE_SUMMARY = {
@@ -310,16 +256,12 @@
     }
 
     if (!user) {
-      console.warn("[construction-progress] No valid session/user found yet.");
       return false;
     }
 
     if (PROJECT_ID) {
-      console.log("[construction-progress] Using existing PROJECT_ID from localStorage:", PROJECT_ID);
       return true;
     }
-
-    console.log("[construction-progress] No PROJECT_ID in localStorage, calling /default-project...");
 
     const result = await WSDP_API.request(
       "GET",
@@ -334,7 +276,6 @@
     }
 
     PROJECT_ID = project.id;
-    console.log("[construction-progress] Resolved PROJECT_ID:", PROJECT_ID, project);
 
     localStorage.setItem("current_project", JSON.stringify(project));
     localStorage.setItem("current_project_code", project.code || "");
@@ -349,66 +290,28 @@
     try {
       if (!PROJECT_ID) {
         const ready = await ensureSessionAndProject();
-        if (!ready) {
-          renderDiagnosticBar({
-            status: "error",
-            projectId: "none",
-            projectName: "none",
-            error: "Could not resolve a project id (no session yet?)",
-          });
-          return;
-        }
+        if (!ready) return;
       }
 
-      const url = noCacheUrl(`/construction-progress/dashboard/${PROJECT_ID}`);
-      console.log(`[construction-progress] Fetching dashboard (attempt ${attempt}): ${url}`);
-
-      const response = await WSDP_API.request("GET", url);
+      const response = await WSDP_API.request(
+        "GET",
+        noCacheUrl(`/construction-progress/dashboard/${PROJECT_ID}`)
+      );
 
       dashboardData = unwrap(response);
 
-      console.log("[construction-progress] Dashboard loaded successfully. Row counts:", {
-        area_progress: dashboardData?.area_progress?.length ?? "MISSING",
-        pipe_diameter_progress: dashboardData?.pipe_diameter_progress?.length ?? "MISSING",
-        activity_progress: dashboardData?.activity_progress?.length ?? "MISSING",
-        testing: dashboardData?.testing?.length ?? "MISSING",
-        crossings: dashboardData?.crossings?.length ?? "MISSING",
-      });
-      console.log("[construction-progress] Full dashboard payload:", dashboardData);
-
-      renderDiagnosticBar({
-        status: "ok",
-        projectId: dashboardData?.project?.id || PROJECT_ID,
-        projectName: dashboardData?.project?.name,
-        areaCount: dashboardData?.area_progress?.length,
-        pipeCount: dashboardData?.pipe_diameter_progress?.length,
-        activityCount: dashboardData?.activity_progress?.length,
-        lastFetch: new Date().toLocaleTimeString(),
-      });
-
       renderAll();
     } catch (error) {
-      console.error(
-        `[construction-progress] Dashboard fetch FAILED on attempt ${attempt}/${MAX_ATTEMPTS}. ` +
-        `Full error below — this is why fallback/old values may be showing:`,
-        error
-      );
-
       if (attempt < MAX_ATTEMPTS) {
+        console.warn(
+          `[construction-progress] dashboard fetch failed (attempt ${attempt}/${MAX_ATTEMPTS}), retrying...`,
+          error
+        );
         await sleep(attempt * 700);
         return loadDashboard(attempt + 1);
       }
 
-      console.error("[construction-progress] Giving up after retries. Rendering static fallback data now.");
-
-      renderDiagnosticBar({
-        status: "error",
-        projectId: PROJECT_ID || "none",
-        projectName: "?",
-        lastFetch: new Date().toLocaleTimeString(),
-        error: error?.message || String(error),
-      });
-
+      console.error("[construction-progress] dashboard fetch failed after retries, showing report fallback data:", error);
       toast(
         error.message || "Live data unavailable — showing latest report figures",
         "fa-circle-exclamation"
@@ -429,17 +332,11 @@
       const found = rows.some((row) => row.id === id);
 
       if (!found) {
-        console.error(`[construction-progress] VERIFICATION FAILED: ${label} id=${id} not found in a fresh re-fetch immediately after saving.`, {
-          field,
-          savedId: id,
-          freshRowIds: rows.map((r) => r.id),
-        });
+        console.error(`[construction-progress] Verification failed: ${label} id=${id} not found in a fresh re-fetch immediately after saving.`);
         toast(
           `Warning: "${label}" saved, but could not be verified on a fresh reload. Please refresh and check.`,
           "fa-triangle-exclamation"
         );
-      } else {
-        console.log(`[construction-progress] Verified: ${label} id=${id} confirmed present in fresh re-fetch.`);
       }
     } catch (err) {
       console.warn(`[construction-progress] Could not verify persistence of ${label} (verification fetch itself failed):`, err);
@@ -618,8 +515,6 @@
         payload.contract = numberValue(payload.contract);
         payload.executed = numberValue(payload.executed);
 
-        console.log("[construction-progress] Submitting Area-wise Progress:", existing?.id ? "UPDATE" : "CREATE", payload);
-
         let response;
         if (existing?.id) {
           response = await WSDP_API.request(
@@ -635,11 +530,8 @@
           );
         }
 
-        console.log("[construction-progress] Area-wise Progress save response:", response);
-
         const saved = unwrap(response);
         if (!saved?.id) {
-          console.error("[construction-progress] Save response did not contain a row id — treating as failed.", response);
           throw new Error("Server did not confirm the save. Please try again.");
         }
         const list = ensureDashboardArray("area_progress");
@@ -728,8 +620,6 @@
         payload.proposedLength = numberValue(payload.proposedLength);
         payload.executed = numberValue(payload.executed);
 
-        console.log("[construction-progress] Submitting Pipe Diameter Progress:", existing?.id ? "UPDATE" : "CREATE", payload);
-
         let response;
         if (existing?.id) {
           response = await WSDP_API.request(
@@ -745,11 +635,8 @@
           );
         }
 
-        console.log("[construction-progress] Pipe Diameter Progress save response:", response);
-
         const saved = unwrap(response);
         if (!saved?.id) {
-          console.error("[construction-progress] Save response did not contain a row id — treating as failed.", response);
           throw new Error("Server did not confirm the save. Please try again.");
         }
         const list = ensureDashboardArray("pipe_diameter_progress");
@@ -841,8 +728,6 @@
         payload.cumulative = numberValue(payload.cumulative);
         payload.totalPercent = numberValue(payload.totalPercent);
 
-        console.log("[construction-progress] Submitting Activity Wise Progress:", existing?.id ? "UPDATE" : "CREATE", payload);
-
         let response;
         if (existing?.id) {
           response = await WSDP_API.request(
@@ -858,11 +743,8 @@
           );
         }
 
-        console.log("[construction-progress] Activity Wise Progress save response:", response);
-
         const saved = unwrap(response);
         if (!saved?.id) {
-          console.error("[construction-progress] Save response did not contain a row id — treating as failed.", response);
           throw new Error("Server did not confirm the save. Please try again.");
         }
         const list = ensureDashboardArray("activity_progress");
@@ -1667,45 +1549,27 @@
   });
 
   /* =========================================================
-     *** ROOT-CAUSE FIX: "fire now or listen" pattern ***
-     =========================================================
-     Previously, loadDashboard() was ONLY ever triggered by a single
-     "wsdp:authready" event listener. This script is the LAST one loaded
-     on the page (after api.js, i18n.js, shell.js, main.js). If any
-     earlier script checks the session and dispatches "wsdp:authready"
-     SYNCHRONOUSLY during its own execution — a very common pattern —
-     that event fires and is gone forever before this file even reaches
-     the addEventListener("wsdp:authready", ...) line. A CustomEvent
-     dispatched before a listener exists is simply missed; it is never
-     replayed or queued by the browser.
+     Dashboard load trigger — "fire now or listen" pattern.
 
-     The on-page diagnostic bar proved this was happening: it stayed on
-     its initial "loading..." placeholder forever ("Last refresh: -",
-     no error), which is only possible if loadDashboard() was NEVER
-     invoked — not even to fail — since both its success and failure
-     branches always update those fields to a real value.
-
-     This explains every previously reported symptom: dashboardData
-     stayed null forever, renderAll() only ever painted the static
-     FALLBACK_* constants, Add/Edit "worked" (those call the API
-     directly, independent of loadDashboard) but a refresh always
-     re-showed old numbers — because the real data was NEVER being
-     fetched in the first place. It wasn't reverting; it was never
-     loaded to begin with.
-
-     FIX: "fire now or listen". Try to resolve the session/project
-     immediately and synchronously with this script's own execution —
-     do not wait for an event that may already have fired and been
-     missed. ALSO keep listening for "wsdp:authready" in case the
-     session genuinely resolves later. ALSO poll briefly as a final
-     safety net in case neither the immediate check nor the event ever
-     succeeds right away (e.g. async token restore takes a moment). A
-     guard flag ensures the dashboard is only actually loaded once no
-     matter which of these three paths triggers it first.
+     This script loads LAST on the page (after api.js, i18n.js,
+     shell.js, main.js). If an earlier script dispatches
+     "wsdp:authready" synchronously during its own execution, that event
+     can fire and be gone before this file's listener is even attached —
+     a CustomEvent dispatched before a listener exists is never queued
+     or replayed by the browser. To guard against that, this file does
+     NOT rely solely on the event:
+       1. It tries to resolve the session/project and load the
+          dashboard immediately on DOMContentLoaded.
+       2. It also listens for "wsdp:authready" in case the session
+          resolves later.
+       3. It also polls briefly (every 500ms, up to ~10s) as a final
+          safety net in case neither (1) nor (2) succeeds right away.
+     A guard flag ensures the dashboard is only actually loaded once,
+     no matter which path triggers it first.
      ========================================================= */
   let dashboardLoadKicked = false;
 
-  async function kickOffDashboardLoad(source) {
+  async function kickOffDashboardLoad() {
     if (dashboardLoadKicked) {
       return;
     }
@@ -1713,24 +1577,18 @@
     const ready = await ensureSessionAndProject();
 
     if (!ready) {
-      console.warn(`[construction-progress] Session/project not ready yet (trigger: "${source}"). Will retry shortly.`);
       return;
     }
 
     dashboardLoadKicked = true;
-    console.log(`[construction-progress] Session ready — loading dashboard now (triggered by: "${source}")`);
     await loadDashboard();
   }
 
   document.addEventListener("wsdp:authready", function () {
-    console.log("[construction-progress] wsdp:authready event received.");
-    kickOffDashboardLoad("wsdp:authready event");
+    kickOffDashboardLoad();
   });
 
   document.addEventListener("DOMContentLoaded", function () {
-    ensureDiagnosticBar();
-    renderDiagnosticBar({ status: "error", projectId: PROJECT_ID || "resolving...", projectName: "loading...", error: null });
-
     initConstructionDateRangePicker();
 
     renderAll();
@@ -1751,16 +1609,8 @@
       });
     }
 
-    // Covers the case where "wsdp:authready" already fired (dispatched
-    // by an earlier script) before this file's listener above was even
-    // attached. Try immediately rather than waiting on an event that
-    // may never come again.
-    kickOffDashboardLoad("DOMContentLoaded direct check");
+    kickOffDashboardLoad();
 
-    // Final safety net: briefly poll in case the session takes a moment
-    // to hydrate (async token restore, etc.) and neither the immediate
-    // check above nor the event listener has succeeded yet. Stops as
-    // soon as real data loads, or after ~10 seconds.
     let pollAttempts = 0;
     const pollInterval = setInterval(() => {
       pollAttempts++;
@@ -1768,7 +1618,7 @@
         clearInterval(pollInterval);
         return;
       }
-      kickOffDashboardLoad(`poll attempt ${pollAttempts}`);
+      kickOffDashboardLoad();
     }, 500);
   });
 
