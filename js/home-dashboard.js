@@ -10,7 +10,10 @@
       cards, backed by the HomeSummaryCard model /
       homeSummaryCard.routes.js.
    2) "Cashflow" line chart (Planned vs Actual, M AOA) replacing the
-      old "Cumulative Financial Execution" chart.
+      old "Cumulative Financial Execution" chart. The chart's X-axis
+      is capped at the last month for which records exist (see
+      CASHFLOW_LAST_RECORDED_MONTH below) so it never trails off
+      into months with no data.
    3) Functional Import (Excel template -> bulk-updates all summary
       cards) and Export (whole Home Dashboard -> PDF).
    4) Functional module search box: clicking/focusing #globalSearch
@@ -31,6 +34,53 @@
     cashFlow: null,
     cashflowChart: null
   };
+
+  // ---------------------------------------------------------------
+  // Cashflow X-axis cutoff
+  // ---------------------------------------------------------------
+  // Records currently exist only through this month. Update this
+  // single value as more months of actual data become available --
+  // everything else (fallback + live backend data) will follow it
+  // automatically. Format must be "MMM-YY" (matches the `month`
+  // field already used by both FALLBACK_CASH_FLOW and the backend's
+  // /financial-summary cash_flow payload).
+  const CASHFLOW_LAST_RECORDED_MONTH = "Jun-26";
+
+  const MONTH_INDEX = {
+    Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+    Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11
+  };
+
+  // Parses a "MMM-YY" tag (e.g. "Jun-26") into a single comparable
+  // integer (year * 12 + monthIndex). Returns null if the tag can't
+  // be parsed, so unrecognized formats are never silently dropped.
+  function parseMonthTag(tag) {
+    if (!tag) return null;
+    const parts = String(tag).trim().split("-");
+    if (parts.length !== 2) return null;
+
+    const monthIdx = MONTH_INDEX[parts[0]];
+    const year = parseInt(parts[1], 10);
+    if (monthIdx === undefined || isNaN(year)) return null;
+
+    return year * 12 + monthIdx;
+  }
+
+  const CASHFLOW_CUTOFF_VALUE = parseMonthTag(CASHFLOW_LAST_RECORDED_MONTH);
+
+  // Trims a cash_flow array (whether from FALLBACK_CASH_FLOW or the
+  // live backend response) so it never extends past
+  // CASHFLOW_LAST_RECORDED_MONTH. Entries whose month can't be
+  // parsed are kept as-is (fail-safe: never hide data we can't
+  // confidently classify as "future").
+  function trimCashFlowToRecordedRange(cashFlow) {
+    if (!Array.isArray(cashFlow) || CASHFLOW_CUTOFF_VALUE === null) return cashFlow;
+
+    return cashFlow.filter(function (item) {
+      const value = parseMonthTag(item && item.month);
+      return value === null || value <= CASHFLOW_CUTOFF_VALUE;
+    });
+  }
 
   // Keep in sync with backend VALID_CARD_KEYS in homeSummaryCard.validation.js
   const HOME_CARD_META = {
@@ -616,17 +666,17 @@
 
   async function loadCashFlow() {
     if (!state.projectId) {
-      state.cashFlow = FALLBACK_CASH_FLOW;
+      state.cashFlow = trimCashFlowToRecordedRange(FALLBACK_CASH_FLOW);
       return;
     }
 
     try {
       const result = await request("GET", "/projects/" + state.projectId + "/financial-summary");
       const cashFlow = result && result.data && Array.isArray(result.data.cash_flow) ? result.data.cash_flow : null;
-      state.cashFlow = cashFlow && cashFlow.length ? cashFlow : FALLBACK_CASH_FLOW;
+      state.cashFlow = trimCashFlowToRecordedRange(cashFlow && cashFlow.length ? cashFlow : FALLBACK_CASH_FLOW);
     } catch (err) {
       console.error("Failed to load cash flow for Home Dashboard:", err);
-      state.cashFlow = FALLBACK_CASH_FLOW;
+      state.cashFlow = trimCashFlowToRecordedRange(FALLBACK_CASH_FLOW);
     }
   }
 
@@ -634,7 +684,10 @@
     const canvas = document.getElementById("cashflowChart");
     if (!canvas || typeof Chart === "undefined") return;
 
-    const cashFlow = state.cashFlow || FALLBACK_CASH_FLOW;
+    // Trim defensively here too, so the chart is always capped at
+    // CASHFLOW_LAST_RECORDED_MONTH even before loadCashFlow() has run
+    // (e.g. the very first render, which uses FALLBACK_CASH_FLOW).
+    const cashFlow = trimCashFlowToRecordedRange(state.cashFlow || FALLBACK_CASH_FLOW);
 
     const plannedColor = cssVar("--color-success", "#1E8449");
     const actualColor = cssVar("--color-primary", "#0A4595");
