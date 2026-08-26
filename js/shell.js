@@ -128,7 +128,7 @@
           />
         </div>
         <div class="sidebar-brand__text">
-          <div class="name">PDISA-2 LUBANGO</div>
+          <div class="name">WSIDP 2 - Lubango</div>
           <div class="sub"> Contract 44W3/LUBANGO/DNA18</div>
         </div>
       </div>

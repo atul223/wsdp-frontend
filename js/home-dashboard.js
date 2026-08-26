@@ -847,7 +847,7 @@
         }
 
         const dateStr = new Date().toISOString().slice(0, 10);
-        pdf.save("PDISA-2-Lubango-Home-Dashboard-" + dateStr + ".pdf");
+        pdf.save("WSIDP 2 - Lubango-Home-Dashboard-" + dateStr + ".pdf");
 
         toast("Home Dashboard exported to PDF", "fa-file-pdf");
       } catch (err) {
